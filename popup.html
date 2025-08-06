@@ -13,7 +13,6 @@
 
       body {
         width: 380px;
-        min-height: 500px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
           sans-serif;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -21,15 +20,21 @@
       }
 
       .header {
-        padding: 20px;
+        padding: 16px 16px 0 16px;
         text-align: center;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        /* border-bottom: 1px solid rgba(255, 255, 255, 0.1); */
       }
 
       .logo {
         font-size: 24px;
         font-weight: 700;
-        margin-bottom: 8px;
+      }
+
+      .logo-img {
+        height: auto;
+        max-width: 90%;
+        vertical-align: middle;
+        margin-right: 8px;
       }
 
       .tagline {
@@ -38,7 +43,7 @@
       }
 
       .main-controls {
-        padding: 20px;
+        margin: 0 16px 16px 16px;
         text-align: center;
       }
 
@@ -66,6 +71,67 @@
         border-color: #e74c3c;
       }
 
+      .session-status {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 16px;
+        margin: 16px 0;
+        text-align: center;
+      }
+
+      .session-timer {
+        font-size: 28px;
+        font-weight: 700;
+        font-family: "Courier New", monospace;
+        color: #2ecc71;
+        margin: 8px 0 0 0;
+        letter-spacing: 2px;
+      }
+
+      .session-label {
+        font-size: 12px;
+        opacity: 0.8;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin: 16px;
+      }
+
+      .btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-family: inherit;
+        font-weight: 500;
+        transition: all 0.3s ease;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-1px);
+      }
+
+      .btn-danger {
+        background: rgba(231, 76, 60, 0.3);
+      }
+
+      .btn-danger:hover {
+        background: rgba(231, 76, 60, 0.5);
+      }
+
+      #settings {
+        display: none;
+      }
+
       .toggle-btn {
         background: rgba(255, 255, 255, 0.1);
         border: 2px solid rgba(255, 255, 255, 0.3);
@@ -77,7 +143,6 @@
         cursor: pointer;
         transition: all 0.3s ease;
         backdrop-filter: blur(10px);
-        margin-bottom: 1em;
       }
 
       .toggle-btn:hover {
@@ -96,7 +161,7 @@
       }
 
       .section {
-        margin: 20px;
+        margin: 16px;
         background: rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         padding: 16px;
@@ -137,31 +202,6 @@
         color: rgba(255, 255, 255, 0.6);
       }
 
-      .btn {
-        background: rgba(255, 255, 255, 0.2);
-        border: none;
-        color: white;
-        padding: 8px 12px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-        transition: all 0.2s ease;
-      }
-
-      .btn:hover {
-        background: rgba(255, 255, 255, 0.3);
-        transform: translateY(-1px);
-      }
-
-      .btn-danger {
-        background: rgba(231, 76, 60, 0.3);
-      }
-
-      .btn-danger:hover {
-        background: rgba(231, 76, 60, 0.5);
-      }
-
       .rule-item {
         background: rgba(255, 255, 255, 0.1);
         border-radius: 8px;
@@ -192,7 +232,6 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 12px;
-        margin-bottom: 20px;
       }
 
       .stat-card {
@@ -217,7 +256,7 @@
         text-align: center;
         opacity: 0.7;
         font-size: 12px;
-        padding: 20px;
+        padding: 16px;
       }
 
       .scroll-container {
@@ -242,15 +281,23 @@
   </head>
   <body>
     <div class="header">
-      <div class="logo">🎯 Producer</div>
-      <div class="tagline">Focus Mode Extension</div>
+      <div class="logo">
+        <img src="producer-logo.png" alt="Producer logo" class="logo-img" />
+      </div>
     </div>
 
-    <div class="main-controls">
+    <div id="main-controls" class="main-controls">
       <div class="status-indicator" id="statusIndicator">
-        <span id="statusIcon">⏸️</span>
+        <span id="statusIcon">🎯</span>
       </div>
       <button class="toggle-btn" id="toggleBtn">Start Producing</button>
+
+      <div class="session-status">
+        <div class="session-label">
+          <span id="sessionStatusText">Session Inactive</span>
+        </div>
+        <div class="session-timer" id="sessionTimer">00:00:00</div>
+      </div>
 
       <div class="stats">
         <div class="stat-card">
@@ -258,50 +305,65 @@
           <div class="stat-label">Sites Blocked</div>
         </div>
         <div class="stat-card">
-          <div class="stat-number" id="sessionBlocks">0</div>
-          <div class="stat-label">Session Blocks</div>
+          <div class="stat-number" id="sessionBlocks">00h00min</div>
+          <div class="stat-label">Focused Time</div>
         </div>
       </div>
-    </div>
 
-    <div class="section">
-      <div class="section-title">🚫 Add Block Rule</div>
-
-      <div class="input-group">
-        <select id="ruleType">
-          <option selected hidden>Select one option</option>
-          <option value="domain">Block Domain</option>
-          <option value="url">Block Specific URL</option>
-          <option value="allow">Allow Specific URL</option>
-        </select>
-      </div>
-
-      <div class="input-group">
-        <input
-          type="text"
-          id="urlInput"
-          placeholder="e.g., youtube.com or youtube.com/feed/trending"
-        />
-        <button class="btn" id="addRule">Add</button>
-      </div>
-
-      <div style="font-size: 11px; opacity: 0.8; margin-top: 8px">
-        💡 Use "Allow Specific URL" to whitelist pages on blocked domains
+      <div class="controls" style="margin: 16px 0">
+        <button id="settingsBtn" class="btn">⚙️ Settings</button>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-title">
-        📋 Active Rules (<span id="ruleCount">0</span>)
+    <!-- SETTINGS PAGE  -->
+
+    <div id="settings" class="settings">
+      <div class="section">
+        <div class="section-title">🚫 Add Block Rule</div>
+
+        <div class="input-group">
+          <select id="ruleType">
+            <option selected hidden>Select one option</option>
+            <option value="domain">Block Domain</option>
+            <option value="url">Block Specific URL</option>
+            <option value="allow">Allow Specific URL</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <input
+            type="text"
+            id="urlInput"
+            placeholder="e.g., youtube.com or youtube.com/feed/trending"
+          />
+          <button class="btn" id="addRule">Add</button>
+        </div>
+
+        <div style="font-size: 11px; opacity: 0.8; margin-top: 8px">
+          💡 Use "Allow Specific URL" to whitelist pages on blocked domains
+        </div>
       </div>
 
-      <div class="scroll-container">
-        <div id="rulesList">
-          <div class="empty-state">
-            No blocking rules configured yet.<br />
-            Add some rules above to get started!
+      <div class="section">
+        <div class="section-title">
+          📋 Active Rules (<span id="ruleCount">0</span>)
+        </div>
+
+        <div class="scroll-container">
+          <div id="rulesList">
+            <div class="empty-state">
+              No blocking rules configured yet.<br />
+              Add some rules above to get started!
+            </div>
           </div>
         </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-danger" id="clearRulesBtn">
+          Clear All Rules
+        </button>
+        <button class="btn" id="closeSettingsBtn">Close Settings</button>
       </div>
     </div>
 

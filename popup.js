@@ -93,7 +93,7 @@ class ProducerPopup {
     // Update status indicator
     this.statusIndicator.classList.toggle("active", this.isActive);
     this.statusIndicator.classList.toggle("inactive", !this.isActive);
-    this.statusIcon.textContent = this.isActive ? "🎯" : "⏸️";
+    this.statusIcon.textContent = this.isActive ? "⏸️" : "🎯";
 
     // Update stats
     this.blockedCount.textContent = this.rules.length;
@@ -253,6 +253,21 @@ class ProducerPopup {
     }, 3000);
   }
 }
+
+const settingsBtn = document.getElementById("settingsBtn");
+const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+
+const settings = document.getElementById("settings");
+const mainControls = document.getElementById("main-controls");
+
+settingsBtn.addEventListener("click", () => {
+  settings.style.display = "block";
+  mainControls.style.display = "none";
+});
+closeSettingsBtn.addEventListener("click", () => {
+  settings.style.display = "none";
+  mainControls.style.display = "block";
+});
 
 // Initialize popup
 const popup = new ProducerPopup();
