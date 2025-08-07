@@ -22,7 +22,6 @@
       .header {
         padding: 16px 16px 0 16px;
         text-align: center;
-        /* border-bottom: 1px solid rgba(255, 255, 255, 0.1); */
       }
 
       .logo {
@@ -79,11 +78,15 @@
         text-align: center;
       }
 
+      .session-status-text {
+        color: #e74c3c;
+        font-weight: 500;
+      }
+
       .session-timer {
         font-size: 28px;
         font-weight: 700;
         font-family: "Courier New", monospace;
-        color: #2ecc71;
         margin: 8px 0 0 0;
         letter-spacing: 2px;
       }
@@ -294,7 +297,9 @@
 
       <div class="session-status">
         <div class="session-label">
-          <span id="sessionStatusText">Session Inactive</span>
+          <span id="sessionStatusText" class="session-status-text"
+            >Session Inactive</span
+          >
         </div>
         <div class="session-timer" id="sessionTimer">00:00:00</div>
       </div>
@@ -305,7 +310,7 @@
           <div class="stat-label">Sites Blocked</div>
         </div>
         <div class="stat-card">
-          <div class="stat-number" id="sessionBlocks">00h00min</div>
+          <div class="stat-number" id="focusedTime">00h00min</div>
           <div class="stat-label">Focused Time</div>
         </div>
       </div>

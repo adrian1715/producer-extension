@@ -3,6 +3,9 @@ class ProducerPopup {
     this.isActive = false;
     this.rules = [];
     this.sessionBlocks = 0;
+    this.sessionTime = 0; // in seconds
+    this.focusedTime = 0; // in seconds
+    this.timerInterval = null; // Add timer interval property
 
     this.initializeElements();
     this.bindEvents();
@@ -20,6 +23,9 @@ class ProducerPopup {
     this.ruleCount = document.getElementById("ruleCount");
     this.blockedCount = document.getElementById("blockedCount");
     this.sessionBlocksEl = document.getElementById("sessionBlocks");
+    this.sessionStatusText = document.getElementById("sessionStatusText");
+    this.sessionTimerEl = document.getElementById("sessionTimer");
+    this.focusedTimeEl = document.getElementById("focusedTime");
   }
 
   bindEvents() {
@@ -36,13 +42,22 @@ class ProducerPopup {
         "isActive",
         "rules",
         "sessionBlocks",
+        "sessionTime",
+        "focusedTime",
       ]);
 
       this.isActive = data.isActive || false;
       this.rules = data.rules || [];
       this.sessionBlocks = data.sessionBlocks || 0;
+      this.sessionTime = data.sessionTime || 0;
+      this.focusedTime = data.focusedTime || 0;
 
       this.updateUI();
+
+      // If active state was restored, restart the timer
+      if (this.isActive) {
+        this.startTimer();
+      }
     } catch (error) {
       console.error("Failed to load state:", error);
     }
@@ -54,6 +69,8 @@ class ProducerPopup {
         isActive: this.isActive,
         rules: this.rules,
         sessionBlocks: this.sessionBlocks,
+        sessionTime: this.sessionTime,
+        focusedTime: this.focusedTime,
       });
 
       // Notify background script of changes
@@ -72,6 +89,9 @@ class ProducerPopup {
 
     if (this.isActive) {
       this.sessionBlocks = 0;
+      this.startTimer(); // Start timer when focus mode is activated
+    } else {
+      this.stopTimer(); // Stop timer when focus mode is deactivated
     }
 
     await this.saveState();
@@ -97,11 +117,85 @@ class ProducerPopup {
 
     // Update stats
     this.blockedCount.textContent = this.rules.length;
-    this.sessionBlocksEl.textContent = this.sessionBlocks;
+    // this.sessionBlocksEl.textContent = this.sessionBlocks;
     this.ruleCount.textContent = this.rules.length;
 
     // Update rules list
     this.renderRulesList();
+
+    // Update timer display
+    this.updateTimerDisplay();
+
+    // Update session status text
+    this.sessionStatusText.textContent = this.isActive
+      ? "Session Active"
+      : "Session Inactive";
+    this.sessionStatusText.style.color = this.isActive ? "#2ecc71" : "#e74c3c";
+  }
+
+  // initiate timer
+  startTimer() {
+    // Clear any existing timer
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.sessionTime = 0;
+
+    // Reset timer if starting fresh
+    if (!this.isActive || this.focusedTime === 0) this.focusedTime = 0;
+
+    this.updateUI();
+
+    this.timerInterval = setInterval(() => {
+      this.sessionTime++;
+      this.focusedTime++;
+      this.updateTimerDisplay();
+
+      // Save focused time periodically (every minute)
+      if (this.focusedTime % 60 === 0) {
+        this.saveState();
+      }
+    }, 1000);
+  }
+
+  // stop timer
+  stopTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+
+    this.updateUI();
+
+    // Save final state when stopping
+    this.saveState();
+  }
+
+  // update timer display
+  updateTimerDisplay() {
+    if (this.sessionTimerEl && this.focusedTimeEl) {
+      const hours = Math.floor(this.sessionTime / 3600);
+      const minutes = Math.floor((this.sessionTime % 3600) / 60);
+      const seconds = this.sessionTime % 60;
+
+      // Format as HH:MM:SS
+      const sessionTimeString = `${hours.toString().padStart(2, "0")}:${minutes
+        .toString()
+        .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+      const focusedTimeString = `${Math.floor(this.focusedTime / 3600)
+        .toString()
+        .padStart(2, "0")}:${Math.floor((this.focusedTime % 3600) / 60)
+        .toString()
+        .padStart(2, "0")}:${(this.focusedTime % 60)
+        .toString()
+        .padStart(2, "0")}`;
+
+      this.sessionTimerEl.textContent = sessionTimeString;
+      // focusedTime should be the total of all the sessionTimes together
+      this.focusedTimeEl.textContent = focusedTimeString;
+    }
+
+    if (this.sessionTimerEl && !this.isActive)
+      this.sessionTimerEl.textContent = "00:00:00";
   }
 
   addRule() {
@@ -194,6 +288,7 @@ class ProducerPopup {
       const removeBtn = document.createElement("button");
       removeBtn.className = "btn btn-danger";
       removeBtn.textContent = "✕";
+      removeBtn.style.padding = "8px 12px";
       removeBtn.addEventListener("click", () => {
         this.removeRule(rule.id);
       });
@@ -254,6 +349,7 @@ class ProducerPopup {
   }
 }
 
+// to change popup pages
 const settingsBtn = document.getElementById("settingsBtn");
 const closeSettingsBtn = document.getElementById("closeSettingsBtn");
 
