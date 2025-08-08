@@ -42,6 +42,7 @@
       }
 
       .main-controls {
+        height: 392px;
         margin: 0 16px 16px 16px;
         text-align: center;
       }
@@ -105,6 +106,13 @@
         margin: 16px;
       }
 
+      .settings-controls {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 16px;
+      }
+
       .btn {
         background: rgba(255, 255, 255, 0.2);
         border: 2px solid rgba(255, 255, 255, 0.3);
@@ -131,8 +139,29 @@
         background: rgba(231, 76, 60, 0.5);
       }
 
+      .btn-small {
+        background: rgba(231, 76, 60, 0.2);
+        border: 1px solid rgba(231, 76, 60, 0.4);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 11px;
+        font-family: inherit;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(5px);
+      }
+
+      .btn-small:hover {
+        background: rgba(231, 76, 60, 0.4);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+      }
+
       #settings {
         display: none;
+        height: 392px;
       }
 
       .toggle-btn {
@@ -172,6 +201,8 @@
       }
 
       .section-title {
+        justify-content: space-between;
+        display: flex;
         font-size: 14px;
         font-weight: 600;
         margin-bottom: 12px;
@@ -263,7 +294,7 @@
       }
 
       .scroll-container {
-        max-height: 150px;
+        max-height: 75px;
         overflow-y: auto;
       }
 
@@ -335,7 +366,7 @@
           </select>
         </div>
 
-        <div class="input-group">
+        <div class="input-group" style="margin: 0">
           <input
             type="text"
             id="urlInput"
@@ -344,14 +375,18 @@
           <button class="btn" id="addRule">Add</button>
         </div>
 
-        <div style="font-size: 11px; opacity: 0.8; margin-top: 8px">
-          💡 Use "Allow Specific URL" to whitelist pages on blocked domains
-        </div>
+        <!-- <div style="font-size: 11px; opacity: 0.8; margin-top: 4px">
+          💡 Use "Allow Specific URL" to whitelist specific pages
+        </div> -->
       </div>
 
       <div class="section">
         <div class="section-title">
-          📋 Active Rules (<span id="ruleCount">0</span>)
+          <span>📋 Active Rules (<span id="ruleCount">0</span>)</span>
+
+          <button id="clearAllRluesBtn" class="btn-small" style="display: none">
+            Clear all rules
+          </button>
         </div>
 
         <div class="scroll-container">
@@ -364,11 +399,13 @@
         </div>
       </div>
 
-      <div class="controls">
-        <button class="btn btn-danger" id="clearRulesBtn">
-          Clear All Rules
+      <div class="settings-controls">
+        <button class="btn btn-danger" id="clearFocusedTime" style="width: 50%">
+          Clear Focused Time
         </button>
-        <button class="btn" id="closeSettingsBtn">Close Settings</button>
+        <button class="btn" id="closeSettingsBtn" style="width: 50%">
+          Close Settings
+        </button>
       </div>
     </div>
 
