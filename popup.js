@@ -26,6 +26,7 @@ class ProducerPopup {
     this.sessionStatusText = document.getElementById("sessionStatusText");
     this.sessionTimerEl = document.getElementById("sessionTimer");
     this.focusedTimeEl = document.getElementById("focusedTime");
+    this.clearRulesBtn = document.getElementById("clearAllRluesBtn");
   }
 
   bindEvents() {
@@ -34,6 +35,7 @@ class ProducerPopup {
     this.urlInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter") this.addRule();
     });
+    this.clearRulesBtn.addEventListener("click", () => this.clearRules());
   }
 
   async loadState() {
@@ -131,6 +133,13 @@ class ProducerPopup {
       ? "Session Active"
       : "Session Inactive";
     this.sessionStatusText.style.color = this.isActive ? "#2ecc71" : "#e74c3c";
+
+    // Update Clear Rules button visibility
+    if (this.rules.length > 0) {
+      this.clearRulesBtn.style.display = "inline-block";
+    } else {
+      this.clearRulesBtn.style.display = "none";
+    }
   }
 
   // initiate timer
@@ -347,9 +356,24 @@ class ProducerPopup {
       notification.remove();
     }, 3000);
   }
+
+  clearRules() {
+    if (this.rules.length === 0) {
+      this.showNotification("No rules to clear", "error");
+      return;
+    }
+
+    // Confirm before clearing
+    // if (confirm("Are you sure you want to clear all rules?")) {
+    this.rules = [];
+    this.saveState();
+    this.updateUI();
+    this.showNotification("All rules cleared");
+    // }
+  }
 }
 
-// to change popup pages
+// to change popup pages (can be moved to bindEvents)
 const settingsBtn = document.getElementById("settingsBtn");
 const closeSettingsBtn = document.getElementById("closeSettingsBtn");
 
