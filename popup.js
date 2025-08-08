@@ -27,6 +27,10 @@ class ProducerPopup {
     this.sessionTimerEl = document.getElementById("sessionTimer");
     this.focusedTimeEl = document.getElementById("focusedTime");
     this.clearRulesBtn = document.getElementById("clearAllRluesBtn");
+    this.settingsBtn = document.getElementById("settingsBtn");
+    this.closeSettingsBtn = document.getElementById("closeSettingsBtn");
+    this.settingsEl = document.getElementById("settings");
+    this.mainControlsEl = document.getElementById("main-controls");
   }
 
   bindEvents() {
@@ -36,6 +40,14 @@ class ProducerPopup {
       if (e.key === "Enter") this.addRule();
     });
     this.clearRulesBtn.addEventListener("click", () => this.clearRules());
+    this.settingsBtn.addEventListener("click", () => {
+      this.settingsEl.style.display = "block";
+      this.mainControlsEl.style.display = "none";
+    });
+    closeSettingsBtn.addEventListener("click", () => {
+      this.settingsEl.style.display = "none";
+      this.mainControlsEl.style.display = "block";
+    });
   }
 
   async loadState() {
@@ -372,22 +384,6 @@ class ProducerPopup {
     // }
   }
 }
-
-// to change popup pages (can be moved to bindEvents)
-const settingsBtn = document.getElementById("settingsBtn");
-const closeSettingsBtn = document.getElementById("closeSettingsBtn");
-
-const settings = document.getElementById("settings");
-const mainControls = document.getElementById("main-controls");
-
-settingsBtn.addEventListener("click", () => {
-  settings.style.display = "block";
-  mainControls.style.display = "none";
-});
-closeSettingsBtn.addEventListener("click", () => {
-  settings.style.display = "none";
-  mainControls.style.display = "block";
-});
 
 // Initialize popup
 const popup = new ProducerPopup();
