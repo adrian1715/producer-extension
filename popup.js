@@ -5,7 +5,7 @@ class ProducerPopup {
     this.sessionBlocks = 0;
     this.sessionTime = 0; // in seconds
     this.focusedTime = 0; // in seconds
-    this.timerInterval = null; // Add timer interval property
+    this.timerInterval = null;
 
     this.initializeElements();
     this.bindEvents();
@@ -26,6 +26,7 @@ class ProducerPopup {
     this.sessionStatusText = document.getElementById("sessionStatusText");
     this.sessionTimerEl = document.getElementById("sessionTimer");
     this.focusedTimeEl = document.getElementById("focusedTime");
+    this.clearFocusedTimeBtn = document.getElementById("clearFocusedTimeBtn");
     this.clearRulesBtn = document.getElementById("clearAllRluesBtn");
     this.settingsBtn = document.getElementById("settingsBtn");
     this.closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -44,10 +45,13 @@ class ProducerPopup {
       this.settingsEl.style.display = "block";
       this.mainControlsEl.style.display = "none";
     });
-    closeSettingsBtn.addEventListener("click", () => {
+    this.closeSettingsBtn.addEventListener("click", () => {
       this.settingsEl.style.display = "none";
       this.mainControlsEl.style.display = "block";
     });
+    this.clearFocusedTimeBtn.addEventListener("click", () =>
+      this.clearFocusedTime()
+    );
   }
 
   async loadState() {
@@ -346,8 +350,12 @@ class ProducerPopup {
   }
 
   showNotification(message, type = "success") {
+    const existingNotification = document.querySelector(".notification");
+    if (existingNotification) existingNotification.remove();
+
     // Create notification element
     const notification = document.createElement("div");
+    notification.className = "notification";
     notification.style.cssText = `
             position: fixed;
             top: 10px;
@@ -382,6 +390,18 @@ class ProducerPopup {
     this.updateUI();
     this.showNotification("All rules cleared");
     // }
+  }
+
+  clearFocusedTime() {
+    if (this.focusedTime === 0) {
+      this.showNotification("No focused time to clear", "error");
+      return;
+    }
+
+    this.focusedTime = 0;
+    this.saveState();
+    this.updateUI();
+    this.showNotification("Focused time cleared");
   }
 }
 
