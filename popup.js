@@ -26,8 +26,8 @@ class ProducerPopup {
     this.sessionStatusText = document.getElementById("sessionStatusText");
     this.sessionTimerEl = document.getElementById("sessionTimer");
     this.focusedTimeEl = document.getElementById("focusedTime");
-    this.clearFocusedTimeBtn = document.getElementById("clearFocusedTimeBtn");
-    this.clearRulesBtn = document.getElementById("clearAllRluesBtn");
+    this.clearTimersBtn = document.getElementById("clearTimersBtn");
+    this.clearRulesBtn = document.getElementById("clearAllRulesBtn");
     this.settingsBtn = document.getElementById("settingsBtn");
     this.closeSettingsBtn = document.getElementById("closeSettingsBtn");
     this.settingsEl = document.getElementById("settings");
@@ -54,9 +54,7 @@ class ProducerPopup {
       this.settingsEl.style.display = "none";
       this.mainControlsEl.style.display = "block";
     });
-    this.clearFocusedTimeBtn.addEventListener("click", () =>
-      this.clearFocusedTime()
-    );
+    this.clearTimersBtn.addEventListener("click", () => this.clearTimers());
     this.ruleType.addEventListener("change", () => {
       if (this.paramInputsContainer) {
         const isParamRule = this.ruleType.value === "allowParam";
@@ -145,7 +143,7 @@ class ProducerPopup {
         isActive: this.isActive,
         rules: this.rules,
         sessionBlocks: this.sessionBlocks,
-        focusedTime: this.focusedTime,
+        // focusedTime: this.focusedTime,
       });
 
       // Notify background script of changes
@@ -202,7 +200,7 @@ class ProducerPopup {
     this.statusIcon.textContent = this.isActive ? "⏸️" : "🎯";
 
     // Update stats
-    this.blockedCount.textContent = this.rules.length;
+    this.blockedCount.textContent = this.sessionBlocks || 0;
     // this.sessionBlocksEl.textContent = this.sessionBlocks;
     this.ruleCount.textContent = this.rules.length;
 
@@ -211,6 +209,8 @@ class ProducerPopup {
 
     // Update timer display
     this.updateTimerDisplay();
+    // if (this.sessionTime === 0) this.sessionTimerEl.textContent = "00:00:00";
+    // if (this.focusedTime === 0) this.focusedTimeEl.textContent = "00:00:00";
 
     // Update session status text
     this.sessionStatusText.textContent = this.isActive
@@ -253,9 +253,6 @@ class ProducerPopup {
       this.sessionTimerEl.textContent = sessionTimeString;
       this.focusedTimeEl.textContent = focusedTimeString;
     }
-
-    if (this.sessionTimerEl && !this.isActive)
-      this.sessionTimerEl.textContent = "00:00:00";
   }
 
   addRule() {
@@ -421,7 +418,8 @@ class ProducerPopup {
 
   showNotification(message, type = "success") {
     const existingNotification = document.querySelector(".notification");
-    if (existingNotification) existingNotification.remove();
+    if (existingNotification)
+      document.querySelectorAll(".notification").forEach((n) => n.remove());
 
     // Create notification element
     const notification = document.createElement("div");
@@ -462,17 +460,18 @@ class ProducerPopup {
     // }
   }
 
-  async clearFocusedTime() {
-    if (this.focusedTime === 0) {
-      this.showNotification("No focused time to clear", "error");
+  async clearTimers() {
+    if (this.sessionTime === 0 && this.focusedTime === 0) {
+      this.showNotification("No timers to clear", "error");
       return;
     }
 
+    this.sessionTime = 0;
     this.focusedTime = 0;
 
     // Tell background script to clear focused time
     chrome.runtime.sendMessage({
-      action: "clearFocusedTime",
+      action: "clearTimers",
     });
 
     this.saveState();

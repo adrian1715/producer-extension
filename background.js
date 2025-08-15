@@ -4,10 +4,25 @@ class ProducerBackground {
     this.isActive = false;
     this.sessionBlocks = 0;
     this.sessionStartTime = null;
-    this.focusedTime = 0;
+    this.focusedTime = 0; // persisted cumulative total
+    this.focusedTimeBase = 0; // snapshot of cumulative total at session start
     this.timerInterval = null;
 
     this.init();
+  }
+
+  // Helper: single source of truth for both timers
+  getTimes() {
+    const sessionElapsed = this.sessionStartTime
+      ? Math.floor((Date.now() - this.sessionStartTime) / 1000)
+      : 0;
+
+    // If session is running, total focused is base + elapsed; else it's the stored total
+    const totalFocused = this.sessionStartTime
+      ? this.focusedTimeBase + sessionElapsed
+      : this.focusedTime;
+
+    return { sessionElapsed, totalFocused };
   }
 
   async init() {
@@ -40,6 +55,9 @@ class ProducerBackground {
       this.sessionBlocks = data.sessionBlocks || 0;
       this.sessionStartTime = data.sessionStartTime || null;
       this.focusedTime = data.focusedTime || 0;
+
+      // Make the session base reflect the persisted focused total
+      this.focusedTimeBase = this.focusedTime;
     } catch (error) {
       console.error("Failed to load state:", error);
     }
@@ -93,17 +111,32 @@ class ProducerBackground {
         this.stopTimer();
         break;
 
-      case "getTimerState":
-        const currentSessionTime = this.getCurrentSessionTime();
+      case "getTimerState": {
+        const { sessionElapsed, totalFocused } = this.getTimes();
         sendResponse({
-          sessionTime: currentSessionTime,
-          focusedTime: this.focusedTime,
+          sessionTime: sessionElapsed,
+          focusedTime: totalFocused,
         });
         break;
+      }
 
-      case "clearFocusedTime":
+      case "clearTimers":
         this.focusedTime = 0;
+
+        if (this.sessionStartTime) {
+          this.sessionStartTime = Date.now();
+          this.focusedTimeBase = 0;
+        } else {
+          this.focusedTimeBase = 0;
+        }
+
         await this.saveTimerState();
+
+        // Immediately push zeroed values to popup
+        this.notifyPopup("timerUpdate", {
+          sessionTime: 0,
+          focusedTime: 0,
+        });
         break;
 
       case "checkBlock":
@@ -121,29 +154,27 @@ class ProducerBackground {
   }
 
   startTimer() {
-    // Clear any existing timer
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-    }
+    if (this.timerInterval) clearInterval(this.timerInterval);
 
-    // Set session start time
+    // New session starts now. Keep cumulative focused time; just snapshot it as base.
     this.sessionStartTime = Date.now();
+    this.focusedTimeBase = this.focusedTime; // cumulative prior to this session
     this.saveTimerState();
 
-    // Start interval to update focused time and save periodically
     this.timerInterval = setInterval(() => {
-      this.focusedTime++;
+      const { sessionElapsed, totalFocused } = this.getTimes();
 
-      // Save focused time every minute
-      if (this.focusedTime % 60 === 0) {
+      // Push a consistent view to the popup
+      this.notifyPopup("timerUpdate", {
+        sessionTime: sessionElapsed,
+        focusedTime: totalFocused,
+      });
+
+      // Persist cumulative total once per minute
+      if (sessionElapsed > 0 && sessionElapsed % 60 === 0) {
+        this.focusedTime = totalFocused; // roll forward the stored total
         this.saveTimerState();
       }
-
-      // Notify popup if it's open
-      this.notifyPopup("timerUpdate", {
-        sessionTime: this.getCurrentSessionTime(),
-        focusedTime: this.focusedTime,
-      });
     }, 1000);
   }
 
@@ -152,6 +183,10 @@ class ProducerBackground {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+
+    // Finalize the cumulative total for this session
+    const { sessionElapsed, totalFocused } = this.getTimes();
+    this.focusedTime = totalFocused;
 
     this.sessionStartTime = null;
     this.saveTimerState();
@@ -232,12 +267,11 @@ class ProducerBackground {
     switch (rule.type) {
       case "domain":
         // Block entire domain and all subdomains
-        return (
-          checkUrl === ruleUrl ||
-          checkUrl.startsWith(ruleUrl + "/") ||
-          checkUrl.includes("." + ruleUrl) ||
-          checkUrl.includes("//" + ruleUrl)
+        const hostname = new URL("https://" + url).hostname.replace(
+          /^www\./,
+          ""
         );
+        return hostname === ruleUrl || hostname.endsWith("." + ruleUrl);
 
       case "url":
       case "allow":
