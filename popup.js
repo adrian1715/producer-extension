@@ -86,24 +86,56 @@ class ProducerPopup {
         "isActive",
         "rules",
         "sessionBlocks",
-        "sessionTime",
         "focusedTime",
       ]);
 
       this.isActive = data.isActive || false;
       this.rules = data.rules || [];
       this.sessionBlocks = data.sessionBlocks || 0;
-      this.sessionTime = data.sessionTime || 0;
       this.focusedTime = data.focusedTime || 0;
 
-      this.updateUI();
-
-      // If active state was restored, restart the timer
+      // Request current timer state from background script
       if (this.isActive) {
-        this.startTimer();
+        this.requestTimerUpdate();
+        this.startTimerUpdates();
       }
+
+      this.updateUI();
     } catch (error) {
       console.error("Failed to load state:", error);
+    }
+  }
+
+  async requestTimerUpdate() {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: "getTimerState",
+      });
+
+      if (response) {
+        this.sessionTime = response.sessionTime || 0;
+        this.focusedTime = response.focusedTime || 0;
+        this.updateTimerDisplay();
+      }
+    } catch (error) {
+      console.error("Failed to get timer state:", error);
+    }
+  }
+
+  startTimerUpdates() {
+    // Clear any existing interval
+    if (this.timerInterval) clearInterval(this.timerInterval);
+
+    // Update timer display every second by requesting from background
+    this.timerInterval = setInterval(() => {
+      this.requestTimerUpdate();
+    }, 1000);
+  }
+
+  stopTimerUpdates() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
     }
   }
 
@@ -113,7 +145,6 @@ class ProducerPopup {
         isActive: this.isActive,
         rules: this.rules,
         sessionBlocks: this.sessionBlocks,
-        sessionTime: this.sessionTime,
         focusedTime: this.focusedTime,
       });
 
@@ -133,9 +164,20 @@ class ProducerPopup {
 
     if (this.isActive) {
       this.sessionBlocks = 0;
-      this.startTimer(); // Start timer when focus mode is activated
+      this.sessionTime = 0;
+      this.startTimerUpdates();
+
+      // Tell background script to start timer
+      chrome.runtime.sendMessage({
+        action: "startTimer",
+      });
     } else {
-      this.stopTimer(); // Stop timer when focus mode is deactivated
+      this.stopTimerUpdates();
+
+      // Tell background script to stop timer
+      chrome.runtime.sendMessage({
+        action: "stopTimer",
+      });
     }
 
     await this.saveState();
@@ -188,42 +230,6 @@ class ProducerPopup {
     if (this.paramValueInput) this.paramValueInput.value = "";
   }
 
-  // initiate timer
-  startTimer() {
-    // Clear any existing timer
-    if (this.timerInterval) clearInterval(this.timerInterval);
-    this.sessionTime = 0;
-
-    // Reset timer if starting fresh
-    if (!this.isActive || this.focusedTime === 0) this.focusedTime = 0;
-
-    this.updateUI();
-
-    this.timerInterval = setInterval(() => {
-      this.sessionTime++;
-      this.focusedTime++;
-      this.updateTimerDisplay();
-
-      // Save focused time periodically (every minute)
-      if (this.focusedTime % 60 === 0) {
-        this.saveState();
-      }
-    }, 1000);
-  }
-
-  // stop timer
-  stopTimer() {
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-      this.timerInterval = null;
-    }
-
-    this.updateUI();
-
-    // Save final state when stopping
-    this.saveState();
-  }
-
   // update timer display
   updateTimerDisplay() {
     if (this.sessionTimerEl && this.focusedTimeEl) {
@@ -245,7 +251,6 @@ class ProducerPopup {
         .padStart(2, "0")}`;
 
       this.sessionTimerEl.textContent = sessionTimeString;
-      // focusedTime should be the total of all the sessionTimes together
       this.focusedTimeEl.textContent = focusedTimeString;
     }
 
@@ -457,13 +462,19 @@ class ProducerPopup {
     // }
   }
 
-  clearFocusedTime() {
+  async clearFocusedTime() {
     if (this.focusedTime === 0) {
       this.showNotification("No focused time to clear", "error");
       return;
     }
 
     this.focusedTime = 0;
+
+    // Tell background script to clear focused time
+    chrome.runtime.sendMessage({
+      action: "clearFocusedTime",
+    });
+
     this.saveState();
     this.updateUI();
     this.showNotification("Focused time cleared");
@@ -477,8 +488,16 @@ const popup = new ProducerPopup();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "updateBlockCount") {
     popup.sessionBlocks = message.count;
-    popup.sessionBlocksEl.textContent = popup.sessionBlocks;
+    if (popup.sessionBlocksEl) {
+      popup.sessionBlocksEl.textContent = popup.sessionBlocks;
+    }
     chrome.storage.local.set({ sessionBlocks: popup.sessionBlocks });
+  }
+
+  if (message.action === "timerUpdate") {
+    popup.sessionTime = message.sessionTime;
+    popup.focusedTime = message.focusedTime;
+    popup.updateTimerDisplay();
   }
 });
 

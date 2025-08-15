@@ -3,6 +3,9 @@ class ProducerBackground {
     this.rules = [];
     this.isActive = false;
     this.sessionBlocks = 0;
+    this.sessionStartTime = null;
+    this.focusedTime = 0;
+    this.timerInterval = null;
 
     this.init();
   }
@@ -16,6 +19,11 @@ class ProducerBackground {
 
     // Update rules on startup
     this.updateBlockingRules();
+
+    // Restore timer if was active
+    if (this.isActive && this.sessionStartTime) {
+      this.startTimer();
+    }
   }
 
   async loadState() {
@@ -24,12 +32,27 @@ class ProducerBackground {
         "rules",
         "isActive",
         "sessionBlocks",
+        "sessionStartTime",
+        "focusedTime",
       ]);
       this.rules = data.rules || [];
       this.isActive = data.isActive || false;
       this.sessionBlocks = data.sessionBlocks || 0;
+      this.sessionStartTime = data.sessionStartTime || null;
+      this.focusedTime = data.focusedTime || 0;
     } catch (error) {
       console.error("Failed to load state:", error);
+    }
+  }
+
+  async saveTimerState() {
+    try {
+      await chrome.storage.local.set({
+        sessionStartTime: this.sessionStartTime,
+        focusedTime: this.focusedTime,
+      });
+    } catch (error) {
+      console.error("Failed to save timer state:", error);
     }
   }
 
@@ -37,10 +60,7 @@ class ProducerBackground {
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       this.handleMessage(message, sender, sendResponse);
-      if (message.action === "checkBlock") {
-        sendResponse({ shouldBlock: true }); // or false
-        return true; // if you want to send response asynchronously
-      }
+      return true; // Keep message channel open for async responses
     });
 
     // Listen for tab updates to check for blocks
@@ -65,6 +85,27 @@ class ProducerBackground {
         await this.updateBlockingRules();
         break;
 
+      case "startTimer":
+        this.startTimer();
+        break;
+
+      case "stopTimer":
+        this.stopTimer();
+        break;
+
+      case "getTimerState":
+        const currentSessionTime = this.getCurrentSessionTime();
+        sendResponse({
+          sessionTime: currentSessionTime,
+          focusedTime: this.focusedTime,
+        });
+        break;
+
+      case "clearFocusedTime":
+        this.focusedTime = 0;
+        await this.saveTimerState();
+        break;
+
       case "checkBlock":
         const shouldBlock = this.shouldBlockUrl(message.url);
         sendResponse({ shouldBlock });
@@ -77,6 +118,48 @@ class ProducerBackground {
         this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
         break;
     }
+  }
+
+  startTimer() {
+    // Clear any existing timer
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
+
+    // Set session start time
+    this.sessionStartTime = Date.now();
+    this.saveTimerState();
+
+    // Start interval to update focused time and save periodically
+    this.timerInterval = setInterval(() => {
+      this.focusedTime++;
+
+      // Save focused time every minute
+      if (this.focusedTime % 60 === 0) {
+        this.saveTimerState();
+      }
+
+      // Notify popup if it's open
+      this.notifyPopup("timerUpdate", {
+        sessionTime: this.getCurrentSessionTime(),
+        focusedTime: this.focusedTime,
+      });
+    }, 1000);
+  }
+
+  stopTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
+
+    this.sessionStartTime = null;
+    this.saveTimerState();
+  }
+
+  getCurrentSessionTime() {
+    if (!this.sessionStartTime) return 0;
+    return Math.floor((Date.now() - this.sessionStartTime) / 1000);
   }
 
   async checkAndBlockTab(tab) {
