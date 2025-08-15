@@ -363,16 +363,38 @@
             <option value="domain">Block Domain</option>
             <option value="url">Block Specific URL</option>
             <option value="allow">Allow Specific URL</option>
+            <option value="allowParam">Allow Parameter</option>
           </select>
         </div>
 
-        <div class="input-group" style="margin: 0">
+        <div id="urlInputContainer" class="input-group" style="margin: 0">
           <input
             type="text"
             id="urlInput"
             placeholder="e.g., youtube.com or youtube.com/feed/trending"
           />
-          <button class="btn" id="addRule">Add</button>
+          <button id="addRule" class="btn">Add</button>
+        </div>
+
+        <div
+          id="paramInputsContainer"
+          class="input-group"
+          style="margin: 0; display: none"
+        >
+          <input
+            type="text"
+            id="paramKeyInput"
+            placeholder="Key (e.g., list)"
+            style="width: 50%"
+          />
+          <input
+            type="text"
+            id="paramValueInput"
+            placeholder="Value (optional)"
+            style="width: 50%"
+          />
+
+          <button id="addParamRule" class="btn">Add</button>
         </div>
 
         <!-- <div style="font-size: 11px; opacity: 0.8; margin-top: 4px">

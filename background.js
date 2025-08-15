@@ -105,7 +105,7 @@ class ProducerBackground {
 
     const cleanUrl = this.cleanUrl(url);
 
-    // Check allow rules first (they take precedence)
+    // Check regular allow rules first (they take precedence)
     const allowRules = this.rules.filter((rule) => rule.type === "allow");
     for (const rule of allowRules) {
       if (this.matchesRule(cleanUrl, rule)) {
@@ -113,17 +113,33 @@ class ProducerBackground {
       }
     }
 
-    // Check block rules
+    // Check if URL would be blocked by domain/url rules
     const blockRules = this.rules.filter(
       (rule) => rule.type === "domain" || rule.type === "url"
     );
+
+    let wouldBeBlocked = false;
     for (const rule of blockRules) {
       if (this.matchesRule(cleanUrl, rule)) {
-        return true; // Should be blocked
+        wouldBeBlocked = true;
+        break;
       }
     }
 
-    return false;
+    // If URL would be blocked, check for allowParam exceptions
+    if (wouldBeBlocked) {
+      const allowParamRules = this.rules.filter(
+        (rule) => rule.type === "allowParam"
+      );
+      for (const rule of allowParamRules) {
+        if (this.matchesParamRule(url, rule)) {
+          return false; // Allowed by parameter rule
+        }
+      }
+      return true; // Blocked and no parameter exception found
+    }
+
+    return false; // Not blocked
   }
 
   matchesRule(url, rule) {
@@ -147,6 +163,29 @@ class ProducerBackground {
 
       default:
         return false;
+    }
+  }
+
+  matchesParamRule(url, rule) {
+    try {
+      const urlObj = new URL(url);
+      const paramValue = urlObj.searchParams.get(rule.paramKey);
+
+      // Parameter must exist
+      if (paramValue === null) {
+        return false;
+      }
+
+      // If rule has no specific value requirement, any value is allowed
+      if (!rule.paramValue || rule.paramValue === "") {
+        return true;
+      }
+
+      // Check if parameter value matches exactly
+      return paramValue === rule.paramValue;
+    } catch (error) {
+      console.error("Error parsing URL for parameter matching:", error);
+      return false;
     }
   }
 

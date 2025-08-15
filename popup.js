@@ -32,6 +32,11 @@ class ProducerPopup {
     this.closeSettingsBtn = document.getElementById("closeSettingsBtn");
     this.settingsEl = document.getElementById("settings");
     this.mainControlsEl = document.getElementById("main-controls");
+    this.urlInputContainer = document.getElementById("urlInputContainer");
+    this.paramKeyInput = document.getElementById("paramKeyInput");
+    this.paramValueInput = document.getElementById("paramValueInput");
+    this.paramInputsContainer = document.getElementById("paramInputsContainer");
+    this.addParamRuleBtn = document.getElementById("addParamRule");
   }
 
   bindEvents() {
@@ -52,6 +57,27 @@ class ProducerPopup {
     this.clearFocusedTimeBtn.addEventListener("click", () =>
       this.clearFocusedTime()
     );
+    this.ruleType.addEventListener("change", () => {
+      if (this.paramInputsContainer) {
+        const isParamRule = this.ruleType.value === "allowParam";
+        this.paramInputsContainer.style.display = isParamRule ? "flex" : "none";
+        this.urlInputContainer.style.display = isParamRule ? "none" : "flex";
+      }
+      if (this.paramKeyInput) this.paramKeyInput.value = "";
+      if (this.paramValueInput) this.paramValueInput.value = "";
+      if (this.urlInput) this.urlInput.value = "";
+    });
+    this.addParamRuleBtn.addEventListener("click", () => this.addRule());
+    if (this.paramKeyInput) {
+      this.paramKeyInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") this.addRule();
+      });
+    }
+    if (this.paramValueInput) {
+      this.paramValueInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") this.addRule();
+      });
+    }
   }
 
   async loadState() {
@@ -156,6 +182,10 @@ class ProducerPopup {
     } else {
       this.clearRulesBtn.style.display = "none";
     }
+
+    // Clear parameter inputs if they exist
+    if (this.paramKeyInput) this.paramKeyInput.value = "";
+    if (this.paramValueInput) this.paramValueInput.value = "";
   }
 
   // initiate timer
@@ -227,29 +257,52 @@ class ProducerPopup {
     const url = this.urlInput.value.trim();
     const type = this.ruleType.value;
 
-    if (!url) {
-      this.showNotification("Please enter a URL or domain", "error");
+    // Check if a rule type is selected (assuming empty string or 'select' is default)
+    if (!type || type === "Select one option") {
+      this.showNotification("Please select a block rule option", "error");
       return;
     }
 
-    // Verify that a rule type is selected (assuming empty string or 'select' is default)
-    if (!type || type === "Select one option") {
-      this.showNotification("Please select a block rule option", "error");
+    // Check if URL is valid
+    if (
+      (!url || !this.isValidUrl(this.cleanUrl(url))) &&
+      this.ruleType.value !== "allowParam"
+    ) {
+      this.showNotification("Please enter a valid URL or domain", "error");
       return;
     }
 
     // Clean and validate URL
     const cleanUrl = this.cleanUrl(url);
 
-    if (!this.isValidUrl(cleanUrl)) {
-      this.showNotification("Please enter a valid URL or domain", "error");
-      return;
+    // For parameter-based rules, validate parameter inputs
+    let paramKey = "";
+    let paramValue = "";
+    if (type === "allowParam") {
+      if (!this.paramKeyInput || !this.paramValueInput) {
+        this.showNotification("Parameter input fields not found", "error");
+        return;
+      }
+      paramKey = this.paramKeyInput.value.trim();
+      paramValue = this.paramValueInput.value.trim();
+      if (!paramKey) {
+        this.showNotification("Please enter a parameter key", "error");
+        return;
+      }
+      // Parameter value can be empty (to allow any value for the key)
     }
 
     // Check for duplicates
-    const exists = this.rules.some(
-      (rule) => rule.url === cleanUrl && rule.type === type
-    );
+    const exists = this.rules.some((rule) => {
+      if (rule.type === type) {
+        if (type === "allowParam") {
+          return rule.paramKey === paramKey && rule.paramValue === paramValue;
+        } else {
+          return rule.url === cleanUrl;
+        }
+      }
+      return false;
+    });
     if (exists) {
       this.showNotification("This rule already exists", "error");
       return;
@@ -258,10 +311,17 @@ class ProducerPopup {
     // Add rule
     const rule = {
       id: Date.now(),
-      url: cleanUrl,
       type: type,
       created: new Date().toISOString(),
     };
+
+    // Set URL or parameters based on rule type
+    if (type === "allowParam") {
+      rule.paramKey = paramKey;
+      rule.paramValue = paramValue;
+    } else {
+      rule.url = cleanUrl;
+    }
 
     this.rules.push(rule);
     this.urlInput.value = "";
@@ -301,7 +361,11 @@ class ProducerPopup {
 
       const url = document.createElement("div");
       url.className = "rule-url";
-      url.textContent = this.formatUrl(rule.url);
+      if (rule.type !== "allowParam") {
+        url.textContent = this.formatUrl(rule.url);
+      } else {
+        url.textContent = `?${rule.paramKey}=${rule.paramValue || "any"}`;
+      }
 
       const type = document.createElement("div");
       type.className = "rule-type";
@@ -345,6 +409,7 @@ class ProducerPopup {
       domain: "🚫 Block Domain",
       url: "🎯 Block URL",
       allow: "✅ Allow URL",
+      allowParam: "🔗 Allow with Parameter",
     };
     return typeMap[type] || type;
   }
