@@ -33,7 +33,6 @@ class ProducerContentScript {
       });
 
       if (response && response.shouldBlock) {
-        console.log(response);
         this.blockPage();
         return true;
       }
@@ -57,8 +56,6 @@ class ProducerContentScript {
 
   // Intercept all navigation attempts before they happen
   interceptNavigationAttempts() {
-    const self = this;
-
     // Intercept all clicks on links
     document.addEventListener(
       "click",
@@ -96,7 +93,7 @@ class ProducerContentScript {
               e.preventDefault();
               e.stopPropagation();
               e.stopImmediatePropagation();
-              self.blockPage();
+              this.blockPage();
               return false;
             }
           } catch (err) {
@@ -122,7 +119,7 @@ class ProducerContentScript {
             if (response && response.shouldBlock) {
               e.preventDefault();
               e.stopPropagation();
-              self.blockPage();
+              this.blockPage();
               return false;
             }
           } catch (err) {
@@ -142,7 +139,7 @@ class ProducerContentScript {
         if (url) {
           const fullUrl = new URL(url, window.location.href).href;
           // Use debounced check to prevent race conditions
-          setTimeout(() => self.debouncedCheck(fullUrl), 0);
+          setTimeout(() => this.debouncedCheck(fullUrl), 0);
         }
         originalPushState.apply(this, arguments);
         window.dispatchEvent(new Event("producer-urlchange"));
@@ -156,7 +153,7 @@ class ProducerContentScript {
       try {
         if (url) {
           const fullUrl = new URL(url, window.location.href).href;
-          setTimeout(() => self.debouncedCheck(fullUrl), 0);
+          setTimeout(() => this.debouncedCheck(fullUrl), 0);
         }
         originalReplaceState.apply(this, arguments);
         window.dispatchEvent(new Event("producer-urlchange"));
@@ -171,8 +168,6 @@ class ProducerContentScript {
 
   // Intercept additional navigation methods
   interceptAdditionalNavigation() {
-    const self = this;
-
     // Override window.open (this one works reliably)
     const originalOpen = window.open;
     window.open = async function (url, ...args) {
@@ -185,7 +180,7 @@ class ProducerContentScript {
           });
 
           if (response && response.shouldBlock) {
-            self.blockPage();
+            this.blockPage();
             return null;
           }
         } catch (err) {
@@ -379,6 +374,7 @@ class ProducerContentScript {
                         font-weight: 600;
                         color: #2ecc71;
                         margin-bottom: 8px;
+                        white-space: pre;
                     }
                 </style>
             </head>
@@ -416,41 +412,66 @@ class ProducerContentScript {
         window.close();
       });
 
-      // Timer
-      function updateTime() {
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString();
-        const el = document.getElementById("sessionTime");
-        if (el) el.textContent = "Focus Session Active - " + timeStr;
+      // Format time helper function
+      function formatTime(seconds) {
+        if (!seconds || seconds < 0) return "0m";
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = (seconds % 60) + 1;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        else if (minutes > 0) return `${minutes}m ${secs}s`;
+        else return `${secs}s`;
       }
 
-      updateTime();
-      setInterval(updateTime, 1000);
+      // Timer - show focused time instead of local time
+      async function updateFocusedTime() {
+        try {
+          const response = await chrome.runtime.sendMessage({
+            action: "getTimerState",
+          });
+
+          if (response) {
+            const focusedTimeFormatted = formatTime(response.focusedTime);
+            const sessionTimeFormatted = formatTime(response.sessionTime);
+
+            const el = document.getElementById("sessionTime");
+            if (el) {
+              el.textContent = "Focus Session Active\r\n";
+              el.textContent += `Session Time: ${sessionTimeFormatted} | Total Focused: ${focusedTimeFormatted}`;
+            }
+          }
+        } catch (error) {
+          console.error("Error getting timer state:", error);
+          const el = document.getElementById("sessionTime");
+          if (el) el.textContent = "Focus Session Active";
+        }
+      }
+
+      updateFocusedTime();
+      setInterval(updateFocusedTime, 1000);
     }, 100);
   }
 
   observeUrlChanges() {
-    const self = this;
-
     // Listen for popstate, hashchange, and custom urlchange events
     window.addEventListener("popstate", () => {
-      self.debouncedCheck(window.location.href);
+      this.debouncedCheck(window.location.href);
     });
 
     window.addEventListener("hashchange", () => {
-      self.debouncedCheck(window.location.href);
+      this.debouncedCheck(window.location.href);
     });
 
     window.addEventListener("producer-urlchange", () => {
-      self.debouncedCheck(window.location.href);
+      this.debouncedCheck(window.location.href);
     });
 
     // More efficient MutationObserver - only observe significant changes
     const startObserver = () => {
       if (document.body) {
         this.observer = new MutationObserver((mutations) => {
-          if (window.location.href !== self.lastUrl) {
-            self.debouncedCheck(window.location.href);
+          if (window.location.href !== this.lastUrl) {
+            this.debouncedCheck(window.location.href);
           }
         });
 
@@ -467,8 +488,8 @@ class ProducerContentScript {
 
     // Less aggressive polling - 2 seconds instead of 500ms
     this.pollInterval = setInterval(() => {
-      if (window.location.href !== self.lastUrl && !self.isBlocked) {
-        self.debouncedCheck(window.location.href);
+      if (window.location.href !== this.lastUrl && !this.isBlocked) {
+        this.debouncedCheck(window.location.href);
       }
     }, 2000);
   }
