@@ -19,7 +19,7 @@ class ProducerContentScript {
     if (
       this.isBlocked ||
       (url === this.lastUrl &&
-        document.getElementById("producer-claude-block-overlay"))
+        document.getElementById("producer-block-overlay"))
     ) {
       return;
     }
@@ -33,6 +33,7 @@ class ProducerContentScript {
       });
 
       if (response && response.shouldBlock) {
+        console.log(response);
         this.blockPage();
         return true;
       }
@@ -144,7 +145,7 @@ class ProducerContentScript {
           setTimeout(() => self.debouncedCheck(fullUrl), 0);
         }
         originalPushState.apply(this, arguments);
-        window.dispatchEvent(new Event("producer-claude-urlchange"));
+        window.dispatchEvent(new Event("producer-urlchange"));
       } catch (err) {
         // Fallback to original behavior if our override fails
         originalPushState.apply(this, arguments);
@@ -158,7 +159,7 @@ class ProducerContentScript {
           setTimeout(() => self.debouncedCheck(fullUrl), 0);
         }
         originalReplaceState.apply(this, arguments);
-        window.dispatchEvent(new Event("producer-claude-urlchange"));
+        window.dispatchEvent(new Event("producer-urlchange"));
       } catch (err) {
         originalReplaceState.apply(this, arguments);
       }
@@ -172,7 +173,7 @@ class ProducerContentScript {
   interceptAdditionalNavigation() {
     const self = this;
 
-    // Override window.open
+    // Override window.open (this one works reliably)
     const originalOpen = window.open;
     window.open = async function (url, ...args) {
       if (url) {
@@ -193,29 +194,9 @@ class ProducerContentScript {
       }
       return originalOpen.apply(this, arguments);
     };
-
-    // Override location setters
-    const originalLocationAssign = window.location.assign;
-    const originalLocationReplace = window.location.replace;
-
-    window.location.assign = async function (url) {
-      const shouldBlock = await self.checkAndBlock(url);
-      if (!shouldBlock) {
-        originalLocationAssign.call(this, url);
-      }
-    };
-
-    window.location.replace = async function (url) {
-      const shouldBlock = await self.checkAndBlock(url);
-      if (!shouldBlock) {
-        originalLocationReplace.call(this, url);
-      }
-    };
   }
 
-  blockPage() {
-    this.isBlocked = true;
-
+  async blockPage() {
     // Cleanup intervals and timeouts
     this.cleanup();
 
@@ -223,7 +204,7 @@ class ProducerContentScript {
     if (typeof window.stop === "function") window.stop();
 
     // Avoid injecting multiple overlays
-    if (document.getElementById("producer-claude-block-overlay")) return;
+    if (document.getElementById("producer-block-overlay")) return;
 
     // Report the block to background script
     try {
@@ -378,7 +359,7 @@ class ProducerContentScript {
                 </style>
             </head>
             <body>
-                <div class="block-container" id="producer-claude-block-overlay">
+                <div class="block-container" id="producer-block-overlay">
                     <div class="icon">🎯</div>
                     <div class="title">Stay Focused!</div>
                     <div class="message">This site is blocked during your focus session.</div>
@@ -438,7 +419,7 @@ class ProducerContentScript {
       self.debouncedCheck(window.location.href);
     });
 
-    window.addEventListener("producer-claude-urlchange", () => {
+    window.addEventListener("producer-urlchange", () => {
       self.debouncedCheck(window.location.href);
     });
 
