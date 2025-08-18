@@ -32,9 +32,6 @@ class ProducerBackground {
     // Set up listeners
     this.setupListeners();
 
-    // Update rules on startup
-    this.updateBlockingRules();
-
     // Restore timer if was active
     if (this.isActive && this.sessionStartTime) {
       this.startTimer();
@@ -100,7 +97,6 @@ class ProducerBackground {
       case "updateRules":
         this.rules = message.rules;
         this.isActive = message.isActive;
-        await this.updateBlockingRules();
         break;
 
       case "startTimer":
@@ -139,6 +135,13 @@ class ProducerBackground {
         });
         break;
 
+      case "resetSessionBlocks":
+        this.sessionBlocks = 0;
+        chrome.storage.local.set({ sessionBlocks: 0 });
+        // Notify popup of the reset
+        this.notifyPopup("updateBlockCount", { count: 0 });
+        break;
+
       case "checkBlock":
         const shouldBlock = this.shouldBlockUrl(message.url);
         sendResponse({ shouldBlock });
@@ -150,6 +153,20 @@ class ProducerBackground {
         // Notify popup if it's open
         this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
         break;
+
+      case "getMotivationalQuote":
+        this.fetchMotivationalQuote()
+          .then((quote) => {
+            sendResponse({ success: true, quote });
+          })
+          .catch((error) => {
+            console.error("Fetching error: ", error);
+            sendResponse({
+              success: true,
+              quote: "Stay positive and keep pushing forward!",
+            });
+          });
+        return true; // Keep message channel open for async response
     }
   }
 
@@ -318,10 +335,23 @@ class ProducerBackground {
     }
   }
 
-  async updateBlockingRules() {
-    // This method updates the declarative net request rules
-    // For now, we'll handle blocking in content scripts for more flexibility
-    console.log("Updated blocking rules:", this.rules);
+  async fetchMotivationalQuote() {
+    try {
+      const response = await fetch(
+        "https://api.forismatic.com/api/1.0/?method=getQuote&format=json&lang=en"
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.quoteText;
+    } catch (error) {
+      console.error("ERROR: ", error.message);
+    }
+
+    return "Stay positive and keep pushing forward!";
   }
 
   notifyPopup(action, data) {

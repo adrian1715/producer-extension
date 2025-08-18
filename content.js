@@ -194,9 +194,33 @@ class ProducerContentScript {
       }
       return originalOpen.apply(this, arguments);
     };
+
+    // skipped location.assign and location.replace overrides entirely
+  }
+
+  // fetch motivational quote from background script
+  async getMotivationalQuote() {
+    const defaultQuote = "Stay focused and keep pushing forward!";
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: "getMotivationalQuote",
+      });
+
+      if (!response || !response.success) {
+        console.warn("No quote received, using default.");
+        return defaultQuote;
+      }
+
+      return response.quote;
+    } catch (error) {
+      console.error("Error getting motivational quote:", error);
+      return defaultQuote;
+    }
   }
 
   async blockPage() {
+    const phrase = await this.getMotivationalQuote();
+
     // Cleanup intervals and timeouts
     this.cleanup();
 
@@ -365,9 +389,7 @@ class ProducerContentScript {
                     <div class="message">This site is blocked during your focus session.</div>
                     <div class="blocked-url">${window.location.href}</div>
                     
-                    <div class="motivational">
-                        "Success is where preparation and opportunity meet productivity."
-                    </div>
+                    <div class="motivational">${phrase}</div>
                     
                     <div class="stats">
                         <div class="time" id="sessionTime">Focus Session Active</div>
