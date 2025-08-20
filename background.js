@@ -78,13 +78,6 @@ class ProducerBackground {
       return true; // Keep message channel open for async responses
     });
 
-    // Listen for tab updates to check for blocks
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-      if (changeInfo.status === "loading" && tab.url) {
-        this.checkAndBlockTab(tab);
-      }
-    });
-
     // Reset session blocks when extension is restarted
     chrome.runtime.onStartup.addListener(() => {
       this.sessionBlocks = 0;
@@ -212,27 +205,6 @@ class ProducerBackground {
   getCurrentSessionTime() {
     if (!this.sessionStartTime) return 0;
     return Math.floor((Date.now() - this.sessionStartTime) / 1000);
-  }
-
-  async checkAndBlockTab(tab) {
-    if (!this.isActive || !tab.url) return;
-
-    if (this.shouldBlockUrl(tab.url)) {
-      // Inject the blocking content
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: this.injectBlockPage,
-          args: [tab.url],
-        });
-
-        this.sessionBlocks++;
-        chrome.storage.local.set({ sessionBlocks: this.sessionBlocks });
-        this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
-      } catch (error) {
-        console.error("Failed to inject block page:", error);
-      }
-    }
   }
 
   shouldBlockUrl(url) {
@@ -379,105 +351,6 @@ class ProducerBackground {
     chrome.runtime.sendMessage({ action, ...data }).catch(() => {
       // Popup is closed, ignore error
     });
-  }
-
-  // Function to inject into blocked pages
-  injectBlockPage(blockedUrl) {
-    // Only inject if not already blocked
-    if (document.querySelector(".producer-block-page")) return;
-
-    document.documentElement.innerHTML = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Producer - Site Blocked</title>
-                <style>
-                    * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                    }
-                    
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        height: 100vh;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        text-align: center;
-                    }
-                    
-                    .producer-block-page {
-                        max-width: 500px;
-                        padding: 40px;
-                    }
-                    
-                    .icon {
-                        font-size: 80px;
-                        margin-bottom: 20px;
-                    }
-                    
-                    .title {
-                        font-size: 32px;
-                        font-weight: 700;
-                        margin-bottom: 16px;
-                    }
-                    
-                    .message {
-                        font-size: 18px;
-                        opacity: 0.9;
-                        margin-bottom: 8px;
-                    }
-                    
-                    .url {
-                        font-size: 14px;
-                        opacity: 0.7;
-                        background: rgba(255, 255, 255, 0.1);
-                        padding: 8px 16px;
-                        border-radius: 20px;
-                        display: inline-block;
-                        margin: 20px 0;
-                    }
-                    
-                    .motivational {
-                        font-size: 16px;
-                        opacity: 0.8;
-                        font-style: italic;
-                        margin-top: 20px;
-                    }
-                    
-                    .back-btn {
-                        margin-top: 30px;
-                        background: rgba(255, 255, 255, 0.2);
-                        border: none;
-                        color: white;
-                        padding: 12px 24px;
-                        border-radius: 25px;
-                        font-size: 16px;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                    }
-                    
-                    .back-btn:hover {
-                        background: rgba(255, 255, 255, 0.3);
-                        transform: translateY(-2px);
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="producer-block-page">
-                    <div class="icon">🎯</div>
-                    <div class="title">Stay Focused!</div>
-                    <div class="message">This site is blocked during your focus session.</div>
-                    <div class="url">${blockedUrl}</div>
-                    <div class="motivational">"The successful warrior is the average man with laser-like focus."</div>
-                    <button class="back-btn" onclick="history.back()">← Go Back</button>
-                </div>
-            </body>
-            </html>
-        `;
   }
 }
 
