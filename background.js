@@ -291,8 +291,28 @@ class ProducerBackground {
         return hostname === ruleUrl || hostname.endsWith("." + ruleUrl);
 
       case "url":
+        // Block only the specific URL - exact match for base domain or exact path match
+        try {
+          const urlObj = new URL("https://" + checkUrl);
+          const ruleObj = new URL("https://" + ruleUrl);
+
+          // If rule is just a domain (no path or just "/"), only block the exact base domain
+          if (ruleObj.pathname === "/" || ruleObj.pathname === "") {
+            return (
+              urlObj.hostname === ruleObj.hostname &&
+              (urlObj.pathname === "/" || urlObj.pathname === "")
+            );
+          }
+
+          // Otherwise, exact URL match including path
+          return checkUrl === ruleUrl;
+        } catch (error) {
+          // Fallback to simple string comparison if URL parsing fails
+          return checkUrl === ruleUrl;
+        }
+
       case "allow":
-        // Exact URL match or starts with the URL
+        // Allow rules should match the URL and its subpaths
         return checkUrl === ruleUrl || checkUrl.startsWith(ruleUrl);
 
       default:
