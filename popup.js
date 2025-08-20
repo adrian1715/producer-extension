@@ -26,7 +26,7 @@ class ProducerPopup {
     this.sessionStatusText = document.getElementById("sessionStatusText");
     this.sessionTimerEl = document.getElementById("sessionTimer");
     this.focusedTimeEl = document.getElementById("focusedTime");
-    this.clearTimersBtn = document.getElementById("clearTimersBtn");
+    this.clearInfoBtn = document.getElementById("clearInfoBtn");
     this.clearRulesBtn = document.getElementById("clearAllRulesBtn");
     this.settingsBtn = document.getElementById("settingsBtn");
     this.closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -54,7 +54,7 @@ class ProducerPopup {
       this.settingsEl.style.display = "none";
       this.mainControlsEl.style.display = "block";
     });
-    this.clearTimersBtn.addEventListener("click", () => this.clearTimers());
+    this.clearInfoBtn.addEventListener("click", () => this.clearInfo());
     this.ruleType.addEventListener("change", () => {
       if (this.paramInputsContainer) {
         const isParamRule = this.ruleType.value === "allowParam";
@@ -161,7 +161,7 @@ class ProducerPopup {
     this.isActive = !this.isActive;
 
     if (this.isActive) {
-      this.sessionBlocks = 0;
+      // this.sessionBlocks = 0;
       this.sessionTime = 0;
       this.startTimerUpdates();
 
@@ -460,23 +460,33 @@ class ProducerPopup {
     // }
   }
 
-  async clearTimers() {
-    if (this.sessionTime === 0 && this.focusedTime === 0) {
-      this.showNotification("No timers to clear", "error");
+  async clearInfo() {
+    if (
+      this.sessionTime === 0 &&
+      this.focusedTime === 0 &&
+      this.sessionBlocks === 0
+    ) {
+      this.showNotification("No info to clear", "error");
       return;
     }
 
     this.sessionTime = 0;
     this.focusedTime = 0;
+    this.sessionBlocks = 0;
 
-    // Tell background script to clear focused time
+    // Tell background script to clear focused time and reset session blocks
     chrome.runtime.sendMessage({
       action: "clearTimers",
     });
 
+    // Also send message to reset session blocks in background
+    chrome.runtime.sendMessage({
+      action: "resetSessionBlocks",
+    });
+
     this.saveState();
     this.updateUI();
-    this.showNotification("Focused time cleared");
+    this.showNotification("Timers and session blocks cleared");
   }
 }
 
