@@ -137,7 +137,7 @@ class ProducerPopup {
     }
   }
 
-  async saveState() {
+  async saveState(action) {
     try {
       await chrome.storage.local.set({
         isActive: this.isActive,
@@ -152,6 +152,13 @@ class ProducerPopup {
         isActive: this.isActive,
         rules: this.rules,
       });
+
+      // Reload all tabs if rules change OR focus mode is toggle, AND the extension is active
+      if (
+        (this.isActive || action === "toggleProducing") &&
+        action !== "clearInfo"
+      )
+        chrome.runtime.sendMessage({ action: "reloadAllTabs" });
     } catch (error) {
       console.error("Failed to save state:", error);
     }
@@ -178,7 +185,7 @@ class ProducerPopup {
       });
     }
 
-    await this.saveState();
+    this.saveState("toggleProducing");
     this.updateUI();
 
     // Show feedback
@@ -484,7 +491,7 @@ class ProducerPopup {
       action: "resetSessionBlocks",
     });
 
-    this.saveState();
+    this.saveState("clearInfo");
     this.updateUI();
     this.showNotification("Timers and session blocks cleared");
   }

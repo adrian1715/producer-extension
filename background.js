@@ -74,6 +74,21 @@ class ProducerBackground {
   setupListeners() {
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.action === "reloadAllTabs") {
+        chrome.tabs.query({}, (tabs) => {
+          tabs.forEach((tab) => {
+            if (
+              tab.id &&
+              tab.url &&
+              !tab.url.startsWith("chrome://") &&
+              !tab.url.startsWith("chrome-extension://")
+            ) {
+              chrome.tabs.reload(tab.id);
+            }
+          });
+        });
+      }
+
       this.handleMessage(message, sender, sendResponse);
       return true; // Keep message channel open for async responses
     });
