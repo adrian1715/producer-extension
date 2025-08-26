@@ -6,6 +6,7 @@ class ProducerPopup {
     this.sessionTime = 0; // in seconds
     this.focusedTime = 0; // in seconds
     this.timerInterval = null;
+    this.lastTimerUpdate = 0; // Track when we last received a timer update
 
     this.initializeElements();
     this.bindEvents();
@@ -94,6 +95,7 @@ class ProducerPopup {
 
       // Request current timer state from background script
       if (this.isActive) {
+        await this.ensureBackgroundTimerRunning();
         this.requestTimerUpdate();
         this.startTimerUpdates();
       }
@@ -101,6 +103,17 @@ class ProducerPopup {
       this.updateUI();
     } catch (error) {
       console.error("Failed to load state:", error);
+    }
+  }
+
+  async ensureBackgroundTimerRunning() {
+    try {
+      // Send a sync message to ensure background timer is running
+      await chrome.runtime.sendMessage({
+        action: "ensureTimerRunning",
+      });
+    } catch (error) {
+      console.error("Failed to ensure background timer is running:", error);
     }
   }
 
@@ -113,10 +126,16 @@ class ProducerPopup {
       if (response) {
         this.sessionTime = response.sessionTime || 0;
         this.focusedTime = response.focusedTime || 0;
+        this.lastTimerUpdate = Date.now();
         this.updateTimerDisplay();
       }
     } catch (error) {
       console.error("Failed to get timer state:", error);
+      // If we can't get timer state and we think we should be active,
+      // try to restart the background timer
+      if (this.isActive) {
+        this.ensureBackgroundTimerRunning();
+      }
     }
   }
 
@@ -127,6 +146,15 @@ class ProducerPopup {
     // Update timer display every second by requesting from background
     this.timerInterval = setInterval(() => {
       this.requestTimerUpdate();
+
+      // Check if we haven't received updates for too long (5 seconds)
+      // This indicates the background timer might have stopped
+      if (this.isActive && Date.now() - this.lastTimerUpdate > 5000) {
+        console.warn(
+          "Timer updates stopped, attempting to restart background timer"
+        );
+        this.ensureBackgroundTimerRunning();
+      }
     }, 1000);
   }
 
@@ -143,7 +171,7 @@ class ProducerPopup {
         isActive: this.isActive,
         rules: this.rules,
         sessionBlocks: this.sessionBlocks,
-        // focusedTime: this.focusedTime,
+        focusedTime: this.focusedTime,
       });
 
       // Notify background script of changes
@@ -216,8 +244,6 @@ class ProducerPopup {
 
     // Update timer display
     this.updateTimerDisplay();
-    // if (this.sessionTime === 0) this.sessionTimerEl.textContent = "00:00:00";
-    // if (this.focusedTime === 0) this.focusedTimeEl.textContent = "00:00:00";
 
     // Update session status text
     this.sessionStatusText.textContent = this.isActive
@@ -458,13 +484,10 @@ class ProducerPopup {
       return;
     }
 
-    // Confirm before clearing
-    // if (confirm("Are you sure you want to clear all rules?")) {
     this.rules = [];
     this.saveState();
     this.updateUI();
     this.showNotification("All rules cleared");
-    // }
   }
 
   async clearInfo() {
@@ -513,6 +536,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "timerUpdate") {
     popup.sessionTime = message.sessionTime;
     popup.focusedTime = message.focusedTime;
+    popup.lastTimerUpdate = Date.now(); // Track when we received the update
     popup.updateTimerDisplay();
   }
 });

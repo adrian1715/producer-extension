@@ -32,9 +32,9 @@ class ProducerBackground {
     // Set up listeners
     this.setupListeners();
 
-    // Restore timer if was active
-    if (this.isActive && this.sessionStartTime) {
-      this.startTimer();
+    // Restore timer if was active - improved logic
+    if (this.isActive) {
+      this.ensureTimerRunning();
     }
   }
 
@@ -71,6 +71,17 @@ class ProducerBackground {
     }
   }
 
+  ensureTimerRunning() {
+    if (!this.isActive) {
+      this.stopTimer();
+      return;
+    }
+
+    // If we think we should be active but don't have a session start time,
+    // or if we don't have a timer interval running, start it
+    if (!this.sessionStartTime || !this.timerInterval) this.startTimer();
+  }
+
   setupListeners() {
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -98,6 +109,16 @@ class ProducerBackground {
       this.sessionBlocks = 0;
       chrome.storage.local.set({ sessionBlocks: 0 });
     });
+
+    // Handle service worker lifecycle in manifest v3
+    chrome.runtime.onSuspend?.addListener(() => {
+      if (this.isActive && this.sessionStartTime) {
+        // Save current focused time before suspension
+        const { totalFocused } = this.getTimes();
+        this.focusedTime = totalFocused;
+        this.saveTimerState();
+      }
+    });
   }
 
   async handleMessage(message, sender, sendResponse) {
@@ -115,12 +136,18 @@ class ProducerBackground {
         this.stopTimer();
         break;
 
+      case "ensureTimerRunning":
+        this.ensureTimerRunning();
+        sendResponse({ success: true });
+        break;
+
       case "getTimerState": {
         const { sessionElapsed, totalFocused } = this.getTimes();
-        sendResponse({
+        const response = {
           sessionTime: sessionElapsed,
           focusedTime: totalFocused,
-        });
+        };
+        sendResponse(response);
         break;
       }
 
@@ -179,11 +206,21 @@ class ProducerBackground {
   }
 
   startTimer() {
-    if (this.timerInterval) clearInterval(this.timerInterval);
+    // Clear any existing interval first
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
 
-    // New session starts now. Keep cumulative focused time; just snapshot it as base.
-    this.sessionStartTime = Date.now();
-    this.focusedTimeBase = this.focusedTime; // cumulative prior to this session
+    // If we don't have a session start time, create one
+    if (!this.sessionStartTime) {
+      this.sessionStartTime = Date.now();
+      this.focusedTimeBase = this.focusedTime; // cumulative prior to this session
+    } else {
+      // We already have a session start time, just ensure the base is correct
+      this.focusedTimeBase = this.focusedTime;
+    }
+
     this.saveTimerState();
 
     this.timerInterval = setInterval(() => {
