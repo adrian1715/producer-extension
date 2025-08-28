@@ -167,6 +167,8 @@ class ProducerPopup {
 
   async saveState(action) {
     try {
+      const before = await chrome.storage.local.get(["rules", "isActive"]);
+
       await chrome.storage.local.set({
         isActive: this.isActive,
         rules: this.rules,
@@ -174,19 +176,25 @@ class ProducerPopup {
         focusedTime: this.focusedTime,
       });
 
-      // Notify background script of changes
       chrome.runtime.sendMessage({
         action: "updateRules",
         isActive: this.isActive,
         rules: this.rules,
       });
 
-      // Reload all tabs if rules change OR focus mode is toggle, AND the extension is active
+      // Only reload affected tabs
       if (
         (this.isActive || action === "toggleProducing") &&
         action !== "clearInfo"
-      )
-        chrome.runtime.sendMessage({ action: "reloadAllTabs" });
+      ) {
+        chrome.runtime.sendMessage({
+          action: "reloadAffectedTabs",
+          rulesBefore: before.rules || [],
+          rulesAfter: this.rules,
+          isActiveBefore: before.isActive || false,
+          isActiveAfter: this.isActive,
+        });
+      }
     } catch (error) {
       console.error("Failed to save state:", error);
     }

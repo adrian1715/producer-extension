@@ -85,15 +85,34 @@ class ProducerBackground {
   setupListeners() {
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.action === "reloadAllTabs") {
+      if (message.action === "reloadAffectedTabs") {
+        const { rulesBefore, rulesAfter, isActiveBefore, isActiveAfter } =
+          message;
+
         chrome.tabs.query({}, (tabs) => {
           tabs.forEach((tab) => {
             if (
-              tab.id &&
-              tab.url &&
-              !tab.url.startsWith("chrome://") &&
-              !tab.url.startsWith("chrome-extension://")
-            ) {
+              !tab.id ||
+              !tab.url ||
+              tab.url.startsWith("chrome://") ||
+              tab.url.startsWith("chrome-extension://")
+            )
+              return;
+
+            // Check block status before and after
+            const wasBlocked = this.shouldBlockUrlWith(
+              rulesBefore,
+              isActiveBefore,
+              tab.url
+            );
+            const isBlocked = this.shouldBlockUrlWith(
+              rulesAfter,
+              isActiveAfter,
+              tab.url
+            );
+
+            // Reload only if the status changes
+            if (wasBlocked !== isBlocked) {
               chrome.tabs.reload(tab.id);
             }
           });
@@ -299,6 +318,20 @@ class ProducerBackground {
     }
 
     return false; // Not blocked
+  }
+
+  // To check if the URL should be refreshed or not
+  shouldBlockUrlWith(rules, isActive, url) {
+    const oldRules = this.rules;
+    const oldIsActive = this.isActive;
+
+    this.rules = rules;
+    this.isActive = isActive;
+    const result = this.shouldBlockUrl(url);
+
+    this.rules = oldRules;
+    this.isActive = oldIsActive;
+    return result;
   }
 
   matchesRule(url, rule) {
