@@ -131,18 +131,38 @@
         transform: translateY(-1px);
       }
 
+      .btn-primary {
+        background: rgba(52, 152, 219, 0.3);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: rgba(52, 152, 219, 0.5);
+        box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+      }
+
+      .btn-success {
+        background: rgba(46, 204, 113, 0.3);
+        color: white;
+      }
+
+      .btn-success:hover {
+        background: rgba(46, 204, 113, 0.5);
+        box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
+      }
+
       .btn-danger {
         background: rgba(231, 76, 60, 0.3);
+        color: white;
+        /* border: 1px solid rgba(231, 76, 60, 0.4); */
       }
 
       .btn-danger:hover {
         background: rgba(231, 76, 60, 0.5);
+        box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
       }
 
       .btn-small {
-        background: rgba(231, 76, 60, 0.2);
-        border: 1px solid rgba(231, 76, 60, 0.4);
-        color: white;
         padding: 6px 12px;
         border-radius: 6px;
         cursor: pointer;
@@ -153,10 +173,19 @@
         backdrop-filter: blur(5px);
       }
 
-      .btn-small:hover {
-        background: rgba(231, 76, 60, 0.4);
+      .btn-xsmall {
+        padding: 4px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 11px;
+        font-family: inherit;
+        font-weight: 500;
+        transition: all 0.3s ease;
+      }
+
+      .btn-small:hover,
+      .btn-xsmall:hover {
         transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
       }
 
       #settings {
@@ -406,16 +435,83 @@
         <div class="section-title">
           <span>📋 Active Rules (<span id="ruleCount">0</span>)</span>
 
-          <button id="clearAllRulesBtn" class="btn-small" style="display: none">
-            Clear all
-          </button>
+          <div id="rulesOptionBtn">
+            <button
+              id="importRulesBtn"
+              class="btn btn-xsmall btn-primary"
+              title="Import Rules"
+            >
+              <input
+                type="file"
+                id="importFileInput"
+                accept=".txt"
+                style="display: none"
+              />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                fill="currentColor"
+                class="bi bi-download"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"
+                />
+                <path
+                  d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"
+                />
+              </svg>
+            </button>
+            <button
+              id="exportRulesBtn"
+              class="btn btn-xsmall btn-success"
+              title="Export Rules"
+              style="display: none"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                fill="currentColor"
+                class="bi bi-upload"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"
+                />
+                <path
+                  d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"
+                />
+              </svg>
+            </button>
+            <button
+              id="clearRulesBtn"
+              class="btn btn-xsmall btn-danger"
+              title="Clear Rules"
+              style="display: none; padding: 4px 6px"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                fill="currentColor"
+                class="bi bi-trash3"
+                viewBox="0 0 16 16"
+              >
+                <path
+                  d="M6.5 1h3a.5.5 0 0 1 .5.5v1H6v-1a.5.5 0 0 1 .5-.5M11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3A1.5 1.5 0 0 0 5 1.5v1H1.5a.5.5 0 0 0 0 1h.538l.853 10.66A2 2 0 0 0 4.885 16h6.23a2 2 0 0 0 1.994-1.84l.853-10.66h.538a.5.5 0 0 0 0-1zm1.958 1-.846 10.58a1 1 0 0 1-.997.92h-6.23a1 1 0 0 1-.997-.92L3.042 3.5zm-7.487 1a.5.5 0 0 1 .528.47l.5 8.5a.5.5 0 0 1-.998.06L5 5.03a.5.5 0 0 1 .47-.53Zm5.058 0a.5.5 0 0 1 .47.53l-.5 8.5a.5.5 0 1 1-.998-.06l.5-8.5a.5.5 0 0 1 .528-.47M8 4.5a.5.5 0 0 1 .5.5v8.5a.5.5 0 0 1-1 0V5a.5.5 0 0 1 .5-.5"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div class="scroll-container">
           <div id="rulesList">
             <div class="empty-state">
               No blocking rules configured yet.<br />
-              Add some rules above to get started!
+              Add or import some rules to get started!
             </div>
           </div>
         </div>

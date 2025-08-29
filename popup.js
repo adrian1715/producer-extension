@@ -28,7 +28,10 @@ class ProducerPopup {
     this.sessionTimerEl = document.getElementById("sessionTimer");
     this.focusedTimeEl = document.getElementById("focusedTime");
     this.clearInfoBtn = document.getElementById("clearInfoBtn");
-    this.clearRulesBtn = document.getElementById("clearAllRulesBtn");
+    this.exportRulesBtn = document.getElementById("exportRulesBtn");
+    this.importRulesBtn = document.getElementById("importRulesBtn");
+    this.importFileInput = document.getElementById("importFileInput");
+    this.clearRulesBtn = document.getElementById("clearRulesBtn");
     this.settingsBtn = document.getElementById("settingsBtn");
     this.closeSettingsBtn = document.getElementById("closeSettingsBtn");
     this.settingsEl = document.getElementById("settings");
@@ -55,6 +58,15 @@ class ProducerPopup {
       this.settingsEl.style.display = "none";
       this.mainControlsEl.style.display = "block";
     });
+    this.importRulesBtn.addEventListener("click", async () =>
+      this.importFileInput.click()
+    );
+    this.importFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) this.importRules(file);
+      e.target.value = ""; // Reset file input
+    });
+    this.exportRulesBtn.addEventListener("click", () => this.exportRules());
     this.clearInfoBtn.addEventListener("click", () => this.clearInfo());
     this.ruleType.addEventListener("change", () => {
       if (this.paramInputsContainer) {
@@ -165,9 +177,10 @@ class ProducerPopup {
     }
   }
 
-  async saveState(action) {
+  async saveState(action, oldRules) {
     try {
-      const before = await chrome.storage.local.get(["rules", "isActive"]);
+      const before =
+        oldRules || (await chrome.storage.local.get(["rules", "isActive"]));
 
       await chrome.storage.local.set({
         isActive: this.isActive,
@@ -259,11 +272,13 @@ class ProducerPopup {
       : "Session Inactive";
     this.sessionStatusText.style.color = this.isActive ? "#2ecc71" : "#e74c3c";
 
-    // Update Clear Rules button visibility
+    // Update Clear and Export Rules buttons visibility
     if (this.rules.length > 0) {
       this.clearRulesBtn.style.display = "inline-block";
+      this.exportRulesBtn.style.display = "inline-block";
     } else {
       this.clearRulesBtn.style.display = "none";
+      this.exportRulesBtn.style.display = "none";
     }
 
     // Clear parameter inputs if they exist
@@ -389,7 +404,7 @@ class ProducerPopup {
       this.rulesList.innerHTML = `
             <div class="empty-state">
                 No blocking rules configured yet.<br>
-                Add some rules above to get started!
+                Add or import some rules to get started!
             </div>
         `;
       return;
@@ -418,9 +433,10 @@ class ProducerPopup {
       info.appendChild(type);
 
       const removeBtn = document.createElement("button");
-      removeBtn.className = "btn btn-danger";
+      removeBtn.className = "btn btn-xsmall btn-danger";
       removeBtn.textContent = "✕";
-      removeBtn.style.padding = "8px 12px";
+      removeBtn.title = "Delete Rule";
+      // removeBtn.style.padding = "8px 12px";
       removeBtn.addEventListener("click", () => {
         this.removeRule(rule.id);
       });
@@ -484,6 +500,94 @@ class ProducerPopup {
     setTimeout(() => {
       notification.remove();
     }, 3000);
+  }
+
+  async importRules(file) {
+    try {
+      // Read file contents
+      const text = await file.text();
+      const lines = text.split("\n");
+
+      // Parse rules from file
+      const importedRules = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+
+        const [type, ...valueParts] = trimmed.split(" ");
+        const value = valueParts.join(" ").trim();
+
+        if (!type || !value) continue;
+
+        const baseRule = {
+          id: Math.floor(Date.now() * Math.random()),
+          created: new Date().toISOString(),
+          type,
+        };
+
+        // Properly split query parameter rules
+        if (type === "allowParam") {
+          const [param, paramValue = ""] = value.split("=");
+          baseRule.paramKey = param.trim();
+          baseRule.paramValue = paramValue.trim();
+        } else {
+          baseRule.url = this.cleanUrl(value);
+        }
+
+        importedRules.push(baseRule);
+      }
+
+      // Keep a copy of old rules for comparison (to reload affected tabs properly)
+      const oldRules = this.rules.slice();
+
+      // Saving imported rules
+      this.rules = importedRules;
+      await chrome.storage.local.set({ rules: importedRules });
+
+      // Updating popup
+      await this.saveState("import", oldRules); // passing oldRules to compare rules and reload affected tabs properly
+      this.updateUI();
+
+      this.showNotification("Rules imported successfully", "success");
+    } catch (err) {
+      console.error("Failed to import rules:", err);
+    }
+  }
+
+  exportRules() {
+    if (this.rules.length === 0) {
+      this.showNotification("No rules to export", "error");
+      return;
+    }
+
+    chrome.storage.local.get(["rules"], (data) => {
+      const rules = data.rules || [];
+
+      const lines = rules.map(
+        (rule) =>
+          `${rule.type} ${rule.url || rule.paramKey + "=" + rule.paramValue}`
+      );
+
+      const fileContent =
+        "# Producer Rules File\n" +
+        "# Format: RULE_TYPE RULE_VALUE\n" +
+        "# Types: BLOCK_DOMAIN | BLOCK_URL | ALLOW_URL | ALLOW_PARAM\n\n" +
+        lines.join("\n");
+
+      // Create a downloadable Blob
+      const blob = new Blob([fileContent], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+
+      // Trigger download
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "rules.txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      URL.revokeObjectURL(url);
+    });
   }
 
   clearRules() {
