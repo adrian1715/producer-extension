@@ -140,6 +140,7 @@ class ProducerPopup {
         this.focusedTime = response.focusedTime || 0;
         this.lastTimerUpdate = Date.now();
         this.updateTimerDisplay();
+        // this.updateUI(); // to updateUI every second the timer changes
       }
     } catch (error) {
       console.error("Failed to get timer state:", error);
@@ -284,6 +285,19 @@ class ProducerPopup {
     // Clear parameter inputs if they exist
     if (this.paramKeyInput) this.paramKeyInput.value = "";
     if (this.paramValueInput) this.paramValueInput.value = "";
+
+    // Show Clear Info button only when there's info to clear
+    if (
+      this.focusedTime === 0 &&
+      this.sessionTime === 0 &&
+      this.sessionBlocks === 0
+    ) {
+      this.clearInfoBtn.style.display = "none";
+      this.closeSettingsBtn.style.width = "100%";
+    } else {
+      this.clearInfoBtn.style.display = "block";
+      this.closeSettingsBtn.style.width = "85%";
+    }
   }
 
   // update timer display
