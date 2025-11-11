@@ -23,6 +23,8 @@ class ProducerPopup {
     this.rulesList = document.getElementById("rulesList");
     this.ruleCount = document.getElementById("ruleCount");
     this.blockedCount = document.getElementById("blockedCount");
+    this.totalBlockedCountEl = document.getElementById("totalBlockedCount");
+    this.totalFocusedTimeEl = document.getElementById("totalFocusedTime");
     this.sessionBlocksEl = document.getElementById("sessionBlocks");
     this.sessionStatusText = document.getElementById("sessionStatusText");
     this.sessionTimerEl = document.getElementById("sessionTimer");
@@ -32,17 +34,38 @@ class ProducerPopup {
     this.importRulesBtn = document.getElementById("importRulesBtn");
     this.importFileInput = document.getElementById("importFileInput");
     this.clearRulesBtn = document.getElementById("clearRulesBtn");
-    this.settingsBtn = document.getElementById("settingsBtn");
-    this.closeSettingsBtn = document.getElementById("closeSettingsBtn");
-    this.settingsEl = document.getElementById("settings");
-    this.mainControlsEl = document.getElementById("main-controls");
-    this.mainFooter = document.getElementById("main-footer");
-    this.settingsFooter = document.getElementById("settings-footer");
     this.urlInputContainer = document.getElementById("urlInputContainer");
     this.paramKeyInput = document.getElementById("paramKeyInput");
     this.paramValueInput = document.getElementById("paramValueInput");
     this.paramInputsContainer = document.getElementById("paramInputsContainer");
     this.addParamRuleBtn = document.getElementById("addParamRule");
+
+    // Tab elements
+    this.tabBtns = document.querySelectorAll(".tab-btn");
+    this.tabContents = document.querySelectorAll(".tab-content");
+
+    // Personalization elements
+    this.themeOptions = document.querySelectorAll(".theme-option");
+    this.blockPageTitle = document.getElementById("blockPageTitle");
+    this.blockPageMessage = document.getElementById("blockPageMessage");
+    this.previewTitle = document.getElementById("previewTitle");
+    this.previewMessage = document.getElementById("previewMessage");
+    this.savePersonalizationBtn = document.getElementById(
+      "savePersonalizationBtn"
+    );
+    this.resetPersonalizationBtn = document.getElementById(
+      "resetPersonalizationBtn"
+    );
+
+    // Navigation elements for block page settings
+    this.openBlockPageSettingsBtn = document.getElementById(
+      "openBlockPageSettingsBtn"
+    );
+    this.backToThemeBtn = document.getElementById("backToThemeBtn");
+    this.themeMainView = document.getElementById("theme-main-view");
+    this.blockPageSettingsView = document.getElementById(
+      "block-page-settings-view"
+    );
   }
 
   bindEvents() {
@@ -52,18 +75,6 @@ class ProducerPopup {
       if (e.key === "Enter") this.addRule();
     });
     this.clearRulesBtn.addEventListener("click", () => this.clearRules());
-    this.settingsBtn.addEventListener("click", () => {
-      this.settingsEl.style.display = "block";
-      this.mainControlsEl.style.display = "none";
-      this.mainFooter.style.display = "none";
-      this.settingsFooter.style.display = "flex";
-    });
-    this.closeSettingsBtn.addEventListener("click", () => {
-      this.settingsEl.style.display = "none";
-      this.mainControlsEl.style.display = "block";
-      this.mainFooter.style.display = "flex";
-      this.settingsFooter.style.display = "none";
-    });
     this.importRulesBtn.addEventListener("click", async () =>
       this.importFileInput.click()
     );
@@ -95,6 +106,70 @@ class ProducerPopup {
         if (e.key === "Enter") this.addRule();
       });
     }
+
+    // Tab switching
+    this.tabBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetTab = btn.getAttribute("data-tab");
+        this.switchTab(targetTab);
+      });
+    });
+
+    // Personalization events
+    this.themeOptions.forEach((option) => {
+      option.addEventListener("click", () => {
+        this.selectTheme(option.getAttribute("data-theme"));
+      });
+    });
+
+    if (this.blockPageTitle) {
+      this.blockPageTitle.addEventListener("input", () => this.updatePreview());
+    }
+    if (this.blockPageMessage) {
+      this.blockPageMessage.addEventListener("input", () =>
+        this.updatePreview()
+      );
+    }
+    if (this.savePersonalizationBtn) {
+      this.savePersonalizationBtn.addEventListener("click", () =>
+        this.savePersonalization()
+      );
+    }
+    if (this.resetPersonalizationBtn) {
+      this.resetPersonalizationBtn.addEventListener("click", () =>
+        this.resetPersonalization()
+      );
+    }
+
+    // Block page settings navigation
+    if (this.openBlockPageSettingsBtn) {
+      this.openBlockPageSettingsBtn.addEventListener("click", () =>
+        this.showBlockPageSettings()
+      );
+    }
+    if (this.backToThemeBtn) {
+      this.backToThemeBtn.addEventListener("click", () =>
+        this.showThemeMainView()
+      );
+    }
+  }
+
+  switchTab(tabName) {
+    // Remove active class from all tabs and contents
+    this.tabBtns.forEach((btn) => btn.classList.remove("active"));
+    this.tabContents.forEach((content) => content.classList.remove("active"));
+
+    // Add active class to selected tab and content
+    const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
+    const activeContent = document.getElementById(`tab-${tabName}`);
+
+    if (activeBtn) activeBtn.classList.add("active");
+    if (activeContent) activeContent.classList.add("active");
+
+    // If switching to personalize tab, always show main theme view
+    if (tabName === "personalize") {
+      this.showThemeMainView();
+    }
   }
 
   async loadState() {
@@ -104,12 +179,26 @@ class ProducerPopup {
         "rules",
         "sessionBlocks",
         "focusedTime",
+        "theme",
+        "blockPageTitle",
+        "blockPageMessage",
       ]);
 
       this.isActive = data.isActive || false;
       this.rules = data.rules || [];
       this.sessionBlocks = data.sessionBlocks || 0;
       this.focusedTime = data.focusedTime || 0;
+
+      // Load personalization settings
+      this.currentTheme = data.theme || "blue";
+      this.currentBlockPageTitle = data.blockPageTitle || "🎯 Stay Focused!";
+      this.currentBlockPageMessage =
+        data.blockPageMessage ||
+        "This site is blocked during your focus session.";
+
+      // Apply loaded personalization
+      this.applyTheme(this.currentTheme);
+      this.loadPersonalizationUI();
 
       // Request current timer state from background script
       if (this.isActive) {
@@ -262,10 +351,30 @@ class ProducerPopup {
     this.statusIndicator.classList.toggle("inactive", !this.isActive);
     this.statusIcon.textContent = this.isActive ? "⏸️" : "🎯";
 
-    // Update stats
+    // Update stats in home tab
     this.blockedCount.textContent = this.sessionBlocks || 0;
-    // this.sessionBlocksEl.textContent = this.sessionBlocks;
     this.ruleCount.textContent = this.rules.length;
+
+    // Update focused time in home tab
+    if (this.focusedTimeEl) {
+      const hours = Math.floor(this.focusedTime / 3600);
+      const minutes = Math.floor((this.focusedTime % 3600) / 60);
+      this.focusedTimeEl.textContent = `${hours
+        .toString()
+        .padStart(2, "0")}h${minutes.toString().padStart(2, "0")}m`;
+    }
+
+    // Update stats in stats tab
+    if (this.totalBlockedCountEl) {
+      this.totalBlockedCountEl.textContent = this.sessionBlocks || 0;
+    }
+    if (this.totalFocusedTimeEl) {
+      const hours = Math.floor(this.focusedTime / 3600);
+      const minutes = Math.floor((this.focusedTime % 3600) / 60);
+      this.totalFocusedTimeEl.textContent = `${hours
+        .toString()
+        .padStart(2, "0")}h${minutes.toString().padStart(2, "0")}m`;
+    }
 
     // Update rules list
     this.renderRulesList();
@@ -307,14 +416,17 @@ class ProducerPopup {
 
       const focusedTimeString = `${Math.floor(this.focusedTime / 3600)
         .toString()
-        .padStart(2, "0")}:${Math.floor((this.focusedTime % 3600) / 60)
+        .padStart(2, "0")}h${Math.floor((this.focusedTime % 3600) / 60)
         .toString()
-        .padStart(2, "0")}:${(this.focusedTime % 60)
-        .toString()
-        .padStart(2, "0")}`;
+        .padStart(2, "0")}m`;
 
       this.sessionTimerEl.textContent = sessionTimeString;
       this.focusedTimeEl.textContent = focusedTimeString;
+
+      // Also update stats tab if element exists
+      if (this.totalFocusedTimeEl) {
+        this.totalFocusedTimeEl.textContent = focusedTimeString;
+      }
     }
   }
 
@@ -636,6 +748,153 @@ class ProducerPopup {
     this.saveState("clearInfo");
     this.updateUI();
     this.showNotification("Timers and session blocks cleared");
+  }
+
+  // Personalization methods
+  async selectTheme(theme) {
+    this.currentTheme = theme;
+
+    // Update active state on theme options
+    this.themeOptions.forEach((option) => {
+      if (option.getAttribute("data-theme") === theme) {
+        option.classList.add("active");
+      } else {
+        option.classList.remove("active");
+      }
+    });
+
+    // If theme is already applied, do nothing and display a message
+    if (document.body.classList.contains(`theme-${theme}`)) {
+      this.showNotification(`Theme ${theme} is already applied!`, "error");
+      return;
+    }
+
+    // Apply theme immediately
+    this.applyTheme(theme);
+
+    // Auto-save theme to storage
+    try {
+      await chrome.storage.local.set({ theme });
+
+      // Send message to background script to update block page theme
+      chrome.runtime.sendMessage({
+        action: "updatePersonalization",
+        theme,
+        blockPageTitle: this.currentBlockPageTitle,
+        blockPageMessage: this.currentBlockPageMessage,
+      });
+
+      this.showNotification(`Theme changed to ${theme}!`);
+    } catch (error) {
+      console.error("Failed to save theme:", error);
+      this.showNotification("Failed to save theme", "error");
+    }
+  }
+
+  applyTheme(theme) {
+    // Remove all theme classes
+    document.body.className = document.body.className
+      .split(" ")
+      .filter((c) => !c.startsWith("theme-"))
+      .join(" ");
+
+    // Add new theme class
+    document.body.classList.add(`theme-${theme}`);
+  }
+
+  loadPersonalizationUI() {
+    // Set input values
+    if (this.blockPageTitle) {
+      this.blockPageTitle.value = this.currentBlockPageTitle;
+    }
+    if (this.blockPageMessage) {
+      this.blockPageMessage.value = this.currentBlockPageMessage;
+    }
+
+    // Update preview
+    this.updatePreview();
+
+    // Set active theme option
+    this.themeOptions.forEach((option) => {
+      if (option.getAttribute("data-theme") === this.currentTheme) {
+        option.classList.add("active");
+      } else {
+        option.classList.remove("active");
+      }
+    });
+  }
+
+  updatePreview() {
+    if (this.previewTitle && this.blockPageTitle) {
+      this.previewTitle.textContent =
+        this.blockPageTitle.value || "🎯 Stay Focused!";
+    }
+    if (this.previewMessage && this.blockPageMessage) {
+      this.previewMessage.textContent =
+        this.blockPageMessage.value ||
+        "This site is blocked during your focus session.";
+    }
+  }
+
+  async savePersonalization() {
+    try {
+      const blockPageTitle = this.blockPageTitle?.value || "🎯 Stay Focused!";
+      const blockPageMessage =
+        this.blockPageMessage?.value ||
+        "This site is blocked during your focus session.";
+
+      // Save to storage
+      await chrome.storage.local.set({
+        blockPageTitle,
+        blockPageMessage,
+      });
+
+      // Update current values
+      this.currentBlockPageTitle = blockPageTitle;
+      this.currentBlockPageMessage = blockPageMessage;
+
+      // Send message to background script to update block page
+      chrome.runtime.sendMessage({
+        action: "updatePersonalization",
+        theme: this.currentTheme,
+        blockPageTitle,
+        blockPageMessage,
+      });
+
+      this.showNotification("Block page settings saved!");
+    } catch (error) {
+      console.error("Failed to save block page settings:", error);
+      this.showNotification("Failed to save settings", "error");
+    }
+  }
+
+  resetPersonalization() {
+    // Reset to defaults
+    this.currentTheme = "blue";
+    this.currentBlockPageTitle = "🎯 Stay Focused!";
+    this.currentBlockPageMessage =
+      "This site is blocked during your focus session.";
+
+    // Update UI
+    this.applyTheme(this.currentTheme);
+    this.loadPersonalizationUI();
+
+    this.showNotification("Reset to default settings");
+  }
+
+  // Navigation methods for block page settings
+  showBlockPageSettings() {
+    if (this.themeMainView && this.blockPageSettingsView) {
+      this.themeMainView.style.display = "none";
+      this.blockPageSettingsView.style.display = "block";
+    }
+  }
+
+  showThemeMainView() {
+    if (this.themeMainView && this.blockPageSettingsView) {
+      this.themeMainView.style.display = "block";
+      this.blockPageSettingsView.style.display = "none";
+    }
   }
 }
 
