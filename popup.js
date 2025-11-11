@@ -36,6 +36,8 @@ class ProducerPopup {
     this.closeSettingsBtn = document.getElementById("closeSettingsBtn");
     this.settingsEl = document.getElementById("settings");
     this.mainControlsEl = document.getElementById("main-controls");
+    this.mainFooter = document.getElementById("main-footer");
+    this.settingsFooter = document.getElementById("settings-footer");
     this.urlInputContainer = document.getElementById("urlInputContainer");
     this.paramKeyInput = document.getElementById("paramKeyInput");
     this.paramValueInput = document.getElementById("paramValueInput");
@@ -53,10 +55,14 @@ class ProducerPopup {
     this.settingsBtn.addEventListener("click", () => {
       this.settingsEl.style.display = "block";
       this.mainControlsEl.style.display = "none";
+      this.mainFooter.style.display = "none";
+      this.settingsFooter.style.display = "flex";
     });
     this.closeSettingsBtn.addEventListener("click", () => {
       this.settingsEl.style.display = "none";
       this.mainControlsEl.style.display = "block";
+      this.mainFooter.style.display = "flex";
+      this.settingsFooter.style.display = "none";
     });
     this.importRulesBtn.addEventListener("click", async () =>
       this.importFileInput.click()
@@ -285,19 +291,6 @@ class ProducerPopup {
     // Clear parameter inputs if they exist
     if (this.paramKeyInput) this.paramKeyInput.value = "";
     if (this.paramValueInput) this.paramValueInput.value = "";
-
-    // Show Clear Info button only when there's info to clear
-    if (
-      this.focusedTime === 0 &&
-      this.sessionTime === 0 &&
-      this.sessionBlocks === 0
-    ) {
-      this.clearInfoBtn.style.display = "none";
-      this.closeSettingsBtn.style.width = "100%";
-    } else {
-      this.clearInfoBtn.style.display = "block";
-      this.closeSettingsBtn.style.width = "85%";
-    }
   }
 
   // update timer display

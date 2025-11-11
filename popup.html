@@ -11,29 +11,33 @@
         box-sizing: border-box;
       }
 
+      html {
+        width: 412px;
+        height: 522px !important;
+      }
+
       body {
-        width: 380px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
           sans-serif;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
+        padding: 16px;
+      }
+
+      .page {
+        height: 330px !important;
+        /* overflow-y: auto; */
       }
 
       .header {
-        padding: 16px 16px 0 16px;
+        margin-bottom: 16px;
         text-align: center;
-      }
-
-      .logo {
-        font-size: 24px;
-        font-weight: 700;
       }
 
       .logo-img {
         height: auto;
         max-width: 90%;
         vertical-align: middle;
-        margin-right: 8px;
       }
 
       .tagline {
@@ -42,10 +46,7 @@
       }
 
       .main-controls {
-        height: 392px;
         text-align: center;
-        margin: 0 16px 16px 16px;
-        /* padding-top: 11px; */
       }
 
       .status-indicator {
@@ -100,20 +101,27 @@
         letter-spacing: 1px;
       }
 
-      .controls {
-        display: flex;
-        flex-direction: column;
-        /* justify-content: space-between; */
-        /* gap: 8px; */
-        margin: 16px 0;
+      .footer {
+        height: 34px !important;
+        margin-top: 16px;
       }
 
-      .settings-controls {
+      .main-footer {
+        display: flex;
+        justify-content: space-between;
+        /* flex-direction: column; */
+        /* gap: 8px; */
+      }
+      .main-footer div {
+        gap: 4px;
+      }
+
+      .settings-footer {
         display: flex;
         /* flex-direction: column; */
         justify-content: space-between;
         gap: 8px;
-        margin: 16px;
+        /* margin: 16px; */
       }
 
       .btn {
@@ -196,7 +204,10 @@
 
       #settings {
         display: none;
-        height: 392px;
+      }
+
+      #settings .section:first-child {
+        margin-top: 0;
       }
 
       .toggle-btn {
@@ -228,7 +239,7 @@
       }
 
       .section {
-        margin: 16px;
+        margin: 16px 0;
         background: rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         padding: 16px;
@@ -329,7 +340,7 @@
       }
 
       .scroll-container {
-        max-height: 75px;
+        max-height: 86px;
         overflow-y: auto;
       }
 
@@ -346,6 +357,11 @@
         background: rgba(255, 255, 255, 0.3);
         border-radius: 2px;
       }
+
+      .flex-row {
+        display: flex;
+        gap: 6px;
+      }
     </style>
     <link
       rel="stylesheet"
@@ -354,12 +370,10 @@
   </head>
   <body>
     <div class="header">
-      <div class="logo">
-        <img src="producer-logo.png" alt="Producer logo" class="logo-img" />
-      </div>
+      <img src="producer-logo.png" alt="Producer logo" class="logo-img" />
     </div>
 
-    <div id="main-controls" class="main-controls">
+    <div id="main-controls" class="main-controls page">
       <div class="status-indicator" id="statusIndicator">
         <span id="statusIcon">🎯</span>
       </div>
@@ -384,17 +398,11 @@
           <div class="stat-label">Focused Time</div>
         </div>
       </div>
-
-      <div class="controls">
-        <button id="settingsBtn" class="btn">
-          Settings <i class="bi bi-gear-fill" style="margin-left: 4px"></i>
-        </button>
-      </div>
     </div>
 
     <!-- SETTINGS PAGE  -->
 
-    <div id="settings" class="settings">
+    <div id="settings" class="settings page">
       <div class="section">
         <div class="section-title">🚫 Add Block Rule</div>
 
@@ -443,7 +451,7 @@
         </div> -->
       </div>
 
-      <div class="section" style="height: 145px">
+      <div class="section" style="height: 160px">
         <div class="section-title">
           <span>📋 Active Rules (<span id="ruleCount">0</span>)</span>
 
@@ -489,18 +497,51 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="settings-controls">
-        <button id="closeSettingsBtn" class="btn" style="width: 85%">
-          Back to Menu
-        </button>
+    <div id="footer" class="footer">
+      <div id="main-footer" class="main-footer">
+        <div>
+          <button class="btn btn-small" title="Analytics">
+            <i class="bi bi-bar-chart"></i>
+          </button>
+          <button id="sessionsBtn" class="btn btn-small" title="Sessions">
+            <i class="bi bi-journal-text"></i>
+          </button>
+        </div>
+        <div class="flex-row" style="width: 50%">
+          <select name="projects" id="projectsBtn" class="btn btn-small">
+            <option value="" disabled selected hidden>Project Mode</option>
+            <option value="">Study</option>
+            <option value="">Work</option>
+            <option value="">Create new</option>
+          </select>
+          <!-- <button class="btn btn-xsmall" title="New project">
+            <i class="bi bi-plus"></i>
+          </button> -->
+        </div>
+        <div style="display: flex">
+          <button id="clearInfoBtn" class="btn btn-small" title="Clear Info">
+            <i class="bi bi-stars"></i>
+          </button>
+          <button id="settingsBtn" class="btn btn-small" title="Settings">
+            <i class="bi bi-gear-fill"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="settings-footer" class="settings-footer" style="display: none">
         <button
-          id="clearInfoBtn"
-          class="btn btn-small btn-danger"
-          title="Clear Info"
-          style="width: 15%"
+          type="button"
+          id="saveSettingsBtn"
+          class="btn btn-small"
+          style="width: 50%"
+          disabled
         >
-          <i class="bi bi-stars"></i>
+          <i class="bi bi-check2"></i> Save Changes
+        </button>
+        <button id="closeSettingsBtn" class="btn btn-small" style="width: 50%">
+          <i class="bi bi-house" style="margin-right: 3px"></i> Back to Menu
         </button>
       </div>
     </div>
