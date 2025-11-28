@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Producer - Focus Extension",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Dynamically block distracting websites and URLs to boost your productivity",
   "web_accessible_resources": [
     {

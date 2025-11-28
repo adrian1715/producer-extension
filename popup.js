@@ -1,7 +1,12 @@
 class ProducerPopup {
   constructor() {
     this.isActive = false;
-    this.rules = [];
+    this.customRules = []; // Array of rule sets
+    this.activeRuleSetId = null; // ID of currently active rule set
+    this.currentEditingRuleSetId = null; // ID of rule set being edited
+    this.isCreatingNewRuleSet = false; // Flag to track if we're creating a new rule set
+    this.tempRuleSet = null; // Temporary rule set for unsaved changes
+    this.sessionHistory = []; // Array of completed sessions
     this.sessionBlocks = 0;
     this.sessionTime = 0; // in seconds
     this.focusedTime = 0; // in seconds
@@ -39,6 +44,26 @@ class ProducerPopup {
     this.paramValueInput = document.getElementById("paramValueInput");
     this.paramInputsContainer = document.getElementById("paramInputsContainer");
     this.addParamRuleBtn = document.getElementById("addParamRule");
+
+    // Custom rule sets elements
+    this.createRuleSetBtn = document.getElementById("createRuleSetBtn");
+    this.ruleSetsList = document.getElementById("ruleSetsList");
+    this.activeRuleSetSelect = document.getElementById("activeRuleSetSelect");
+    this.rulesMainView = document.getElementById("rules-main-view");
+    this.rulesEditView = document.getElementById("rules-edit-view");
+    this.backToRuleSetListBtn = document.getElementById("backToRuleSetListBtn");
+    this.ruleSetNameInput = document.getElementById("ruleSetNameInput");
+    this.ruleSetNameSection = document.getElementById("ruleSetNameSection");
+    this.saveRuleSetBtn = document.getElementById("saveRuleSetBtn");
+    this.cancelRuleSetBtn = document.getElementById("cancelRuleSetBtn");
+    this.ruleSetActionButtons = document.getElementById("ruleSetActionButtons");
+    this.ruleSetEditTitle = document.getElementById("ruleSetEditTitle");
+
+    // Sessions elements
+    this.sessionsList = document.getElementById("sessionsList");
+    this.clearSessionsBtn = document.getElementById("clearSessionsBtn");
+    this.totalSessionsCount = document.getElementById("totalSessionsCount");
+    this.avgSessionDuration = document.getElementById("avgSessionDuration");
 
     // Tab elements
     this.tabBtns = document.querySelectorAll(".tab-btn");
@@ -152,9 +177,48 @@ class ProducerPopup {
         this.showThemeMainView()
       );
     }
+
+    // Custom rule sets events
+    if (this.createRuleSetBtn) {
+      this.createRuleSetBtn.addEventListener("click", () =>
+        this.startCreatingRuleSet()
+      );
+    }
+    if (this.saveRuleSetBtn) {
+      this.saveRuleSetBtn.addEventListener("click", () =>
+        this.saveNewRuleSet()
+      );
+    }
+    if (this.cancelRuleSetBtn) {
+      this.cancelRuleSetBtn.addEventListener("click", () =>
+        this.cancelRuleSetCreation()
+      );
+    }
+    if (this.backToRuleSetListBtn) {
+      this.backToRuleSetListBtn.addEventListener("click", () =>
+        this.showRulesMainView()
+      );
+    }
+    if (this.activeRuleSetSelect) {
+      this.activeRuleSetSelect.addEventListener("change", () =>
+        this.selectActiveRuleSet()
+      );
+    }
+
+    // Sessions events
+    if (this.clearSessionsBtn) {
+      this.clearSessionsBtn.addEventListener("click", () =>
+        this.clearSessions()
+      );
+    }
   }
 
   switchTab(tabName) {
+    // If switching away from rules tab and there are unsaved changes, discard them
+    if (tabName !== "rules" && this.isCreatingNewRuleSet) {
+      this.cancelRuleSetCreation();
+    }
+
     // Remove active class from all tabs and contents
     this.tabBtns.forEach((btn) => btn.classList.remove("active"));
     this.tabContents.forEach((content) => content.classList.remove("active"));
@@ -170,13 +234,21 @@ class ProducerPopup {
     if (tabName === "personalize") {
       this.showThemeMainView();
     }
+
+    // If switching to rules tab, always show main view (list of rule sets)
+    if (tabName === "rules") {
+      this.showRulesMainView();
+    }
   }
 
   async loadState() {
     try {
       const data = await chrome.storage.local.get([
         "isActive",
-        "rules",
+        "rules", // Old format for migration
+        "customRules",
+        "activeRuleSetId",
+        "sessionHistory",
         "sessionBlocks",
         "focusedTime",
         "theme",
@@ -184,8 +256,31 @@ class ProducerPopup {
         "blockPageMessage",
       ]);
 
+      // Data migration: Convert old rules to custom rules structure
+      if (!data.customRules && data.rules && data.rules.length > 0) {
+        // Migrate old rules to a default rule set
+        const defaultRuleSet = {
+          id: "default-" + Date.now(),
+          name: "Default",
+          rules: data.rules,
+        };
+        this.customRules = [defaultRuleSet];
+        this.activeRuleSetId = defaultRuleSet.id;
+
+        // Save migrated data
+        await chrome.storage.local.set({
+          customRules: this.customRules,
+          activeRuleSetId: this.activeRuleSetId,
+        });
+
+        console.log("Migrated old rules to custom rules structure");
+      } else {
+        this.customRules = data.customRules || [];
+        this.activeRuleSetId = data.activeRuleSetId || null;
+      }
+
+      this.sessionHistory = data.sessionHistory || [];
       this.isActive = data.isActive || false;
-      this.rules = data.rules || [];
       this.sessionBlocks = data.sessionBlocks || 0;
       this.focusedTime = data.focusedTime || 0;
 
@@ -273,22 +368,32 @@ class ProducerPopup {
     }
   }
 
-  async saveState(action, oldRules) {
+  async saveState(action, oldData) {
     try {
       const before =
-        oldRules || (await chrome.storage.local.get(["rules", "isActive"]));
+        oldData ||
+        (await chrome.storage.local.get([
+          "customRules",
+          "activeRuleSetId",
+          "isActive",
+        ]));
 
       await chrome.storage.local.set({
         isActive: this.isActive,
-        rules: this.rules,
+        customRules: this.customRules,
+        activeRuleSetId: this.activeRuleSetId,
+        sessionHistory: this.sessionHistory,
         sessionBlocks: this.sessionBlocks,
         focusedTime: this.focusedTime,
       });
 
+      // Get active rule set's rules
+      const activeRules = this.getActiveRules();
+
       chrome.runtime.sendMessage({
         action: "updateRules",
         isActive: this.isActive,
-        rules: this.rules,
+        rules: activeRules,
       });
 
       // Only reload affected tabs
@@ -296,10 +401,14 @@ class ProducerPopup {
         (this.isActive || action === "toggleProducing") &&
         action !== "clearInfo"
       ) {
+        const beforeRules = this.getRulesFromData(
+          before.customRules,
+          before.activeRuleSetId
+        );
         chrome.runtime.sendMessage({
           action: "reloadAffectedTabs",
-          rulesBefore: before.rules || [],
-          rulesAfter: this.rules,
+          rulesBefore: beforeRules,
+          rulesAfter: activeRules,
           isActiveBefore: before.isActive || false,
           isActiveAfter: this.isActive,
         });
@@ -310,11 +419,13 @@ class ProducerPopup {
   }
 
   async toggleProducing() {
+    const wasActive = this.isActive;
     this.isActive = !this.isActive;
 
     if (this.isActive) {
-      // this.sessionBlocks = 0;
+      // Starting a new session
       this.sessionTime = 0;
+      this.sessionStartTime = Date.now(); // Track start time for session history
       this.startTimerUpdates();
 
       // Tell background script to start timer
@@ -322,7 +433,26 @@ class ProducerPopup {
         action: "startTimer",
       });
     } else {
+      // Stopping session
       this.stopTimerUpdates();
+
+      // Save session to history
+      if (wasActive && this.sessionStartTime) {
+        const activeRuleSet = this.customRules.find(
+          (rs) => rs.id === this.activeRuleSetId
+        );
+        const session = {
+          id: "session-" + Date.now(),
+          startTime: this.sessionStartTime,
+          endTime: Date.now(),
+          duration: this.sessionTime, // in seconds
+          blocksCount: this.sessionBlocks,
+          ruleSetId: this.activeRuleSetId,
+          ruleSetName: activeRuleSet ? activeRuleSet.name : "Unknown",
+        };
+        this.sessionHistory.unshift(session); // Add to beginning of array
+        this.sessionStartTime = null;
+      }
 
       // Tell background script to stop timer
       chrome.runtime.sendMessage({
@@ -353,7 +483,6 @@ class ProducerPopup {
 
     // Update stats in home tab
     this.blockedCount.textContent = this.sessionBlocks || 0;
-    this.ruleCount.textContent = this.rules.length;
 
     // Update focused time in home tab
     if (this.focusedTimeEl) {
@@ -376,8 +505,17 @@ class ProducerPopup {
         .padStart(2, "0")}h${minutes.toString().padStart(2, "0")}m`;
     }
 
-    // Update rules list
-    this.renderRulesList();
+    // Update rule sets list and active dropdown
+    this.renderRuleSetsList();
+    this.renderActiveRuleSetDropdown();
+
+    // Update rules list (if in edit view)
+    if (this.currentEditingRuleSetId) {
+      this.renderRulesList();
+    }
+
+    // Update session history
+    this.renderSessionHistory();
 
     // Update timer display
     this.updateTimerDisplay();
@@ -387,15 +525,6 @@ class ProducerPopup {
       ? "Session Active"
       : "Session Inactive";
     this.sessionStatusText.style.color = this.isActive ? "#2ecc71" : "#e74c3c";
-
-    // Update Clear and Export Rules buttons visibility
-    if (this.rules.length > 0) {
-      this.clearRulesBtn.style.display = "inline-block";
-      this.exportRulesBtn.style.display = "inline-block";
-    } else {
-      this.clearRulesBtn.style.display = "none";
-      this.exportRulesBtn.style.display = "none";
-    }
 
     // Clear parameter inputs if they exist
     if (this.paramKeyInput) this.paramKeyInput.value = "";
@@ -431,10 +560,15 @@ class ProducerPopup {
   }
 
   addRule() {
+    if (!this.currentEditingRuleSetId) {
+      this.showNotification("No rule set selected", "error");
+      return;
+    }
+
     const url = this.urlInput.value.trim();
     const type = this.ruleType.value;
 
-    // Check if a rule type is selected (assuming empty string or 'select' is default)
+    // Check if a rule type is selected
     if (!type || type === "Select one option") {
       this.showNotification("Please select a block rule option", "error");
       return;
@@ -466,11 +600,25 @@ class ProducerPopup {
         this.showNotification("Please enter a parameter key", "error");
         return;
       }
-      // Parameter value can be empty (to allow any value for the key)
+    }
+
+    // Find the rule set (from temp if creating, otherwise from custom rules)
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customRules.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet) {
+      this.showNotification("Rule set not found", "error");
+      return;
     }
 
     // Check for duplicates
-    const exists = this.rules.some((rule) => {
+    const exists = ruleSet.rules.some((rule) => {
       if (rule.type === type) {
         if (type === "allowParam") {
           return rule.paramKey === paramKey && rule.paramValue === paramValue;
@@ -500,18 +648,39 @@ class ProducerPopup {
       rule.url = cleanUrl;
     }
 
-    this.rules.push(rule);
+    ruleSet.rules.push(rule);
     this.urlInput.value = "";
 
-    this.saveState();
+    // Only save state if not creating (temp changes don't get saved until confirmation)
+    if (!this.isCreatingNewRuleSet) {
+      this.saveState();
+    }
     this.updateUI();
 
     this.showNotification("Rule added successfully!");
   }
 
   removeRule(ruleId) {
-    this.rules = this.rules.filter((rule) => rule.id !== ruleId);
-    this.saveState();
+    if (!this.currentEditingRuleSetId) return;
+
+    // Find the rule set (from temp if creating, otherwise from custom rules)
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customRules.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet) return;
+
+    ruleSet.rules = ruleSet.rules.filter((rule) => rule.id !== ruleId);
+
+    // Only save state if not creating (temp changes don't get saved until confirmation)
+    if (!this.isCreatingNewRuleSet) {
+      this.saveState();
+    }
     this.updateUI();
     this.showNotification("Rule removed");
   }
@@ -519,17 +688,61 @@ class ProducerPopup {
   renderRulesList() {
     this.rulesList.innerHTML = "";
 
-    if (this.rules.length === 0) {
+    if (!this.currentEditingRuleSetId) {
       this.rulesList.innerHTML = `
-            <div class="empty-state">
-                No blocking rules configured yet.<br>
-                Add or import some rules to get started!
-            </div>
-        `;
+        <div class="empty-state">
+          No rule set selected.<br>
+          Select a rule set to edit.
+        </div>
+      `;
       return;
     }
 
-    this.rules.forEach((rule) => {
+    // Get rule set from temp if creating, otherwise from custom rules
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customRules.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet) {
+      this.rulesList.innerHTML = `
+        <div class="empty-state">
+          Rule set not found.
+        </div>
+      `;
+      return;
+    }
+
+    // Update rule count
+    if (this.ruleCount) {
+      this.ruleCount.textContent = ruleSet.rules.length;
+    }
+
+    // Update export/clear/import button visibility
+    if (ruleSet.rules.length > 0) {
+      if (this.clearRulesBtn) this.clearRulesBtn.style.display = "inline-block";
+      if (this.exportRulesBtn)
+        this.exportRulesBtn.style.display = "inline-block";
+    } else {
+      if (this.clearRulesBtn) this.clearRulesBtn.style.display = "none";
+      if (this.exportRulesBtn) this.exportRulesBtn.style.display = "none";
+    }
+
+    if (ruleSet.rules.length === 0) {
+      this.rulesList.innerHTML = `
+        <div class="empty-state">
+          No blocking rules configured yet.<br>
+          Add or import some rules to get started!
+        </div>
+      `;
+      return;
+    }
+
+    ruleSet.rules.forEach((rule) => {
       const item = document.createElement("div");
       item.className = "rule-item";
 
@@ -555,7 +768,6 @@ class ProducerPopup {
       removeBtn.className = "btn btn-xsmall btn-danger";
       removeBtn.textContent = "✕";
       removeBtn.title = "Delete Rule";
-      // removeBtn.style.padding = "8px 12px";
       removeBtn.addEventListener("click", () => {
         this.removeRule(rule.id);
       });
@@ -622,6 +834,11 @@ class ProducerPopup {
   }
 
   async importRules(file) {
+    if (!this.currentEditingRuleSetId) {
+      this.showNotification("No rule set selected", "error");
+      return;
+    }
+
     try {
       // Read file contents
       const text = await file.text();
@@ -656,67 +873,110 @@ class ProducerPopup {
         importedRules.push(baseRule);
       }
 
-      // Keep a copy of old rules for comparison (to reload affected tabs properly)
-      const oldRules = this.rules.slice();
+      // Find the rule set and update its rules (from temp if creating)
+      let ruleSet;
+      if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+        ruleSet = this.tempRuleSet;
+      } else {
+        ruleSet = this.customRules.find(
+          (rs) => rs.id === this.currentEditingRuleSetId
+        );
+      }
 
-      // Saving imported rules
-      this.rules = importedRules;
-      await chrome.storage.local.set({ rules: importedRules });
+      if (!ruleSet) {
+        this.showNotification("Rule set not found", "error");
+        return;
+      }
 
-      // Updating popup
-      await this.saveState("import", oldRules); // passing oldRules to compare rules and reload affected tabs properly
+      ruleSet.rules = importedRules;
+
+      // Only save state if not creating (temp changes don't get saved until confirmation)
+      if (!this.isCreatingNewRuleSet) {
+        await this.saveState("import");
+      }
       this.updateUI();
 
       this.showNotification("Rules imported successfully", "success");
     } catch (err) {
       console.error("Failed to import rules:", err);
+      this.showNotification("Failed to import rules", "error");
     }
   }
 
   exportRules() {
-    if (this.rules.length === 0) {
+    if (!this.currentEditingRuleSetId) {
+      this.showNotification("No rule set selected", "error");
+      return;
+    }
+
+    // Find the rule set (from temp if creating)
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customRules.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet || ruleSet.rules.length === 0) {
       this.showNotification("No rules to export", "error");
       return;
     }
 
-    chrome.storage.local.get(["rules"], (data) => {
-      const rules = data.rules || [];
+    const lines = ruleSet.rules.map(
+      (rule) =>
+        `${rule.type} ${rule.url || rule.paramKey + "=" + rule.paramValue}`
+    );
 
-      const lines = rules.map(
-        (rule) =>
-          `${rule.type} ${rule.url || rule.paramKey + "=" + rule.paramValue}`
-      );
+    const fileContent =
+      "# Producer Rules File\n" +
+      "# Format: RULE_TYPE RULE_VALUE\n" +
+      "# Types: domain | url | allow | allowParam\n\n" +
+      lines.join("\n");
 
-      const fileContent =
-        "# Producer Rules File\n" +
-        "# Format: RULE_TYPE RULE_VALUE\n" +
-        "# Types: BLOCK_DOMAIN | BLOCK_URL | ALLOW_URL | ALLOW_PARAM\n\n" +
-        lines.join("\n");
+    // Create a downloadable Blob
+    const blob = new Blob([fileContent], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
 
-      // Create a downloadable Blob
-      const blob = new Blob([fileContent], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
+    // Trigger download
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${ruleSet.name.replace(/[^a-z0-9]/gi, "_")}_rules.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 
-      // Trigger download
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "rules.txt";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      URL.revokeObjectURL(url);
-    });
+    URL.revokeObjectURL(url);
   }
 
   clearRules() {
-    if (this.rules.length === 0) {
+    if (!this.currentEditingRuleSetId) {
+      this.showNotification("No rule set selected", "error");
+      return;
+    }
+
+    // Find the rule set (from temp if creating)
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customRules.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet || ruleSet.rules.length === 0) {
       this.showNotification("No rules to clear", "error");
       return;
     }
 
-    this.rules = [];
-    this.saveState();
+    ruleSet.rules = [];
+
+    // Only save state if not creating (temp changes don't get saved until confirmation)
+    if (!this.isCreatingNewRuleSet) {
+      this.saveState();
+    }
     this.updateUI();
     this.showNotification("All rules cleared");
   }
@@ -748,6 +1008,450 @@ class ProducerPopup {
     this.saveState("clearInfo");
     this.updateUI();
     this.showNotification("Timers and session blocks cleared");
+  }
+
+  // Helper methods
+  getActiveRules() {
+    if (!this.activeRuleSetId) return [];
+    const ruleSet = this.customRules.find(
+      (rs) => rs.id === this.activeRuleSetId
+    );
+    return ruleSet ? ruleSet.rules : [];
+  }
+
+  getRulesFromData(customRules, activeRuleSetId) {
+    if (!activeRuleSetId || !customRules) return [];
+    const ruleSet = customRules.find((rs) => rs.id === activeRuleSetId);
+    return ruleSet ? ruleSet.rules : [];
+  }
+
+  // Custom rule set management methods
+  clearAllInputs() {
+    // Clear rule set name
+    if (this.ruleSetNameInput) this.ruleSetNameInput.value = "";
+
+    // Clear URL input
+    if (this.urlInput) this.urlInput.value = "";
+
+    // Reset rule type dropdown to default
+    if (this.ruleType) this.ruleType.selectedIndex = 0;
+
+    // Clear parameter inputs
+    if (this.paramKeyInput) this.paramKeyInput.value = "";
+    if (this.paramValueInput) this.paramValueInput.value = "";
+
+    // Reset the visibility of param inputs container (hide it)
+    if (this.paramInputsContainer) {
+      this.paramInputsContainer.style.display = "none";
+    }
+    if (this.urlInputContainer) {
+      this.urlInputContainer.style.display = "flex";
+    }
+  }
+
+  startCreatingRuleSet() {
+    // Create a temporary rule set
+    this.tempRuleSet = {
+      id: "temp-" + Date.now(),
+      name: "",
+      rules: [],
+    };
+    this.isCreatingNewRuleSet = true;
+    this.currentEditingRuleSetId = this.tempRuleSet.id;
+
+    // Show edit view with save/cancel buttons (inputs will be cleared automatically)
+    this.showRulesEditView();
+
+    // Focus on name input
+    if (this.ruleSetNameInput) {
+      setTimeout(() => this.ruleSetNameInput.focus(), 100);
+    }
+  }
+
+  saveNewRuleSet() {
+    if (!this.tempRuleSet || !this.ruleSetNameInput) {
+      this.showNotification("Configure a custom rule to save", "error");
+      return;
+    }
+
+    const name = this.ruleSetNameInput.value.trim();
+    if (!name) {
+      this.showNotification("Please enter a name for the rule set", "error");
+      return;
+    }
+
+    // Update temp rule set name
+    this.tempRuleSet.name = name;
+
+    // Generate proper ID
+    this.tempRuleSet.id = "ruleset-" + Date.now();
+
+    // Add to custom rules
+    this.customRules.push(this.tempRuleSet);
+
+    // Clear temporary state
+    this.tempRuleSet = null;
+    this.isCreatingNewRuleSet = false;
+    this.currentEditingRuleSetId = null;
+
+    // Save and update UI
+    this.saveState();
+    this.updateUI();
+
+    // Show success message and return to main view
+    this.showNotification("Custom rules saved successfully!");
+    this.showRulesMainView();
+  }
+
+  cancelRuleSetCreation() {
+    // Discard temporary rule set
+    this.tempRuleSet = null;
+    this.isCreatingNewRuleSet = false;
+    this.currentEditingRuleSetId = null;
+
+    // Return to main view
+    this.showRulesMainView();
+  }
+
+  deleteRuleSet(id) {
+    const ruleSet = this.customRules.find((rs) => rs.id === id);
+    if (!ruleSet) return;
+
+    const confirmDelete = confirm(
+      `Delete rule set "${ruleSet.name}"?\n\nThis will permanently delete ${ruleSet.rules.length} rules.`
+    );
+    if (!confirmDelete) return;
+
+    // If deleting the active rule set, clear active selection
+    if (this.activeRuleSetId === id) {
+      this.activeRuleSetId = null;
+    }
+
+    this.customRules = this.customRules.filter((rs) => rs.id !== id);
+    this.saveState();
+    this.updateUI();
+    this.showNotification("Rule set deleted");
+  }
+
+  editRuleSet(id) {
+    this.currentEditingRuleSetId = id;
+    this.showRulesEditView();
+
+    // Populate name after inputs are cleared
+    const ruleSet = this.customRules.find((rs) => rs.id === id);
+    if (ruleSet && this.ruleSetNameInput) {
+      this.ruleSetNameInput.value = ruleSet.name;
+    }
+  }
+
+  saveRuleSetName() {
+    if (!this.currentEditingRuleSetId || !this.ruleSetNameInput) return;
+
+    const newName = this.ruleSetNameInput.value.trim();
+    if (!newName) {
+      this.showNotification("Please enter a name", "error");
+      return;
+    }
+
+    const ruleSet = this.customRules.find(
+      (rs) => rs.id === this.currentEditingRuleSetId
+    );
+    if (!ruleSet) return;
+
+    ruleSet.name = newName;
+    this.saveState();
+    this.updateUI();
+    this.showNotification("Name saved!");
+  }
+
+  selectActiveRuleSet() {
+    if (!this.activeRuleSetSelect) return;
+
+    const selectedId = this.activeRuleSetSelect.value;
+    this.activeRuleSetId = selectedId || null;
+    this.saveState();
+    this.showNotification(
+      selectedId ? "Active rule set changed!" : "No rule set active"
+    );
+  }
+
+  showRulesMainView() {
+    if (this.rulesMainView) this.rulesMainView.style.display = "block";
+    if (this.rulesEditView) this.rulesEditView.style.display = "none";
+    this.currentEditingRuleSetId = null;
+    this.isCreatingNewRuleSet = false;
+    this.tempRuleSet = null;
+  }
+
+  showRulesEditView() {
+    // Clear all inputs first to ensure clean state
+    this.clearAllInputs();
+
+    if (this.rulesMainView) this.rulesMainView.style.display = "none";
+    if (this.rulesEditView) this.rulesEditView.style.display = "block";
+
+    // Show/hide name section and appropriate buttons based on whether we're creating or editing
+    if (this.isCreatingNewRuleSet) {
+      // Show name section when creating
+      if (this.ruleSetNameSection) {
+        this.ruleSetNameSection.style.display = "block";
+      }
+      // Show save/cancel buttons, hide back button
+      if (this.ruleSetActionButtons) {
+        this.ruleSetActionButtons.style.display = "flex";
+      }
+      if (this.backToRuleSetListBtn) {
+        this.backToRuleSetListBtn.style.display = "none";
+      }
+    } else {
+      // Hide name section when editing
+      if (this.ruleSetNameSection) {
+        this.ruleSetNameSection.style.display = "none";
+      }
+      // Hide save/cancel buttons, show back button
+      if (this.ruleSetActionButtons) {
+        this.ruleSetActionButtons.style.display = "none";
+      }
+      if (this.backToRuleSetListBtn) {
+        this.backToRuleSetListBtn.style.display = "block";
+      }
+    }
+
+    this.updateUI();
+  }
+
+  renderRuleSetsList() {
+    if (!this.ruleSetsList) return;
+
+    this.ruleSetsList.innerHTML = "";
+
+    if (this.customRules.length === 0) {
+      this.ruleSetsList.innerHTML = `
+        <div class="empty-state">
+          No custom rule sets yet.<br />
+          Create one to get started!
+        </div>
+      `;
+      return;
+    }
+
+    this.customRules.forEach((ruleSet) => {
+      const item = document.createElement("div");
+      item.className = "rule-set-item";
+
+      const info = document.createElement("div");
+      info.className = "rule-set-info";
+
+      const name = document.createElement("div");
+      name.className = "rule-set-name";
+      name.textContent = ruleSet.name;
+
+      // Add double-click to edit name
+      name.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "rule-set-name-input";
+        input.value = ruleSet.name;
+        input.style.width = "100%";
+        input.style.fontSize = "inherit";
+        input.style.fontWeight = "inherit";
+        input.style.padding = "4px";
+        input.style.border = "1px solid #ccc";
+        input.style.borderRadius = "4px";
+
+        const saveEdit = () => {
+          const newName = input.value.trim();
+          if (newName && newName !== ruleSet.name) {
+            ruleSet.name = newName;
+            this.saveState();
+            this.updateUI();
+            this.showNotification("Name updated!");
+          } else if (!newName) {
+            this.showNotification("Name cannot be empty", "error");
+          }
+          name.textContent = ruleSet.name;
+          name.style.display = "";
+          input.remove();
+        };
+
+        const cancelEdit = () => {
+          name.textContent = ruleSet.name;
+          name.style.display = "";
+          input.remove();
+        };
+
+        input.addEventListener("blur", saveEdit);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            input.blur();
+          } else if (e.key === "Escape") {
+            cancelEdit();
+          }
+        });
+
+        name.style.display = "none";
+        name.parentNode.insertBefore(input, name);
+        input.focus();
+        input.select();
+      });
+
+      const details = document.createElement("div");
+      details.className = "rule-set-details";
+      details.textContent = `${ruleSet.rules.length} rule${
+        ruleSet.rules.length !== 1 ? "s" : ""
+      }`;
+
+      info.appendChild(name);
+      info.appendChild(details);
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn btn-xsmall btn-secondary";
+      editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
+      editBtn.title = "Edit Rules";
+      editBtn.style.margin = "0 4px";
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.editRuleSet(ruleSet.id);
+      });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "btn btn-xsmall btn-danger";
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      deleteBtn.title = "Delete Rules";
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.deleteRuleSet(ruleSet.id);
+      });
+
+      item.appendChild(info);
+      item.appendChild(editBtn);
+      item.appendChild(deleteBtn);
+      this.ruleSetsList.appendChild(item);
+    });
+  }
+
+  renderActiveRuleSetDropdown() {
+    if (!this.activeRuleSetSelect) return;
+
+    // Save current selection
+    const currentValue = this.activeRuleSetSelect.value;
+
+    // Clear and repopulate
+    this.activeRuleSetSelect.innerHTML =
+      '<option value="" hidden>No Rules Active</option>';
+
+    this.customRules.forEach((ruleSet) => {
+      const option = document.createElement("option");
+      option.value = ruleSet.id;
+      option.textContent = ruleSet.name;
+      this.activeRuleSetSelect.appendChild(option);
+    });
+
+    // Restore selection
+    if (this.activeRuleSetId) {
+      this.activeRuleSetSelect.value = this.activeRuleSetId;
+    } else {
+      this.activeRuleSetSelect.value = "";
+    }
+  }
+
+  // Session history methods
+  renderSessionHistory() {
+    if (!this.sessionsList) return;
+
+    this.sessionsList.innerHTML = "";
+
+    // Update statistics
+    if (this.totalSessionsCount) {
+      this.totalSessionsCount.textContent = this.sessionHistory.length;
+    }
+
+    if (this.avgSessionDuration && this.sessionHistory.length > 0) {
+      const totalDuration = this.sessionHistory.reduce(
+        (sum, s) => sum + s.duration,
+        0
+      );
+      const avgDuration = totalDuration / this.sessionHistory.length;
+      const hours = Math.floor(avgDuration / 3600);
+      const minutes = Math.floor((avgDuration % 3600) / 60);
+      this.avgSessionDuration.textContent = `${hours
+        .toString()
+        .padStart(2, "0")}h${minutes.toString().padStart(2, "0")}m`;
+    } else if (this.avgSessionDuration) {
+      this.avgSessionDuration.textContent = "00h00m";
+    }
+
+    // Show/hide clear button
+    if (this.clearSessionsBtn) {
+      this.clearSessionsBtn.style.display =
+        this.sessionHistory.length > 0 ? "inline-block" : "none";
+    }
+
+    if (this.sessionHistory.length === 0) {
+      this.sessionsList.innerHTML = `
+        <div class="empty-state">
+          No sessions recorded yet.<br />
+          Start a focus session to track your productivity!
+        </div>
+      `;
+      return;
+    }
+
+    this.sessionHistory.forEach((session) => {
+      const item = document.createElement("div");
+      item.className = "session-item";
+
+      const header = document.createElement("div");
+      header.className = "session-header";
+
+      const date = document.createElement("div");
+      date.className = "session-date";
+      const sessionDate = new Date(session.startTime);
+      date.textContent =
+        sessionDate.toLocaleDateString() +
+        " " +
+        sessionDate.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+      const duration = document.createElement("div");
+      duration.className = "session-duration";
+      const hours = Math.floor(session.duration / 3600);
+      const minutes = Math.floor((session.duration % 3600) / 60);
+      duration.textContent = `${hours}h ${minutes}m`;
+
+      header.appendChild(date);
+      header.appendChild(duration);
+
+      const details = document.createElement("div");
+      details.className = "session-details";
+      details.textContent = `${session.ruleSetName} • ${
+        session.blocksCount
+      } block${session.blocksCount !== 1 ? "s" : ""}`;
+
+      item.appendChild(header);
+      item.appendChild(details);
+      this.sessionsList.appendChild(item);
+    });
+  }
+
+  clearSessions() {
+    if (this.sessionHistory.length === 0) {
+      this.showNotification("No sessions to clear", "error");
+      return;
+    }
+
+    const confirmClear = confirm(
+      "Clear all session history?\n\nThis cannot be undone."
+    );
+    if (!confirmClear) return;
+
+    this.sessionHistory = [];
+    this.saveState();
+    this.updateUI();
+    this.showNotification("Session history cleared");
   }
 
   // Personalization methods

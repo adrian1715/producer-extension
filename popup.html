@@ -246,8 +246,18 @@
         backdrop-filter: blur(10px);
       }
 
-      .section:first-child {
+      .tab-content > .section:first-child,
+      .tab-content > *:first-child > .section:first-child,
+      #rules-edit-view > .section:nth-of-type(1),
+      #rules-edit-view > .section:nth-of-type(2) {
         margin-top: 0;
+      }
+
+      .tab-content > .section:last-child,
+      .tab-content > *:last-child > .section:last-child,
+      #rules-edit-view > .section:nth-last-of-type(1),
+      #rules-edit-view > .section:nth-last-of-type(2) {
+        margin-bottom: 0;
       }
 
       .section-title {
@@ -344,8 +354,8 @@
       }
 
       .scroll-container {
-        max-height: 76px;
         overflow-y: auto;
+        /* overflow-x: hidden; */
       }
 
       .scroll-container::-webkit-scrollbar {
@@ -362,6 +372,20 @@
         border-radius: 2px;
       }
 
+      /* Specific scroll container heights for different views */
+      #ruleSetsList {
+        max-height: 180px;
+      }
+
+      /* Rules list needs smaller max-height to fit within section with title */
+      #rulesList {
+        max-height: 100px;
+      }
+
+      #sessionsList {
+        max-height: 220px;
+      }
+
       .flex-row {
         display: flex;
         gap: 6px;
@@ -375,7 +399,7 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-        justify-content: safe center;
+        /* justify-content: safe center; */
       }
 
       .tab-content {
@@ -437,8 +461,8 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
 
-      /* Mode Item Styles */
-      .mode-item {
+      /* Rule Set Item Styles */
+      .rule-set-item {
         background: rgba(255, 255, 255, 0.1);
         border-radius: 8px;
         padding: 10px;
@@ -446,20 +470,56 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        transition: all 0.3s ease;
       }
 
-      .mode-info {
+      /* .rule-set-item:hover {
+        background: rgba(255, 255, 255, 0.2);
+        opacity: 0.95;
+        cursor: pointer;
+      } */
+
+      .rule-set-info {
         flex: 1;
         text-align: left;
       }
 
-      .mode-name {
+      .rule-set-name {
         font-size: 14px;
         font-weight: 600;
         margin-bottom: 4px;
       }
 
-      .mode-details {
+      .rule-set-details {
+        font-size: 11px;
+        opacity: 0.7;
+      }
+
+      /* Session Item Styles */
+      .session-item {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 8px;
+      }
+
+      .session-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+      }
+
+      .session-date {
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .session-duration {
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .session-details {
         font-size: 11px;
         opacity: 0.7;
       }
@@ -614,32 +674,6 @@
             <div class="stat-label">Focused Time</div>
           </div>
         </div>
-
-        <!-- Quick Project Mode Selector -->
-        <!-- <div class="section" style="margin-top: 10px">
-          <div class="input-group" style="margin: 0">
-            <select
-              name="projects"
-              id="projectsBtn"
-              class="btn btn-small"
-              style="flex: 1"
-            >
-              <option value="" disabled selected hidden>
-                Select Project Mode
-              </option>
-              <option value="">Study</option>
-              <option value="">Work</option>
-              <option value="">Create new</option>
-            </select>
-            <button
-              id="clearInfoBtn"
-              class="btn btn-small btn-danger"
-              title="Clear Info"
-            >
-              <i class="bi bi-stars"></i>
-            </button>
-          </div>
-        </div> -->
       </div>
 
       <!-- STATS TAB -->
@@ -687,164 +721,209 @@
         </div>
       </div>
 
-      <!-- RULES TAB -->
+      <!-- RULES TAB (Merged Rules + Modes) -->
       <div id="tab-rules" class="tab-content">
-        <div class="section">
-          <div class="section-title">🚫 Add Block Rule</div>
+        <!-- Main view: List of custom rule sets -->
+        <div id="rules-main-view">
+          <div class="section">
+            <div class="section-title">
+              <span>📋 Custom Rules</span>
+              <button
+                id="createRuleSetBtn"
+                class="btn btn-xsmall btn-success"
+                title="Create New Custom Rules"
+              >
+                <i class="bi bi-plus"></i>
+              </button>
+            </div>
+            <div class="scroll-container" style="max-height: 130px">
+              <div id="ruleSetsList">
+                <div class="empty-state">
+                  No custom rule sets yet.<br />
+                  Create one to get started!
+                </div>
+              </div>
+            </div>
+          </div>
 
-          <div class="input-group">
-            <select id="ruleType">
-              <option selected hidden>Select one option</option>
-              <option value="domain">Block Domain</option>
-              <option value="url">Block Specific URL</option>
-              <option value="allow">Allow Specific URL</option>
-              <option value="allowParam">Allow Parameter</option>
+          <div class="section">
+            <div class="section-title">✔️ Active Rules</div>
+            <select id="activeRuleSetSelect" style="width: 100%">
+              <option value="" hidden selected>No Rules Active</option>
             </select>
-          </div>
-
-          <div id="urlInputContainer" class="input-group" style="margin: 0">
-            <input
-              type="text"
-              id="urlInput"
-              placeholder="e.g., youtube.com or youtube.com/feed/trending"
-            />
-            <button id="addRule" class="btn" title="Add Rule">Add</button>
-          </div>
-
-          <div
-            id="paramInputsContainer"
-            class="input-group"
-            style="margin: 0; display: none"
-          >
-            <input
-              type="text"
-              id="paramKeyInput"
-              placeholder="Key (e.g., list)"
-              style="width: 50%"
-            />
-            <input
-              type="text"
-              id="paramValueInput"
-              placeholder="Value (optional)"
-              style="width: 50%"
-            />
-
-            <button id="addParamRule" class="btn">Add</button>
           </div>
         </div>
 
-        <div class="section" style="height: 144px">
-          <div class="section-title">
-            <span>📋 Active Rules (<span id="ruleCount">0</span>)</span>
-
-            <div id="rulesOptionBtn">
-              <button
-                id="importRulesBtn"
-                class="btn btn-xsmall btn-primary"
-                title="Import Rules"
-              >
-                <input
-                  type="file"
-                  id="importFileInput"
-                  accept=".txt"
-                  style="display: none"
-                />
-                <i class="bi bi-download"></i>
-              </button>
-              <button
-                id="exportRulesBtn"
-                class="btn btn-xsmall btn-success"
-                title="Export Rules"
-                style="display: none"
-              >
-                <i class="bi bi-upload"></i>
-              </button>
-              <button
-                id="clearRulesBtn"
-                class="btn btn-xsmall btn-danger"
-                title="Clear Rules"
-                style="display: none"
-              >
-                <i class="bi bi-trash"></i>
-              </button>
+        <!-- Edit view: Edit or create a rule set -->
+        <div id="rules-edit-view" style="display: none">
+          <!-- Rule set name input (only shown when creating new) -->
+          <div id="ruleSetNameSection" class="section" style="display: none">
+            <div class="section-title" id="ruleSetEditTitle">
+              📝 Add Custom Rule
+            </div>
+            <div class="input-group" style="margin: 0">
+              <input
+                type="text"
+                id="ruleSetNameInput"
+                placeholder="Enter rule set name (e.g., Work, Study)"
+                style="width: 100%"
+              />
             </div>
           </div>
 
-          <div class="scroll-container">
-            <div id="rulesList">
-              <div class="empty-state">
-                No blocking rules configured yet.<br />
-                Add or import some rules to get started!
+          <!-- Add block rule section -->
+          <div class="section">
+            <div class="section-title" style="justify-content: initial">
+              <button id="backToRuleSetListBtn" class="btn btn-xsmall">
+                <i class="bi bi-arrow-left"></i>
+              </button>
+              <span>🚫 Add Rule</span>
+            </div>
+
+            <div class="input-group">
+              <select id="ruleType">
+                <option selected hidden>Select one option</option>
+                <option value="domain">Block Domain</option>
+                <option value="url">Block Specific URL</option>
+                <option value="allow">Allow Specific URL</option>
+                <option value="allowParam">Allow Parameter</option>
+              </select>
+            </div>
+
+            <div id="urlInputContainer" class="input-group" style="margin: 0">
+              <input
+                type="text"
+                id="urlInput"
+                placeholder="e.g., youtube.com or youtube.com/feed/trending"
+              />
+              <button id="addRule" class="btn" title="Add Rule">Add</button>
+            </div>
+
+            <div
+              id="paramInputsContainer"
+              class="input-group"
+              style="margin: 0; display: none"
+            >
+              <input
+                type="text"
+                id="paramKeyInput"
+                placeholder="Key (e.g., list)"
+                style="width: 50%"
+              />
+              <input
+                type="text"
+                id="paramValueInput"
+                placeholder="Value (optional)"
+                style="width: 50%"
+              />
+
+              <button id="addParamRule" class="btn">Add</button>
+            </div>
+          </div>
+
+          <!-- Rules list -->
+          <div class="section" style="height: 144px">
+            <div class="section-title">
+              <span>📋 Rules (<span id="ruleCount">0</span>)</span>
+
+              <div id="rulesOptionBtn">
+                <button
+                  id="importRulesBtn"
+                  class="btn btn-xsmall btn-primary"
+                  title="Import Rules"
+                >
+                  <input
+                    type="file"
+                    id="importFileInput"
+                    accept=".txt"
+                    style="display: none"
+                  />
+                  <i class="bi bi-download"></i>
+                </button>
+                <button
+                  id="exportRulesBtn"
+                  class="btn btn-xsmall btn-success"
+                  title="Export Rules"
+                  style="display: none"
+                >
+                  <i class="bi bi-upload"></i>
+                </button>
+                <button
+                  id="clearRulesBtn"
+                  class="btn btn-xsmall btn-danger"
+                  title="Clear Rules"
+                  style="display: none"
+                >
+                  <i class="bi bi-trash"></i>
+                </button>
               </div>
             </div>
+
+            <div class="scroll-container" style="max-height: 76px">
+              <div id="rulesList">
+                <div class="empty-state">
+                  No blocking rules configured yet.<br />
+                  Add or import some rules to get started!
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer buttons for creating new rule set (hidden when editing) -->
+          <div
+            id="ruleSetActionButtons"
+            style="display: none; gap: 8px; margin-top: 12px"
+          >
+            <button
+              id="cancelRuleSetBtn"
+              class="btn btn-secondary"
+              style="flex: 1"
+            >
+              Cancel
+            </button>
+            <button id="saveRuleSetBtn" class="btn btn-primary" style="flex: 1">
+              Save Custom Rules
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- MODES TAB -->
-      <div id="tab-modes" class="tab-content">
+      <!-- SESSIONS TAB (New) -->
+      <div id="tab-sessions" class="tab-content">
         <div class="section">
           <div class="section-title">
-            <span>💼 Project Modes</span>
-            <button class="btn btn-xsmall btn-success" title="Create New Mode">
-              <i class="bi bi-plus"></i>
+            <span>🕐 Session History</span>
+            <button
+              id="clearSessionsBtn"
+              class="btn btn-xsmall btn-danger"
+              title="Clear History"
+              style="display: none"
+            >
+              <i class="bi bi-trash"></i>
             </button>
           </div>
-          <div class="scroll-container" style="max-height: 130px">
-            <div id="modesList">
-              <div class="mode-item">
-                <div class="mode-info">
-                  <div class="mode-name">🎓 Study</div>
-                  <div class="mode-details">12 blocking rules</div>
-                </div>
-                <div style="gap: 2px">
-                  <button class="btn btn-xsmall btn-primary" title="Edit Mode">
-                    <i class="bi bi-pencil"></i>
-                  </button>
-                  <button
-                    id="deleteModeBtn"
-                    class="btn btn-xsmall btn-danger"
-                    title="Delete Mode"
-                  >
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </div>
+          <div class="scroll-container">
+            <div id="sessionsList">
+              <div class="empty-state">
+                No sessions recorded yet.<br />
+                Start a focus session to track your productivity!
               </div>
-
-              <div class="mode-item">
-                <div class="mode-info">
-                  <div class="mode-name">🍅 Pomodoro</div>
-                  <div class="mode-details">8 blocking rules</div>
-                </div>
-                <div style="gap: 2px">
-                  <button class="btn btn-xsmall btn-primary" title="Edit Mode">
-                    <i class="bi bi-pencil"></i>
-                  </button>
-                  <button
-                    id="deleteModeBtn"
-                    class="btn btn-xsmall btn-danger"
-                    title="Delete Mode"
-                  >
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </div>
-              </div>
-
-              <!-- <div class="empty-state">
-                💡 Project Modes let you switch between<br />
-                different sets of blocking rules instantly!
-              </div> -->
             </div>
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">✔️ Active Mode</div>
-          <select id="activeModeSelect" style="width: 100%">
-            <option value="" selected hidden>No Mode Active</option>
-            <option value="study">🎓 Study</option>
-            <option value="work">🍅 Pomodoro</option>
-          </select>
+          <div class="section-title">📊 Session Statistics</div>
+          <div class="stats">
+            <div class="stat-card">
+              <div class="stat-number" id="totalSessionsCount">0</div>
+              <div class="stat-label">Total Sessions</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" id="avgSessionDuration">00h00m</div>
+              <div class="stat-label">Avg Duration</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1020,17 +1099,17 @@
         <i class="bi bi-house-fill"></i>
         <span>Home</span>
       </button>
-      <button class="tab-btn" data-tab="stats">
-        <i class="bi bi-bar-chart-fill"></i>
-        <span>Stats</span>
-      </button>
       <button class="tab-btn" data-tab="rules">
         <i class="bi bi-shield-fill-exclamation"></i>
         <span>Rules</span>
       </button>
-      <button class="tab-btn" data-tab="modes">
-        <i class="bi bi-briefcase-fill"></i>
-        <span>Modes</span>
+      <button class="tab-btn" data-tab="stats">
+        <i class="bi bi-bar-chart-fill"></i>
+        <span>Stats</span>
+      </button>
+      <button class="tab-btn" data-tab="sessions">
+        <i class="bi bi-clock-history"></i>
+        <span>Sessions</span>
       </button>
       <button class="tab-btn" data-tab="personalize">
         <i class="bi bi-palette-fill"></i>

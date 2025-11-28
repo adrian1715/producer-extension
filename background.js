@@ -41,13 +41,28 @@ class ProducerBackground {
   async loadState() {
     try {
       const data = await chrome.storage.local.get([
-        "rules",
+        "rules", // Old format for backward compatibility
+        "customRules",
+        "activeRuleSetId",
         "isActive",
         "sessionBlocks",
         "sessionStartTime",
         "focusedTime",
       ]);
-      this.rules = data.rules || [];
+
+      // Load rules from active rule set if using new structure
+      if (data.customRules && data.activeRuleSetId) {
+        const activeRuleSet = data.customRules.find(
+          (rs) => rs.id === data.activeRuleSetId
+        );
+        this.rules = activeRuleSet ? activeRuleSet.rules : [];
+      } else if (data.rules) {
+        // Fallback to old format
+        this.rules = data.rules;
+      } else {
+        this.rules = [];
+      }
+
       this.isActive = data.isActive || false;
       this.sessionBlocks = data.sessionBlocks || 0;
       this.sessionStartTime = data.sessionStartTime || null;
