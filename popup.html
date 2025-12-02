@@ -678,46 +678,97 @@
 
       <!-- STATS TAB -->
       <div id="tab-stats" class="tab-content">
-        <div class="section">
-          <div class="section-title">📊 Session Statistics</div>
-          <div class="stats" style="grid-template-columns: 1fr 1fr">
-            <div class="stat-card">
-              <div class="stat-number">0</div>
-              <div class="stat-label">Total Sessions</div>
+        <!-- Main Stats View -->
+        <div id="stats-main-view">
+          <div class="section">
+            <div class="section-title">📊 Session Statistics</div>
+            <div class="stats" style="grid-template-columns: 1fr 1fr">
+              <div class="stat-card">
+                <div class="stat-number" id="statsTabTotalSessions">0</div>
+                <div class="stat-label">Total Sessions</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="statsTabAvgSession">00h00m</div>
+                <div class="stat-label">Avg Session</div>
+              </div>
             </div>
-            <div class="stat-card">
-              <div class="stat-number">00h00m</div>
-              <div class="stat-label">Avg Session</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">🔥 Productivity Stats</div>
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-number" id="totalFocusedTime">00h00m</div>
+                <div class="stat-label">Total Focused Time</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="totalBlockedCount">0</div>
+                <div class="stat-label">Total Sites Blocked</div>
+              </div>
             </div>
+          </div>
+
+          <div class="" style="display: flex; gap: 8px">
+            <button
+              id="viewSessionHistoryBtn"
+              class="btn btn-primary"
+              style="width: 50%"
+            >
+              🕐 Session History
+            </button>
+            <button
+              id="clearInfoBtn"
+              class="btn btn-danger"
+              title="Clear Info"
+              style="width: 50%"
+            >
+              <i class="bi bi-stars"></i> Clear Stats
+            </button>
           </div>
         </div>
 
-        <div class="section">
-          <div class="section-title">🔥 Productivity Stats</div>
-          <div class="stats">
-            <div class="stat-card">
-              <div class="stat-number" id="totalFocusedTime">00h00m</div>
-              <div class="stat-label">Total Focused Time</div>
+        <!-- Session History View (previously separate Sessions tab) -->
+        <div id="session-history-view" style="display: none">
+          <div class="section" style="margin-top: 0">
+            <div class="section-title" style="justify-content: initial">
+              <button id="backToStatsBtn" class="btn btn-xsmall">
+                <i class="bi bi-arrow-left"></i>
+              </button>
+              <span>🕐 Session History</span>
             </div>
-            <div class="stat-card">
-              <div class="stat-number" id="totalBlockedCount">0</div>
-              <div class="stat-label">Total Sites Blocked</div>
+            <div class="scroll-container" style="max-height: 102px">
+              <div id="sessionsList">
+                <div class="empty-state">
+                  No sessions recorded yet.<br />
+                  Start a focus session to track your productivity!
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <button
-          id="clearInfoBtn"
-          class="btn btn-danger"
-          title="Clear Info"
-          style="width: 100%"
-        >
-          Clear Stats <i class="bi bi-stars"></i>
-        </button>
-
-        <div class="empty-state" style="margin-top: 20px">
-          📈 Session history and more detailed analytics coming soon!<br />
-          Start a session to track your productivity.
+          <div class="section">
+            <div class="section-title">
+              <span>📊 Session Statistics</span>
+              <button
+                id="clearSessionsBtn"
+                class="btn btn-xsmall btn-danger"
+                title="Clear History"
+                style="display: none"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+            <div class="stats">
+              <div class="stat-card">
+                <div class="stat-number" id="totalSessionsCount">0</div>
+                <div class="stat-label">Total Sessions</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="avgSessionDuration">00h00m</div>
+                <div class="stat-label">Avg Duration</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -749,7 +800,7 @@
           <div class="section">
             <div class="section-title">✔️ Active Rules</div>
             <select id="activeRuleSetSelect" style="width: 100%">
-              <option value="" hidden selected>No Rules Active</option>
+              <option value="" selected>No Rules</option>
             </select>
           </div>
         </div>
@@ -884,45 +935,6 @@
             <button id="saveRuleSetBtn" class="btn btn-primary" style="flex: 1">
               Save Custom Rules
             </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- SESSIONS TAB (New) -->
-      <div id="tab-sessions" class="tab-content">
-        <div class="section">
-          <div class="section-title">
-            <span>🕐 Session History</span>
-            <button
-              id="clearSessionsBtn"
-              class="btn btn-xsmall btn-danger"
-              title="Clear History"
-              style="display: none"
-            >
-              <i class="bi bi-trash"></i>
-            </button>
-          </div>
-          <div class="scroll-container">
-            <div id="sessionsList">
-              <div class="empty-state">
-                No sessions recorded yet.<br />
-                Start a focus session to track your productivity!
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">📊 Session Statistics</div>
-          <div class="stats">
-            <div class="stat-card">
-              <div class="stat-number" id="totalSessionsCount">0</div>
-              <div class="stat-label">Total Sessions</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-number" id="avgSessionDuration">00h00m</div>
-              <div class="stat-label">Avg Duration</div>
-            </div>
           </div>
         </div>
       </div>
@@ -1091,6 +1103,42 @@
           </button>
         </div>
       </div>
+
+      <!-- ACCOUNT MANAGEMENT TAB -->
+      <div id="tab-account" class="tab-content">
+        <div class="section">
+          <div class="section-title">👤 Account</div>
+          <div class="empty-state" style="padding: 20px">
+            Account management features<br />coming soon!
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">ℹ️ About Producer</div>
+          <div style="text-align: left; font-size: 12px; line-height: 1.6">
+            <p style="margin-bottom: 8px"><strong>Version:</strong> 1.0.0</p>
+            <p style="margin-bottom: 8px">
+              <strong>Description:</strong> A focus mode extension to help you
+              stay productive by blocking distracting websites.
+            </p>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">🔗 Links</div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <button class="btn btn-secondary" style="width: 100%" disabled>
+              📧 Support (Coming Soon)
+            </button>
+            <button class="btn btn-secondary" style="width: 100%" disabled>
+              🌟 Rate Extension (Coming Soon)
+            </button>
+            <button class="btn btn-secondary" style="width: 100%" disabled>
+              📖 Documentation (Coming Soon)
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Tab Navigation (Bottom) -->
@@ -1107,13 +1155,13 @@
         <i class="bi bi-bar-chart-fill"></i>
         <span>Stats</span>
       </button>
-      <button class="tab-btn" data-tab="sessions">
-        <i class="bi bi-clock-history"></i>
-        <span>Sessions</span>
-      </button>
       <button class="tab-btn" data-tab="personalize">
         <i class="bi bi-palette-fill"></i>
         <span>Personalize</span>
+      </button>
+      <button class="tab-btn" data-tab="account">
+        <i class="bi bi-person-circle"></i>
+        <span>Account</span>
       </button>
     </div>
 

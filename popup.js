@@ -65,6 +65,18 @@ class ProducerPopup {
     this.totalSessionsCount = document.getElementById("totalSessionsCount");
     this.avgSessionDuration = document.getElementById("avgSessionDuration");
 
+    // Stats tab navigation elements
+    this.statsMainView = document.getElementById("stats-main-view");
+    this.sessionHistoryView = document.getElementById("session-history-view");
+    this.viewSessionHistoryBtn = document.getElementById(
+      "viewSessionHistoryBtn"
+    );
+    this.backToStatsBtn = document.getElementById("backToStatsBtn");
+    this.statsTabTotalSessions = document.getElementById(
+      "statsTabTotalSessions"
+    );
+    this.statsTabAvgSession = document.getElementById("statsTabAvgSession");
+
     // Tab elements
     this.tabBtns = document.querySelectorAll(".tab-btn");
     this.tabContents = document.querySelectorAll(".tab-content");
@@ -211,6 +223,18 @@ class ProducerPopup {
         this.clearSessions()
       );
     }
+
+    // Stats tab navigation events
+    if (this.viewSessionHistoryBtn) {
+      this.viewSessionHistoryBtn.addEventListener("click", () =>
+        this.showSessionHistoryView()
+      );
+    }
+    if (this.backToStatsBtn) {
+      this.backToStatsBtn.addEventListener("click", () =>
+        this.showStatsMainView()
+      );
+    }
   }
 
   switchTab(tabName) {
@@ -238,6 +262,11 @@ class ProducerPopup {
     // If switching to rules tab, always show main view (list of rule sets)
     if (tabName === "rules") {
       this.showRulesMainView();
+    }
+
+    // If switching to stats tab, always show main stats view
+    if (tabName === "stats") {
+      this.showStatsMainView();
     }
   }
 
@@ -1338,8 +1367,7 @@ class ProducerPopup {
     const currentValue = this.activeRuleSetSelect.value;
 
     // Clear and repopulate
-    this.activeRuleSetSelect.innerHTML =
-      '<option value="" hidden>No Rules Active</option>';
+    this.activeRuleSetSelect.innerHTML = '<option value="">No Rules</option>';
 
     this.customRules.forEach((ruleSet) => {
       const option = document.createElement("option");
@@ -1362,7 +1390,7 @@ class ProducerPopup {
 
     this.sessionsList.innerHTML = "";
 
-    // Update statistics
+    // Update statistics in session history view
     if (this.totalSessionsCount) {
       this.totalSessionsCount.textContent = this.sessionHistory.length;
     }
@@ -1375,11 +1403,25 @@ class ProducerPopup {
       const avgDuration = totalDuration / this.sessionHistory.length;
       const hours = Math.floor(avgDuration / 3600);
       const minutes = Math.floor((avgDuration % 3600) / 60);
-      this.avgSessionDuration.textContent = `${hours
+      const avgString = `${hours.toString().padStart(2, "0")}h${minutes
         .toString()
-        .padStart(2, "0")}h${minutes.toString().padStart(2, "0")}m`;
+        .padStart(2, "0")}m`;
+      this.avgSessionDuration.textContent = avgString;
+
+      // Also update stats in main stats view
+      if (this.statsTabAvgSession) {
+        this.statsTabAvgSession.textContent = avgString;
+      }
     } else if (this.avgSessionDuration) {
       this.avgSessionDuration.textContent = "00h00m";
+      if (this.statsTabAvgSession) {
+        this.statsTabAvgSession.textContent = "00h00m";
+      }
+    }
+
+    // Update total sessions in stats tab main view
+    if (this.statsTabTotalSessions) {
+      this.statsTabTotalSessions.textContent = this.sessionHistory.length;
     }
 
     // Show/hide clear button
@@ -1598,6 +1640,21 @@ class ProducerPopup {
     if (this.themeMainView && this.blockPageSettingsView) {
       this.themeMainView.style.display = "block";
       this.blockPageSettingsView.style.display = "none";
+    }
+  }
+
+  // Navigation methods for stats tab
+  showSessionHistoryView() {
+    if (this.statsMainView && this.sessionHistoryView) {
+      this.statsMainView.style.display = "none";
+      this.sessionHistoryView.style.display = "block";
+    }
+  }
+
+  showStatsMainView() {
+    if (this.statsMainView && this.sessionHistoryView) {
+      this.statsMainView.style.display = "block";
+      this.sessionHistoryView.style.display = "none";
     }
   }
 }
