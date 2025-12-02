@@ -635,6 +635,20 @@
       #backToThemeBtn {
         padding: 6px 10px;
       }
+
+      /* Session active button hover effect */
+      .session-active-btn {
+        transition: all 0.3s ease;
+      }
+
+      .session-active-btn:hover {
+        background: rgba(231, 76, 60, 0.3) !important;
+        border-color: rgba(231, 76, 60, 0.5) !important;
+      }
+
+      .session-active-btn:hover i::before {
+        content: "\f623" !important; /* bi-x-circle-fill */
+      }
     </style>
     <link
       rel="stylesheet"
@@ -736,11 +750,21 @@
               </button>
               <span>🕐 Session History</span>
             </div>
-            <div class="scroll-container" style="max-height: 102px">
+            <div
+              style="
+                font-size: 11px;
+                opacity: 0.8;
+                margin-bottom: 8px;
+                text-align: center;
+              "
+            >
+              Double-click name to edit • Use buttons to activate or delete
+            </div>
+            <div class="scroll-container" style="max-height: 178px">
               <div id="sessionsList">
                 <div class="empty-state">
-                  No sessions recorded yet.<br />
-                  Start a focus session to track your productivity!
+                  No sessions yet.<br />
+                  Start focus mode to create your first session!
                 </div>
               </div>
             </div>
@@ -748,11 +772,11 @@
 
           <div class="section">
             <div class="section-title">
-              <span>📊 Session Statistics</span>
+              <span>📊 Overall Statistics</span>
               <button
                 id="clearSessionsBtn"
                 class="btn btn-xsmall btn-danger"
-                title="Clear History"
+                title="Clear All Sessions"
                 style="display: none"
               >
                 <i class="bi bi-trash"></i>
@@ -765,7 +789,7 @@
               </div>
               <div class="stat-card">
                 <div class="stat-number" id="avgSessionDuration">00h00m</div>
-                <div class="stat-label">Avg Duration</div>
+                <div class="stat-label">Avg Focus Time</div>
               </div>
             </div>
           </div>

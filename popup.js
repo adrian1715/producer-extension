@@ -6,7 +6,13 @@ class ProducerPopup {
     this.currentEditingRuleSetId = null; // ID of rule set being edited
     this.isCreatingNewRuleSet = false; // Flag to track if we're creating a new rule set
     this.tempRuleSet = null; // Temporary rule set for unsaved changes
-    this.sessionHistory = []; // Array of completed sessions
+
+    // New session management structure
+    this.sessions = []; // Array of all sessions (both active and paused)
+    this.currentSessionId = null; // ID of currently selected session
+
+    // Legacy fields for backward compatibility
+    this.sessionHistory = []; // Array of completed sessions (deprecated)
     this.sessionBlocks = 0;
     this.sessionTime = 0; // in seconds
     this.focusedTime = 0; // in seconds
@@ -277,7 +283,9 @@ class ProducerPopup {
         "rules", // Old format for migration
         "customRules",
         "activeRuleSetId",
-        "sessionHistory",
+        "sessions", // New session structure
+        "currentSessionId",
+        "sessionHistory", // Legacy
         "sessionBlocks",
         "focusedTime",
         "theme",
@@ -308,10 +316,35 @@ class ProducerPopup {
         this.activeRuleSetId = data.activeRuleSetId || null;
       }
 
+      // Load session data
+      this.sessions = data.sessions || [];
+      this.currentSessionId = data.currentSessionId || null;
+
+      // Load legacy session data for backward compatibility
       this.sessionHistory = data.sessionHistory || [];
       this.isActive = data.isActive || false;
-      this.sessionBlocks = data.sessionBlocks || 0;
-      this.focusedTime = data.focusedTime || 0;
+
+      // Load current session data if available
+      if (this.currentSessionId) {
+        const currentSession = this.sessions.find(
+          (s) => s.id === this.currentSessionId
+        );
+        if (currentSession) {
+          this.sessionBlocks = currentSession.blocksCount || 0;
+          this.sessionTime = currentSession.totalTime || 0;
+          this.focusedTime = currentSession.totalTime || 0;
+          this.activeRuleSetId = currentSession.ruleSetId || null;
+        } else {
+          // Session not found, reset
+          this.sessionBlocks = 0;
+          this.sessionTime = 0;
+          this.focusedTime = 0;
+        }
+      } else {
+        this.sessionBlocks = data.sessionBlocks || 0;
+        this.focusedTime = data.focusedTime || 0;
+        this.sessionTime = 0;
+      }
 
       // Load personalization settings
       this.currentTheme = data.theme || "blue";
@@ -407,10 +440,25 @@ class ProducerPopup {
           "isActive",
         ]));
 
+      // Update current session data if a session is selected
+      if (this.currentSessionId) {
+        const currentSession = this.sessions.find(
+          (s) => s.id === this.currentSessionId
+        );
+        if (currentSession) {
+          currentSession.blocksCount = this.sessionBlocks;
+          currentSession.totalTime = this.focusedTime;
+          currentSession.ruleSetId = this.activeRuleSetId;
+          currentSession.lastActive = Date.now();
+        }
+      }
+
       await chrome.storage.local.set({
         isActive: this.isActive,
         customRules: this.customRules,
         activeRuleSetId: this.activeRuleSetId,
+        sessions: this.sessions,
+        currentSessionId: this.currentSessionId,
         sessionHistory: this.sessionHistory,
         sessionBlocks: this.sessionBlocks,
         focusedTime: this.focusedTime,
@@ -452,41 +500,77 @@ class ProducerPopup {
     this.isActive = !this.isActive;
 
     if (this.isActive) {
-      // Starting a new session
-      this.sessionTime = 0;
-      this.sessionStartTime = Date.now(); // Track start time for session history
+      // Starting focus mode
+      this.sessionStartTime = Date.now();
       this.startTimerUpdates();
+
+      // Only create a new session if there's no active session selected
+      if (!this.currentSessionId) {
+        // Create a new session
+        const sessionId = "session-" + Date.now();
+        const sessionDate = new Date(this.sessionStartTime);
+        const defaultName = `Session ${sessionDate.toLocaleDateString()} ${sessionDate.toLocaleTimeString(
+          [],
+          { hour: "2-digit", minute: "2-digit" }
+        )}`;
+
+        const newSession = {
+          id: sessionId,
+          name: defaultName,
+          ruleSetId: this.activeRuleSetId,
+          startTime: this.sessionStartTime,
+          totalTime: this.focusedTime || 0,
+          blocksCount: this.sessionBlocks || 0,
+          created: this.sessionStartTime,
+          lastActive: this.sessionStartTime,
+          isActive: true,
+        };
+
+        this.sessions.push(newSession);
+        this.currentSessionId = sessionId;
+        this.sessionTime = 0;
+      } else {
+        // Continue with existing session
+        const currentSession = this.sessions.find(
+          (s) => s.id === this.currentSessionId
+        );
+        if (currentSession) {
+          currentSession.isActive = true;
+          currentSession.lastActive = Date.now();
+          // Session time continues from where it left off
+          this.sessionTime = 0; // Reset session timer display
+        }
+      }
 
       // Tell background script to start timer
       chrome.runtime.sendMessage({
         action: "startTimer",
       });
     } else {
-      // Stopping session
+      // Stopping focus session
       this.stopTimerUpdates();
 
-      // Save session to history
-      if (wasActive && this.sessionStartTime) {
-        const activeRuleSet = this.customRules.find(
-          (rs) => rs.id === this.activeRuleSetId
+      // Update current session with final data
+      if (this.currentSessionId) {
+        const currentSession = this.sessions.find(
+          (s) => s.id === this.currentSessionId
         );
-        const session = {
-          id: "session-" + Date.now(),
-          startTime: this.sessionStartTime,
-          endTime: Date.now(),
-          duration: this.sessionTime, // in seconds
-          blocksCount: this.sessionBlocks,
-          ruleSetId: this.activeRuleSetId,
-          ruleSetName: activeRuleSet ? activeRuleSet.name : "Unknown",
-        };
-        this.sessionHistory.unshift(session); // Add to beginning of array
-        this.sessionStartTime = null;
+        if (currentSession) {
+          currentSession.isActive = false;
+          currentSession.totalTime = this.focusedTime;
+          currentSession.blocksCount = this.sessionBlocks;
+          currentSession.endTime = Date.now();
+          currentSession.lastActive = Date.now();
+        }
       }
 
       // Tell background script to stop timer
       chrome.runtime.sendMessage({
         action: "stopTimer",
       });
+
+      this.sessionStartTime = null;
+      // Don't clear currentSessionId - keep the session active for next time
     }
 
     this.saveState("toggleProducing");
@@ -1011,6 +1095,11 @@ class ProducerPopup {
   }
 
   async clearInfo() {
+    if (!this.currentSessionId) {
+      this.showNotification("No session selected", "error");
+      return;
+    }
+
     if (
       this.sessionTime === 0 &&
       this.focusedTime === 0 &&
@@ -1020,9 +1109,25 @@ class ProducerPopup {
       return;
     }
 
+    const confirmClear = confirm(
+      "Clear stats for current session?\n\nThis will reset the time and blocks count to zero."
+    );
+    if (!confirmClear) return;
+
     this.sessionTime = 0;
     this.focusedTime = 0;
     this.sessionBlocks = 0;
+
+    // Update current session
+    if (this.currentSessionId) {
+      const currentSession = this.sessions.find(
+        (s) => s.id === this.currentSessionId
+      );
+      if (currentSession) {
+        currentSession.totalTime = 0;
+        currentSession.blocksCount = 0;
+      }
+    }
 
     // Tell background script to clear focused time and reset session blocks
     chrome.runtime.sendMessage({
@@ -1036,7 +1141,7 @@ class ProducerPopup {
 
     this.saveState("clearInfo");
     this.updateUI();
-    this.showNotification("Timers and session blocks cleared");
+    this.showNotification("Session stats cleared");
   }
 
   // Helper methods
@@ -1390,19 +1495,23 @@ class ProducerPopup {
 
     this.sessionsList.innerHTML = "";
 
-    // Update statistics in session history view
+    // Update statistics based on new session structure
+    const totalSessions = this.sessions.length;
     if (this.totalSessionsCount) {
-      this.totalSessionsCount.textContent = this.sessionHistory.length;
+      this.totalSessionsCount.textContent = totalSessions;
+    }
+    if (this.statsTabTotalSessions) {
+      this.statsTabTotalSessions.textContent = totalSessions;
     }
 
-    if (this.avgSessionDuration && this.sessionHistory.length > 0) {
-      const totalDuration = this.sessionHistory.reduce(
-        (sum, s) => sum + s.duration,
+    if (this.avgSessionDuration && totalSessions > 0) {
+      const totalTime = this.sessions.reduce(
+        (sum, s) => sum + (s.totalTime || 0),
         0
       );
-      const avgDuration = totalDuration / this.sessionHistory.length;
-      const hours = Math.floor(avgDuration / 3600);
-      const minutes = Math.floor((avgDuration % 3600) / 60);
+      const avgTime = totalTime / totalSessions;
+      const hours = Math.floor(avgTime / 3600);
+      const minutes = Math.floor((avgTime % 3600) / 60);
       const avgString = `${hours.toString().padStart(2, "0")}h${minutes
         .toString()
         .padStart(2, "0")}m`;
@@ -1419,81 +1528,195 @@ class ProducerPopup {
       }
     }
 
-    // Update total sessions in stats tab main view
-    if (this.statsTabTotalSessions) {
-      this.statsTabTotalSessions.textContent = this.sessionHistory.length;
-    }
-
     // Show/hide clear button
     if (this.clearSessionsBtn) {
       this.clearSessionsBtn.style.display =
-        this.sessionHistory.length > 0 ? "inline-block" : "none";
+        totalSessions > 0 ? "inline-block" : "none";
     }
 
-    if (this.sessionHistory.length === 0) {
+    if (totalSessions === 0) {
       this.sessionsList.innerHTML = `
         <div class="empty-state">
-          No sessions recorded yet.<br />
-          Start a focus session to track your productivity!
+          No sessions created yet.<br />
+          Create a session from the Home tab!
         </div>
       `;
       return;
     }
 
-    this.sessionHistory.forEach((session) => {
+    // Sort sessions by last active (most recent first)
+    const sortedSessions = [...this.sessions].sort(
+      (a, b) => b.lastActive - a.lastActive
+    );
+
+    sortedSessions.forEach((session) => {
       const item = document.createElement("div");
       item.className = "session-item";
+      item.style.display = "flex";
+      item.style.justifyContent = "space-between";
+      item.style.alignItems = "center";
+
+      // Highlight if this is the current active session
+      const isActive = session.id === this.currentSessionId;
+      if (isActive) {
+        item.style.border = "2px solid rgba(46, 204, 113, 0.6)";
+        item.style.background = "rgba(46, 204, 113, 0.1)";
+      }
+
+      const info = document.createElement("div");
+      info.style.flex = "1";
 
       const header = document.createElement("div");
-      header.className = "session-header";
+      header.style.display = "flex";
+      header.style.justifyContent = "space-between";
+      header.style.marginBottom = "4px";
 
-      const date = document.createElement("div");
-      date.className = "session-date";
-      const sessionDate = new Date(session.startTime);
-      date.textContent =
-        sessionDate.toLocaleDateString() +
-        " " +
-        sessionDate.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
+      const name = document.createElement("div");
+      name.className = "session-date";
+      name.textContent = session.name;
+      name.style.cursor = "pointer";
+      name.title = "Double-click to edit name";
+
+      // Double-click to edit name inline
+      name.addEventListener("dblclick", (e) => {
+        e.stopPropagation();
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = session.name;
+        input.style.width = "100%";
+        input.style.fontSize = "inherit";
+        input.style.fontWeight = "inherit";
+        input.style.padding = "4px";
+        input.style.border = "1px solid #ccc";
+        input.style.borderRadius = "4px";
+
+        const saveEdit = () => {
+          const newName = input.value.trim();
+          if (newName && newName !== session.name) {
+            session.name = newName;
+            this.saveState();
+            this.updateUI();
+            this.showNotification("Session name updated!");
+          } else if (!newName) {
+            this.showNotification("Name cannot be empty", "error");
+          }
+          name.textContent = session.name;
+          name.style.display = "";
+          input.remove();
+        };
+
+        const cancelEdit = () => {
+          name.textContent = session.name;
+          name.style.display = "";
+          input.remove();
+        };
+
+        input.addEventListener("blur", saveEdit);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            input.blur();
+          } else if (e.key === "Escape") {
+            cancelEdit();
+          }
         });
+
+        name.style.display = "none";
+        name.parentNode.insertBefore(input, name);
+        input.focus();
+        input.select();
+      });
 
       const duration = document.createElement("div");
       duration.className = "session-duration";
-      const hours = Math.floor(session.duration / 3600);
-      const minutes = Math.floor((session.duration % 3600) / 60);
+      const hours = Math.floor((session.totalTime || 0) / 3600);
+      const minutes = Math.floor(((session.totalTime || 0) % 3600) / 60);
       duration.textContent = `${hours}h ${minutes}m`;
 
-      header.appendChild(date);
+      header.appendChild(name);
       header.appendChild(duration);
 
       const details = document.createElement("div");
       details.className = "session-details";
-      details.textContent = `${session.ruleSetName} • ${
-        session.blocksCount
-      } block${session.blocksCount !== 1 ? "s" : ""}`;
+      const ruleSet = this.customRules.find(
+        (rs) => rs.id === session.ruleSetId
+      );
+      const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
+      details.textContent = `${ruleSetName} • ${
+        session.blocksCount || 0
+      } block${(session.blocksCount || 0) !== 1 ? "s" : ""}`;
 
-      item.appendChild(header);
-      item.appendChild(details);
+      info.appendChild(header);
+      info.appendChild(details);
+
+      // Action buttons
+      const actions = document.createElement("div");
+      actions.style.display = "flex";
+      actions.style.gap = "4px";
+
+      // Activate/Deactivate button
+      const toggleBtn = document.createElement("button");
+      toggleBtn.className = isActive
+        ? "btn btn-xsmall btn-success session-active-btn"
+        : "btn btn-xsmall btn-primary";
+      toggleBtn.innerHTML = isActive
+        ? '<i class="bi bi-check-circle-fill"></i>'
+        : '<i class="bi bi-play-circle"></i>';
+      toggleBtn.title = isActive ? "Deactivate Session" : "Activate Session";
+
+      toggleBtn.addEventListener("click", () => {
+        if (isActive) {
+          this.deactivateSession(session.id);
+        } else {
+          this.activateSession(session.id);
+        }
+      });
+
+      actions.appendChild(toggleBtn);
+
+      const editRulesBtn = document.createElement("button");
+      editRulesBtn.className = "btn btn-xsmall btn-secondary";
+      editRulesBtn.innerHTML = '<i class="bi bi-shield"></i>';
+      editRulesBtn.title = "Change Rule Set";
+      editRulesBtn.addEventListener("click", () => {
+        this.editSessionRuleSet(session.id);
+      });
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "btn btn-xsmall btn-danger";
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      deleteBtn.title = "Delete Session";
+      deleteBtn.addEventListener("click", () => {
+        this.deleteSession(session.id);
+      });
+
+      actions.appendChild(editRulesBtn);
+      actions.appendChild(deleteBtn);
+
+      item.appendChild(info);
+      item.appendChild(actions);
       this.sessionsList.appendChild(item);
     });
   }
 
   clearSessions() {
-    if (this.sessionHistory.length === 0) {
+    if (this.sessions.length === 0) {
       this.showNotification("No sessions to clear", "error");
       return;
     }
 
     const confirmClear = confirm(
-      "Clear all session history?\n\nThis cannot be undone."
+      "Clear all sessions?\n\nThis will permanently delete all sessions and their data. This cannot be undone."
     );
     if (!confirmClear) return;
 
-    this.sessionHistory = [];
+    this.sessions = [];
+    this.currentSessionId = null;
+    this.sessionBlocks = 0;
+    this.sessionTime = 0;
+    this.focusedTime = 0;
     this.saveState();
     this.updateUI();
-    this.showNotification("Session history cleared");
+    this.showNotification("All sessions cleared");
   }
 
   // Personalization methods
@@ -1656,6 +1879,142 @@ class ProducerPopup {
       this.statsMainView.style.display = "block";
       this.sessionHistoryView.style.display = "none";
     }
+  }
+
+  // Session management methods
+  async activateSession(sessionId) {
+    if (this.isActive) await this.toggleProducing();
+
+    const session = this.sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+
+    // If already the current session, just notify
+    if (this.currentSessionId === sessionId) {
+      this.showNotification(`"${session.name}" is already active`, "error");
+      return;
+    }
+
+    // Save current session state before switching (if there is one)
+    if (this.currentSessionId) {
+      const currentSession = this.sessions.find(
+        (s) => s.id === this.currentSessionId
+      );
+      if (currentSession) {
+        currentSession.blocksCount = this.sessionBlocks;
+        currentSession.totalTime = this.focusedTime;
+        currentSession.lastActive = Date.now();
+      }
+    }
+
+    // Restore the selected session data
+    this.currentSessionId = sessionId;
+    this.sessionBlocks = session.blocksCount || 0;
+    this.sessionTime = 0; // Reset current timer (not cumulative)
+    this.focusedTime = session.totalTime || 0;
+    this.activeRuleSetId = session.ruleSetId || null;
+    session.lastActive = Date.now();
+
+    await this.saveState();
+    this.updateUI();
+
+    // Show notification
+    this.showNotification(`Session "${session.name}" activated!`);
+  }
+
+  async deactivateSession(sessionId) {
+    if (this.isActive) await this.toggleProducing();
+
+    const session = this.sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+
+    // If this is the current session, deactivate it
+    if (this.currentSessionId === sessionId) {
+      // Save current session state
+      session.blocksCount = this.sessionBlocks;
+      session.totalTime = this.focusedTime;
+      session.lastActive = Date.now();
+
+      // Clear current session
+      this.currentSessionId = null;
+      this.sessionBlocks = 0;
+      this.sessionTime = 0;
+      this.focusedTime = 0;
+
+      await this.saveState();
+      this.updateUI();
+
+      this.showNotification(`Session "${session.name}" deactivated!`);
+    }
+  }
+
+  deleteSession(sessionId) {
+    const session = this.sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+
+    const confirmDelete = confirm(
+      `Delete session "${
+        session.name
+      }"?\n\nThis will permanently delete all session data including ${Math.floor(
+        session.totalTime / 3600
+      )}h ${Math.floor((session.totalTime % 3600) / 60)}m of focused time and ${
+        session.blocksCount
+      } blocks.`
+    );
+    if (!confirmDelete) return;
+
+    // If deleting the current session, clear it
+    if (this.currentSessionId === sessionId) {
+      this.currentSessionId = null;
+      this.sessionBlocks = 0;
+      this.sessionTime = 0;
+      this.focusedTime = 0;
+    }
+
+    this.sessions = this.sessions.filter((s) => s.id !== sessionId);
+    this.saveState();
+    this.updateUI();
+    this.showNotification("Session deleted");
+  }
+
+  editSessionRuleSet(sessionId) {
+    const session = this.sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+
+    // Create a simple UI to select rule set
+    const currentRuleSet = this.customRules.find(
+      (rs) => rs.id === session.ruleSetId
+    );
+    const currentRuleSetName = currentRuleSet
+      ? currentRuleSet.name
+      : "No Rules";
+
+    // Cycle through rule sets: No Rules -> Rule Set 1 -> Rule Set 2 -> ... -> No Rules
+    const currentIndex = currentRuleSet
+      ? this.customRules.findIndex((rs) => rs.id === session.ruleSetId)
+      : -1;
+    const nextIndex = (currentIndex + 1) % (this.customRules.length + 1);
+
+    if (nextIndex === this.customRules.length) {
+      // Set to "No Rules"
+      session.ruleSetId = null;
+    } else {
+      // Set to next rule set
+      session.ruleSetId = this.customRules[nextIndex].id;
+    }
+
+    // If editing current session, update activeRuleSetId
+    if (this.currentSessionId === sessionId) {
+      this.activeRuleSetId = session.ruleSetId;
+    }
+
+    const newRuleSet = this.customRules.find(
+      (rs) => rs.id === session.ruleSetId
+    );
+    const newRuleSetName = newRuleSet ? newRuleSet.name : "No Rules";
+
+    this.saveState();
+    this.updateUI();
+    this.showNotification(`Rule set changed to: ${newRuleSetName}`);
   }
 }
 
