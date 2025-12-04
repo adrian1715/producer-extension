@@ -64,6 +64,7 @@ class ProducerPopup {
     this.cancelRuleSetBtn = document.getElementById("cancelRuleSetBtn");
     this.ruleSetActionButtons = document.getElementById("ruleSetActionButtons");
     this.ruleSetEditTitle = document.getElementById("ruleSetEditTitle");
+    this.clearAllRuleSetsBtn = document.getElementById("clearAllRuleSetsBtn");
 
     // Sessions elements
     this.sessionsList = document.getElementById("sessionsList");
@@ -227,6 +228,13 @@ class ProducerPopup {
     if (this.clearSessionsBtn) {
       this.clearSessionsBtn.addEventListener("click", () =>
         this.clearSessions()
+      );
+    }
+
+    // Clear all rule sets event
+    if (this.clearAllRuleSetsBtn) {
+      this.clearAllRuleSetsBtn.addEventListener("click", () =>
+        this.clearAllRuleSets()
       );
     }
 
@@ -1303,7 +1311,19 @@ class ProducerPopup {
 
     const selectedId = this.activeRuleSetSelect.value;
     this.activeRuleSetId = selectedId || null;
+
+    // Update current session's rule set if there's an active session
+    if (this.currentSessionId) {
+      const currentSession = this.sessions.find(
+        (s) => s.id === this.currentSessionId
+      );
+      if (currentSession) {
+        currentSession.ruleSetId = this.activeRuleSetId;
+      }
+    }
+
     this.saveState();
+    this.updateUI();
     this.showNotification(
       selectedId ? "Active rule set changed!" : "No rule set active"
     );
@@ -1359,6 +1379,12 @@ class ProducerPopup {
 
     this.ruleSetsList.innerHTML = "";
 
+    // Show/hide clear all button
+    if (this.clearAllRuleSetsBtn) {
+      this.clearAllRuleSetsBtn.style.display =
+        this.customRules.length > 0 ? "inline-block" : "none";
+    }
+
     if (this.customRules.length === 0) {
       this.ruleSetsList.innerHTML = `
         <div class="empty-state">
@@ -1379,6 +1405,8 @@ class ProducerPopup {
       const name = document.createElement("div");
       name.className = "rule-set-name";
       name.textContent = ruleSet.name;
+      name.style.cursor = "pointer";
+      name.title = "Double-click to edit name";
 
       // Add double-click to edit name
       name.addEventListener("dblclick", (e) => {
@@ -1439,28 +1467,33 @@ class ProducerPopup {
       info.appendChild(name);
       info.appendChild(details);
 
+      const buttonDiv = document.createElement("div");
+      buttonDiv.style.display = "flex";
+      buttonDiv.style.gap = "4px";
+      buttonDiv.style.marginLeft = "4px";
+
       const editBtn = document.createElement("button");
       editBtn.className = "btn btn-xsmall btn-secondary";
       editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
       editBtn.title = "Edit Rules";
-      editBtn.style.margin = "0 4px";
       editBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.editRuleSet(ruleSet.id);
       });
 
       const deleteBtn = document.createElement("button");
-      deleteBtn.className = "btn btn-xsmall btn-danger";
-      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-      deleteBtn.title = "Delete Rules";
+      deleteBtn.className = "btn btn-small btn-danger";
+      deleteBtn.textContent = "✕";
+      deleteBtn.title = "Delete Rule Set";
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.deleteRuleSet(ruleSet.id);
       });
 
       item.appendChild(info);
-      item.appendChild(editBtn);
-      item.appendChild(deleteBtn);
+      buttonDiv.appendChild(editBtn);
+      buttonDiv.appendChild(deleteBtn);
+      item.appendChild(buttonDiv);
       this.ruleSetsList.appendChild(item);
     });
   }
@@ -1555,6 +1588,7 @@ class ProducerPopup {
       item.style.display = "flex";
       item.style.justifyContent = "space-between";
       item.style.alignItems = "center";
+      item.style.textAlign = "left";
 
       // Highlight if this is the current active session
       const isActive = session.id === this.currentSessionId;
@@ -1566,16 +1600,12 @@ class ProducerPopup {
       const info = document.createElement("div");
       info.style.flex = "1";
 
-      const header = document.createElement("div");
-      header.style.display = "flex";
-      header.style.justifyContent = "space-between";
-      header.style.marginBottom = "4px";
-
       const name = document.createElement("div");
       name.className = "session-date";
       name.textContent = session.name;
       name.style.cursor = "pointer";
       name.title = "Double-click to edit name";
+      name.style.marginBottom = "4px";
 
       // Double-click to edit name inline
       name.addEventListener("dblclick", (e) => {
@@ -1626,32 +1656,28 @@ class ProducerPopup {
         input.select();
       });
 
-      const duration = document.createElement("div");
-      duration.className = "session-duration";
-      const hours = Math.floor((session.totalTime || 0) / 3600);
-      const minutes = Math.floor(((session.totalTime || 0) % 3600) / 60);
-      duration.textContent = `${hours}h ${minutes}m`;
-
-      header.appendChild(name);
-      header.appendChild(duration);
-
       const details = document.createElement("div");
       details.className = "session-details";
       const ruleSet = this.customRules.find(
         (rs) => rs.id === session.ruleSetId
       );
       const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
+      const hours = Math.floor((session.totalTime || 0) / 3600);
+      const minutes = Math.floor(((session.totalTime || 0) % 3600) / 60);
       details.textContent = `${ruleSetName} • ${
         session.blocksCount || 0
-      } block${(session.blocksCount || 0) !== 1 ? "s" : ""}`;
+      } block${
+        (session.blocksCount || 0) !== 1 ? "s" : ""
+      } • ${hours}h ${minutes}m`;
 
-      info.appendChild(header);
+      info.appendChild(name);
       info.appendChild(details);
 
       // Action buttons
-      const actions = document.createElement("div");
-      actions.style.display = "flex";
-      actions.style.gap = "4px";
+      const buttonDiv = document.createElement("div");
+      buttonDiv.style.display = "flex";
+      buttonDiv.style.gap = "4px";
+      buttonDiv.style.marginLeft = "4px";
 
       // Activate/Deactivate button
       const toggleBtn = document.createElement("button");
@@ -1671,29 +1697,30 @@ class ProducerPopup {
         }
       });
 
-      actions.appendChild(toggleBtn);
+      buttonDiv.appendChild(toggleBtn);
 
-      const editRulesBtn = document.createElement("button");
-      editRulesBtn.className = "btn btn-xsmall btn-secondary";
-      editRulesBtn.innerHTML = '<i class="bi bi-shield"></i>';
-      editRulesBtn.title = "Change Rule Set";
-      editRulesBtn.addEventListener("click", () => {
-        this.editSessionRuleSet(session.id);
-      });
+      // Edit session custom rules button
+      // const editRulesBtn = document.createElement("button");
+      // editRulesBtn.className = "btn btn-xsmall btn-secondary";
+      // editRulesBtn.innerHTML = '<i class="bi bi-shield"></i>';
+      // editRulesBtn.title = "Change Rule Set";
+      // editRulesBtn.addEventListener("click", () => {
+      //   this.editSessionRuleSet(session.id);
+      // });
 
       const deleteBtn = document.createElement("button");
-      deleteBtn.className = "btn btn-xsmall btn-danger";
-      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      deleteBtn.className = "btn btn-small btn-danger";
+      deleteBtn.textContent = "✕";
       deleteBtn.title = "Delete Session";
       deleteBtn.addEventListener("click", () => {
         this.deleteSession(session.id);
       });
 
-      actions.appendChild(editRulesBtn);
-      actions.appendChild(deleteBtn);
+      // buttonDiv.appendChild(editRulesBtn);
+      buttonDiv.appendChild(deleteBtn);
 
       item.appendChild(info);
-      item.appendChild(actions);
+      item.appendChild(buttonDiv);
       this.sessionsList.appendChild(item);
     });
   }
@@ -1717,6 +1744,28 @@ class ProducerPopup {
     this.saveState();
     this.updateUI();
     this.showNotification("All sessions cleared");
+  }
+
+  clearAllRuleSets() {
+    if (this.customRules.length === 0) {
+      this.showNotification("No custom rules to clear", "error");
+      return;
+    }
+
+    const confirmClear = confirm(
+      `Clear all custom rules?\n\nThis will permanently delete all ${
+        this.customRules.length
+      } rule set${
+        this.customRules.length !== 1 ? "s" : ""
+      }. This cannot be undone.`
+    );
+    if (!confirmClear) return;
+
+    this.customRules = [];
+    this.activeRuleSetId = null;
+    this.saveState();
+    this.updateUI();
+    this.showNotification("All custom rules cleared");
   }
 
   // Personalization methods
