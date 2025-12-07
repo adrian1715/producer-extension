@@ -40,7 +40,6 @@ class ProducerPopup {
     this.sessionStatusText = document.getElementById("sessionStatusText");
     this.sessionTimerEl = document.getElementById("sessionTimer");
     this.focusedTimeEl = document.getElementById("focusedTime");
-    this.clearInfoBtn = document.getElementById("clearInfoBtn");
     this.exportRulesBtn = document.getElementById("exportRulesBtn");
     this.importRulesBtn = document.getElementById("importRulesBtn");
     this.importFileInput = document.getElementById("importFileInput");
@@ -128,7 +127,6 @@ class ProducerPopup {
       e.target.value = ""; // Reset file input
     });
     this.exportRulesBtn.addEventListener("click", () => this.exportRules());
-    this.clearInfoBtn.addEventListener("click", () => this.clearInfo());
     this.ruleType.addEventListener("change", () => {
       if (this.paramInputsContainer) {
         const isParamRule = this.ruleType.value === "allowParam";
@@ -1102,50 +1100,48 @@ class ProducerPopup {
     this.showNotification("All rules cleared");
   }
 
-  async clearInfo() {
-    if (!this.currentSessionId) {
-      this.showNotification("No session selected", "error");
+  async clearInfo(sessionId) {
+    if (!sessionId) {
+      this.showNotification("No session specified", "error");
       return;
     }
 
-    if (
-      this.sessionTime === 0 &&
-      this.focusedTime === 0 &&
-      this.sessionBlocks === 0
-    ) {
-      this.showNotification("No info to clear", "error");
+    const session = this.sessions.find((s) => s.id === sessionId);
+    if (!session) {
+      this.showNotification("Session not found", "error");
+      return;
+    }
+
+    if (session.totalTime === 0 && session.blocksCount === 0) {
+      this.showNotification("No stats to clear for this session", "error");
       return;
     }
 
     const confirmClear = confirm(
-      "Clear stats for current session?\n\nThis will reset the time and blocks count to zero."
+      `Clear stats for "${session.name}"?\n\nThis will reset the time and blocks count to zero.`
     );
     if (!confirmClear) return;
 
-    this.sessionTime = 0;
-    this.focusedTime = 0;
-    this.sessionBlocks = 0;
+    // Clear the session's stats
+    session.totalTime = 0;
+    session.blocksCount = 0;
 
-    // Update current session
-    if (this.currentSessionId) {
-      const currentSession = this.sessions.find(
-        (s) => s.id === this.currentSessionId
-      );
-      if (currentSession) {
-        currentSession.totalTime = 0;
-        currentSession.blocksCount = 0;
-      }
+    // If this is the currently active session, also clear the UI state
+    if (this.currentSessionId === sessionId) {
+      this.sessionTime = 0;
+      this.focusedTime = 0;
+      this.sessionBlocks = 0;
+
+      // Tell background script to clear focused time and reset session blocks
+      chrome.runtime.sendMessage({
+        action: "clearTimers",
+      });
+
+      // Also send message to reset session blocks in background
+      chrome.runtime.sendMessage({
+        action: "resetSessionBlocks",
+      });
     }
-
-    // Tell background script to clear focused time and reset session blocks
-    chrome.runtime.sendMessage({
-      action: "clearTimers",
-    });
-
-    // Also send message to reset session blocks in background
-    chrome.runtime.sendMessage({
-      action: "resetSessionBlocks",
-    });
 
     this.saveState("clearInfo");
     this.updateUI();
@@ -1699,14 +1695,26 @@ class ProducerPopup {
 
       buttonDiv.appendChild(toggleBtn);
 
-      // Edit session custom rules button
-      // const editRulesBtn = document.createElement("button");
-      // editRulesBtn.className = "btn btn-xsmall btn-secondary";
-      // editRulesBtn.innerHTML = '<i class="bi bi-shield"></i>';
-      // editRulesBtn.title = "Change Rule Set";
-      // editRulesBtn.addEventListener("click", () => {
-      //   this.editSessionRuleSet(session.id);
-      // });
+      // Clear Stats button - only show if session has stats to clear
+      if ((session.totalTime || 0) > 0 || (session.blocksCount || 0) > 0) {
+        const clearStatsBtn = document.createElement("button");
+        clearStatsBtn.className = "btn btn-xsmall";
+        clearStatsBtn.innerHTML = '<i class="bi bi-stars"></i>';
+        clearStatsBtn.title = "Clear Stats";
+        clearStatsBtn.addEventListener("click", () => {
+          this.clearInfo(session.id);
+        });
+
+        // Add hover effect
+        clearStatsBtn.addEventListener("mouseenter", () => {
+          clearStatsBtn.style.boxShadow = "0 2px 8px rgba(241, 196, 15, 0.3)";
+        });
+        clearStatsBtn.addEventListener("mouseleave", () => {
+          clearStatsBtn.style.boxShadow = "none";
+        });
+
+        buttonDiv.appendChild(clearStatsBtn);
+      }
 
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "btn btn-small btn-danger";
@@ -1716,7 +1724,6 @@ class ProducerPopup {
         this.deleteSession(session.id);
       });
 
-      // buttonDiv.appendChild(editRulesBtn);
       buttonDiv.appendChild(deleteBtn);
 
       item.appendChild(info);
