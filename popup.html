@@ -710,13 +710,43 @@
           <div class="section">
             <div class="section-title">
               <span>📊 Current Session</span>
-              <span
-                id="currentSessionName"
-                style="font-size: 10px; opacity: 0.7; font-weight: 400"
-                >No session active</span
+              <div
+                id="sessionNameContainer"
+                style="position: relative; display: inline-block"
               >
+                <span
+                  id="currentSessionName"
+                  style="
+                    font-size: 10px;
+                    opacity: 0.7;
+                    font-weight: 400;
+                    transition: opacity 0.2s ease;
+                  "
+                  >No session active</span
+                >
+                <button
+                  id="deactivateSessionBtn"
+                  class="btn btn-danger"
+                  title="Deactivate Session"
+                  style="
+                    display: none;
+                    opacity: 0;
+                    position: absolute;
+                    right: 0;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 10px;
+                    padding: 4px 8px;
+                    white-space: nowrap;
+                    transition: opacity 0.2s ease;
+                  "
+                >
+                  Deactivate Session
+                </button>
+              </div>
             </div>
             <div
+              id="currentSessionStats"
               class="stats"
               style="grid-template-columns: 1fr 1fr 1fr; gap: 8px"
             >
@@ -752,6 +782,33 @@
                   Session Time
                 </div>
               </div>
+            </div>
+            <div
+              id="noSessionMessage"
+              class="empty-state"
+              style="display: none"
+            >
+              No active session.<br />
+              Start or activate a session to see its stats!
+            </div>
+            <div
+              id="currentSessionInfo"
+              style="
+                display: none;
+                margin-top: 8px;
+                font-size: 11px;
+                text-align: center;
+                opacity: 0.8;
+              "
+            >
+              <span>
+                <span style="opacity: 0.7">Active Rules: </span>
+                <span id="currentSessionRules" style="font-weight: 600"
+                  >No Rules</span
+                >
+                <span style="opacity: 0.7"> • Sites Blocked: </span>
+                <span id="currentSessionBlocksCount" style="font-weight: 600">0</span>
+              </span>
             </div>
           </div>
 
