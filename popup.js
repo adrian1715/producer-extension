@@ -19,6 +19,12 @@ class ProducerPopup {
     this.timerInterval = null;
     this.lastTimerUpdate = 0; // Track when we last received a timer update
 
+    // Session time tracking for stats display
+    this.sessionStatsInterval = null; // Timer for updating session stats display
+    this.sessionCommitInterval = null; // Timer for periodic commits
+    this.sessionFocusStartTime = null; // When focus mode started for current session segment
+    this.sessionPauseStartTime = null; // When session was paused (focus mode stopped)
+
     this.initializeElements();
     this.bindEvents();
     this.loadState();
@@ -82,6 +88,18 @@ class ProducerPopup {
       "statsTabTotalSessions"
     );
     this.statsTabAvgSession = document.getElementById("statsTabAvgSession");
+
+    // Current session stats elements
+    this.currentSessionName = document.getElementById("currentSessionName");
+    this.currentSessionFocusTime = document.getElementById(
+      "currentSessionFocusTime"
+    );
+    this.currentSessionBreakTime = document.getElementById(
+      "currentSessionBreakTime"
+    );
+    this.currentSessionTotalTime = document.getElementById(
+      "currentSessionTotalTime"
+    );
 
     // Tab elements
     this.tabBtns = document.querySelectorAll(".tab-btn");
@@ -337,20 +355,21 @@ class ProducerPopup {
         );
         if (currentSession) {
           this.sessionBlocks = currentSession.blocksCount || 0;
-          this.sessionTime = currentSession.totalTime || 0;
-          this.focusedTime = currentSession.totalTime || 0;
+          this.sessionTime = 0; // Always start at zero when extension opens
+          // focusedTime will be synced from background timer
           this.activeRuleSetId = currentSession.ruleSetId || null;
         } else {
           // Session not found, reset
           this.sessionBlocks = 0;
           this.sessionTime = 0;
-          this.focusedTime = 0;
         }
       } else {
         this.sessionBlocks = data.sessionBlocks || 0;
-        this.focusedTime = data.focusedTime || 0;
-        this.sessionTime = 0;
+        this.sessionTime = 0; // Always start at zero when extension opens
       }
+
+      // Always load focusedTime from storage (background timer's cumulative total)
+      this.focusedTime = data.focusedTime || 0;
 
       // Load personalization settings
       this.currentTheme = data.theme || "blue";
@@ -368,6 +387,44 @@ class ProducerPopup {
         await this.ensureBackgroundTimerRunning();
         this.requestTimerUpdate();
         this.startTimerUpdates();
+      }
+
+      // Initialize session tracking times if there's a current session
+      if (this.currentSessionId) {
+        const currentSession = this.sessions.find(
+          (s) => s.id === this.currentSessionId
+        );
+        if (currentSession) {
+          // Initialize session tracking times if they don't exist
+          if (
+            !currentSession.sessionFocusStartTime &&
+            !currentSession.sessionPauseStartTime
+          ) {
+            if (this.isActive) {
+              currentSession.sessionFocusStartTime = Date.now();
+              currentSession.sessionPauseStartTime = null;
+            } else {
+              currentSession.sessionPauseStartTime = Date.now();
+              currentSession.sessionFocusStartTime = null;
+            }
+          }
+        }
+      }
+
+      // Start session stats tracking if there are any sessions (for real-time average updates)
+      if (this.sessions.length > 0) {
+        this.startSessionStatsTracking();
+      } else {
+        // No sessions - set displays to zero
+        if (this.focusedTimeEl) {
+          this.focusedTimeEl.textContent = "00h00m";
+        }
+        if (this.totalFocusedTimeEl) {
+          this.totalFocusedTimeEl.textContent = "00h00m";
+        }
+        if (this.currentSessionFocusTime) {
+          this.currentSessionFocusTime.textContent = "00h00m";
+        }
       }
 
       this.updateUI();
@@ -436,8 +493,285 @@ class ProducerPopup {
     }
   }
 
+  startSessionStatsTracking() {
+    // Clear any existing interval
+    if (this.sessionStatsInterval) {
+      clearInterval(this.sessionStatsInterval);
+      this.sessionStatsInterval = null;
+    }
+
+    // Always run if there are sessions (to update average focused time)
+    if (this.sessions.length === 0) return;
+
+    // Update every second
+    this.sessionStatsInterval = setInterval(() => {
+      this.updateCurrentSessionStats();
+      this.updateActiveSessionInHistory();
+    }, 1000);
+
+    // Update immediately
+    this.updateCurrentSessionStats();
+    this.updateActiveSessionInHistory();
+
+    // Start periodic commit interval only if there's an active session (every 30 seconds)
+    if (this.currentSessionId) {
+      this.startPeriodicCommit();
+    }
+  }
+
+  stopSessionStatsTracking() {
+    if (this.sessionStatsInterval) {
+      clearInterval(this.sessionStatsInterval);
+      this.sessionStatsInterval = null;
+    }
+    this.stopPeriodicCommit();
+  }
+
+  startPeriodicCommit() {
+    // Clear any existing interval
+    if (this.sessionCommitInterval) {
+      clearInterval(this.sessionCommitInterval);
+      this.sessionCommitInterval = null;
+    }
+
+    if (!this.currentSessionId) return;
+
+    // Commit accumulated time every 30 seconds
+    this.sessionCommitInterval = setInterval(() => {
+      this.commitCurrentSessionTime();
+      this.saveState();
+    }, 30000);
+  }
+
+  stopPeriodicCommit() {
+    if (this.sessionCommitInterval) {
+      clearInterval(this.sessionCommitInterval);
+      this.sessionCommitInterval = null;
+    }
+  }
+
+  commitCurrentSessionTime() {
+    if (!this.currentSessionId) return;
+
+    const currentSession = this.sessions.find(
+      (s) => s.id === this.currentSessionId
+    );
+    if (!currentSession) return;
+
+    // Commit any accumulated focus or break time using session's stored times
+    if (currentSession.sessionFocusStartTime) {
+      const focusElapsed = Math.floor(
+        (Date.now() - currentSession.sessionFocusStartTime) / 1000
+      );
+      currentSession.focusedTime =
+        (currentSession.focusedTime || 0) + focusElapsed;
+      // Reset the start time to now
+      currentSession.sessionFocusStartTime = Date.now();
+    } else if (currentSession.sessionPauseStartTime) {
+      const breakElapsed = Math.floor(
+        (Date.now() - currentSession.sessionPauseStartTime) / 1000
+      );
+      currentSession.breakTime = (currentSession.breakTime || 0) + breakElapsed;
+      // Reset the start time to now
+      currentSession.sessionPauseStartTime = Date.now();
+    }
+  }
+
+  updateActiveSessionInHistory() {
+    if (!this.currentSessionId) return;
+
+    const currentSession = this.sessions.find(
+      (s) => s.id === this.currentSessionId
+    );
+    if (!currentSession) return;
+
+    // Find the session details element in the session history
+    const detailsElement = document.querySelector(
+      `.session-details[data-session-id="${this.currentSessionId}"]`
+    );
+    if (!detailsElement) return;
+
+    // Calculate total time with current elapsed time
+    let totalTime =
+      (currentSession.focusedTime || 0) + (currentSession.breakTime || 0);
+    const now = Date.now();
+
+    if (this.isActive && currentSession.sessionFocusStartTime) {
+      const currentFocusElapsed = Math.floor(
+        (now - currentSession.sessionFocusStartTime) / 1000
+      );
+      totalTime += currentFocusElapsed;
+    } else if (!this.isActive && currentSession.sessionPauseStartTime) {
+      const currentBreakElapsed = Math.floor(
+        (now - currentSession.sessionPauseStartTime) / 1000
+      );
+      totalTime += currentBreakElapsed;
+    }
+
+    const hours = Math.floor(totalTime / 3600);
+    const minutes = Math.floor((totalTime % 3600) / 60);
+
+    const ruleSet = this.customRules.find(
+      (rs) => rs.id === currentSession.ruleSetId
+    );
+    const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
+
+    detailsElement.textContent = `${ruleSetName} • ${
+      currentSession.blocksCount || 0
+    } block${
+      (currentSession.blocksCount || 0) !== 1 ? "s" : ""
+    } • ${hours}h ${minutes}m`;
+  }
+
+  updateCurrentSessionStats() {
+    try {
+      // Always update average focused time regardless of current session
+      this.updateAverageFocusedTime();
+
+      if (!this.currentSessionId) {
+        // No session active - update UI to show "No session active"
+        if (this.currentSessionName) {
+          this.currentSessionName.textContent = "No session active";
+        }
+        if (this.currentSessionFocusTime) {
+          this.currentSessionFocusTime.textContent = "00h00m";
+        }
+        if (this.currentSessionBreakTime) {
+          this.currentSessionBreakTime.textContent = "00h00m";
+        }
+        if (this.currentSessionTotalTime) {
+          this.currentSessionTotalTime.textContent = "00h00m";
+        }
+        // Also update Home tab focused time
+        if (this.focusedTimeEl) {
+          this.focusedTimeEl.textContent = "00h00m";
+        }
+        return;
+      }
+
+      const currentSession = this.sessions.find(
+        (s) => s.id === this.currentSessionId
+      );
+      if (!currentSession) {
+        if (this.currentSessionName) {
+          this.currentSessionName.textContent = "No session active";
+        }
+        return;
+      }
+
+      // Update session name
+      if (this.currentSessionName) {
+        this.currentSessionName.textContent = currentSession.name;
+      }
+
+      // Initialize session time tracking fields if they don't exist
+      if (!currentSession.focusedTime) currentSession.focusedTime = 0;
+      if (!currentSession.breakTime) currentSession.breakTime = 0;
+      if (!currentSession.sessionStartTime) {
+        currentSession.sessionStartTime = Date.now();
+      }
+
+      const now = Date.now();
+
+      // Calculate current segment elapsed time using session's stored times
+      let currentFocusElapsed = 0;
+      let currentBreakElapsed = 0;
+
+      if (this.isActive && currentSession.sessionFocusStartTime) {
+        // Currently in focus mode - calculate elapsed focus time
+        currentFocusElapsed = Math.floor(
+          (now - currentSession.sessionFocusStartTime) / 1000
+        );
+      } else if (!this.isActive && currentSession.sessionPauseStartTime) {
+        // Currently paused - calculate elapsed break time
+        currentBreakElapsed = Math.floor(
+          (now - currentSession.sessionPauseStartTime) / 1000
+        );
+      }
+
+      // Calculate total times
+      const totalFocusedTime = currentSession.focusedTime + currentFocusElapsed;
+      const totalBreakTime = currentSession.breakTime + currentBreakElapsed;
+      const totalSessionTime = totalFocusedTime + totalBreakTime;
+
+      // Format time helper
+      const formatTime = (seconds) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return `${hours.toString().padStart(2, "0")}h${minutes
+          .toString()
+          .padStart(2, "0")}m`;
+      };
+
+      // Update UI
+      if (this.currentSessionFocusTime) {
+        this.currentSessionFocusTime.textContent = formatTime(totalFocusedTime);
+      }
+      if (this.currentSessionBreakTime) {
+        this.currentSessionBreakTime.textContent = formatTime(totalBreakTime);
+      }
+      if (this.currentSessionTotalTime) {
+        this.currentSessionTotalTime.textContent = formatTime(totalSessionTime);
+      }
+
+      // Also update the focused time in Home tab to match Stats tab
+      if (this.focusedTimeEl) {
+        this.focusedTimeEl.textContent = formatTime(totalFocusedTime);
+      }
+    } catch (error) {
+      console.error("Error updating current session stats:", error);
+    }
+  }
+
+  updateAverageFocusedTime() {
+    try {
+      const totalSessions = this.sessions.length;
+      if (totalSessions === 0) {
+        if (this.totalFocusedTimeEl) {
+          this.totalFocusedTimeEl.textContent = "00h00m";
+        }
+        return;
+      }
+
+      // Calculate total focused time across all sessions
+      let totalFocusedTime = this.sessions.reduce((sum, s) => {
+        let sessionFocusedTime = s.focusedTime || 0;
+
+        // Add current elapsed focused time if this is the active session
+        if (
+          s.id === this.currentSessionId &&
+          this.isActive &&
+          s.sessionFocusStartTime
+        ) {
+          const currentFocusElapsed = Math.floor(
+            (Date.now() - s.sessionFocusStartTime) / 1000
+          );
+          sessionFocusedTime += currentFocusElapsed;
+        }
+
+        return sum + sessionFocusedTime;
+      }, 0);
+
+      const avgTime = totalFocusedTime / totalSessions;
+      const hours = Math.floor(avgTime / 3600);
+      const minutes = Math.floor((avgTime % 3600) / 60);
+      const avgString = `${hours.toString().padStart(2, "0")}h${minutes
+        .toString()
+        .padStart(2, "0")}m`;
+
+      if (this.totalFocusedTimeEl) {
+        this.totalFocusedTimeEl.textContent = avgString;
+      }
+    } catch (error) {
+      console.error("Error updating average focused time:", error);
+    }
+  }
+
   async saveState(action, oldData) {
     try {
+      // Commit accumulated time before saving
+      this.commitCurrentSessionTime();
+
       const before =
         oldData ||
         (await chrome.storage.local.get([
@@ -453,7 +787,6 @@ class ProducerPopup {
         );
         if (currentSession) {
           currentSession.blocksCount = this.sessionBlocks;
-          currentSession.totalTime = this.focusedTime;
           currentSession.ruleSetId = this.activeRuleSetId;
           currentSession.lastActive = Date.now();
         }
@@ -525,16 +858,24 @@ class ProducerPopup {
           name: defaultName,
           ruleSetId: this.activeRuleSetId,
           startTime: this.sessionStartTime,
-          totalTime: this.focusedTime || 0,
           blocksCount: this.sessionBlocks || 0,
           created: this.sessionStartTime,
           lastActive: this.sessionStartTime,
           isActive: true,
+          focusedTime: 0,
+          breakTime: 0,
+          sessionStartTime: Date.now(),
+          sessionFocusStartTime: Date.now(), // Store in session
+          sessionPauseStartTime: null,
         };
 
         this.sessions.push(newSession);
         this.currentSessionId = sessionId;
         this.sessionTime = 0;
+
+        // Session already has tracking times set in initialization
+        // Start session stats tracking
+        this.startSessionStatsTracking();
       } else {
         // Continue with existing session
         const currentSession = this.sessions.find(
@@ -545,16 +886,36 @@ class ProducerPopup {
           currentSession.lastActive = Date.now();
           // Session time continues from where it left off
           this.sessionTime = 0; // Reset session timer display
+
+          // Commit any accumulated break time (before switching to focus tracking)
+          this.commitCurrentSessionTime();
+
+          // Start tracking focus time in the session
+          currentSession.sessionFocusStartTime = Date.now();
+          currentSession.sessionPauseStartTime = null;
         }
       }
 
-      // Tell background script to start timer
+      // Tell background script to start timer with current session's focused time
+      const currentSession = this.currentSessionId
+        ? this.sessions.find((s) => s.id === this.currentSessionId)
+        : null;
+      const sessionFocusedTime = currentSession
+        ? currentSession.focusedTime || 0
+        : 0;
+
       chrome.runtime.sendMessage({
         action: "startTimer",
+        focusedTime: sessionFocusedTime,
       });
     } else {
-      // Stopping focus session
+      // Stopping focus session (pausing)
       this.stopTimerUpdates();
+
+      // Get final focused time from background script before stopping
+      const response = await chrome.runtime.sendMessage({
+        action: "getTimerState",
+      });
 
       // Update current session with final data
       if (this.currentSessionId) {
@@ -563,10 +924,16 @@ class ProducerPopup {
         );
         if (currentSession) {
           currentSession.isActive = false;
-          currentSession.totalTime = this.focusedTime;
           currentSession.blocksCount = this.sessionBlocks;
           currentSession.endTime = Date.now();
           currentSession.lastActive = Date.now();
+
+          // Commit any accumulated focus time (before switching to break tracking)
+          this.commitCurrentSessionTime();
+
+          // Start tracking break time in the session
+          currentSession.sessionPauseStartTime = Date.now();
+          currentSession.sessionFocusStartTime = null;
         }
       }
 
@@ -602,27 +969,13 @@ class ProducerPopup {
 
     // Update stats in home tab
     this.blockedCount.textContent = this.sessionBlocks || 0;
-
-    // Update focused time in home tab
-    if (this.focusedTimeEl) {
-      const hours = Math.floor(this.focusedTime / 3600);
-      const minutes = Math.floor((this.focusedTime % 3600) / 60);
-      this.focusedTimeEl.textContent = `${hours
-        .toString()
-        .padStart(2, "0")}h${minutes.toString().padStart(2, "0")}m`;
-    }
+    // Note: focusedTimeEl is updated in updateCurrentSessionStats() for real-time updates
 
     // Update stats in stats tab
     if (this.totalBlockedCountEl) {
       this.totalBlockedCountEl.textContent = this.sessionBlocks || 0;
     }
-    if (this.totalFocusedTimeEl) {
-      const hours = Math.floor(this.focusedTime / 3600);
-      const minutes = Math.floor((this.focusedTime % 3600) / 60);
-      this.totalFocusedTimeEl.textContent = `${hours
-        .toString()
-        .padStart(2, "0")}h${minutes.toString().padStart(2, "0")}m`;
-    }
+    // Note: totalFocusedTimeEl (Avg Focus Time) is updated in updateAverageFocusedTime()
 
     // Update rule sets list and active dropdown
     this.renderRuleSetsList();
@@ -638,6 +991,9 @@ class ProducerPopup {
 
     // Update timer display
     this.updateTimerDisplay();
+
+    // Update current session stats display
+    this.updateCurrentSessionStats();
 
     // Update session status text
     this.sessionStatusText.textContent = this.isActive
@@ -662,19 +1018,8 @@ class ProducerPopup {
         .toString()
         .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
-      const focusedTimeString = `${Math.floor(this.focusedTime / 3600)
-        .toString()
-        .padStart(2, "0")}h${Math.floor((this.focusedTime % 3600) / 60)
-        .toString()
-        .padStart(2, "0")}m`;
-
       this.sessionTimerEl.textContent = sessionTimeString;
-      this.focusedTimeEl.textContent = focusedTimeString;
-
-      // Also update stats tab if element exists
-      if (this.totalFocusedTimeEl) {
-        this.totalFocusedTimeEl.textContent = focusedTimeString;
-      }
+      // Note: focusedTimeEl is updated in updateCurrentSessionStats() for consistency with Stats tab
     }
   }
 
@@ -1112,7 +1457,11 @@ class ProducerPopup {
       return;
     }
 
-    if (session.totalTime === 0 && session.blocksCount === 0) {
+    if (
+      (session.focusedTime || 0) === 0 &&
+      (session.breakTime || 0) === 0 &&
+      (session.blocksCount || 0) === 0
+    ) {
       this.showNotification("No stats to clear for this session", "error");
       return;
     }
@@ -1123,18 +1472,28 @@ class ProducerPopup {
     if (!confirmClear) return;
 
     // Clear the session's stats
-    session.totalTime = 0;
+    session.focusedTime = 0;
+    session.breakTime = 0;
     session.blocksCount = 0;
 
     // If this is the currently active session, also clear the UI state
     if (this.currentSessionId === sessionId) {
       this.sessionTime = 0;
-      this.focusedTime = 0;
       this.sessionBlocks = 0;
+
+      // Reset tracking times in the session
+      if (this.isActive) {
+        session.sessionFocusStartTime = Date.now();
+        session.sessionPauseStartTime = null;
+      } else {
+        session.sessionPauseStartTime = Date.now();
+        session.sessionFocusStartTime = null;
+      }
 
       // Tell background script to clear focused time and reset session blocks
       chrome.runtime.sendMessage({
-        action: "clearTimers",
+        action: "setFocusedTime",
+        focusedTime: 0,
       });
 
       // Also send message to reset session blocks in background
@@ -1534,11 +1893,11 @@ class ProducerPopup {
     }
 
     if (this.avgSessionDuration && totalSessions > 0) {
-      const totalTime = this.sessions.reduce(
-        (sum, s) => sum + (s.totalTime || 0),
+      const totalFocusedTime = this.sessions.reduce(
+        (sum, s) => sum + (s.focusedTime || 0),
         0
       );
-      const avgTime = totalTime / totalSessions;
+      const avgTime = totalFocusedTime / totalSessions;
       const hours = Math.floor(avgTime / 3600);
       const minutes = Math.floor((avgTime % 3600) / 60);
       const avgString = `${hours.toString().padStart(2, "0")}h${minutes
@@ -1556,6 +1915,9 @@ class ProducerPopup {
         this.statsTabAvgSession.textContent = "00h00m";
       }
     }
+
+    // Update average focused time in Overall Stats (real-time updates handled separately)
+    this.updateAverageFocusedTime();
 
     // Show/hide clear button
     if (this.clearSessionsBtn) {
@@ -1654,17 +2016,38 @@ class ProducerPopup {
 
       const details = document.createElement("div");
       details.className = "session-details";
+      details.setAttribute("data-session-id", session.id); // For real-time updates
       const ruleSet = this.customRules.find(
         (rs) => rs.id === session.ruleSetId
       );
       const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
-      const hours = Math.floor((session.totalTime || 0) / 3600);
-      const minutes = Math.floor(((session.totalTime || 0) % 3600) / 60);
+
+      // Calculate total time (focused + break)
+      let totalTime = (session.focusedTime || 0) + (session.breakTime || 0);
+
+      // Add current elapsed time if this is the active session
+      if (session.id === this.currentSessionId) {
+        const now = Date.now();
+        if (this.isActive && session.sessionFocusStartTime) {
+          const currentFocusElapsed = Math.floor(
+            (now - session.sessionFocusStartTime) / 1000
+          );
+          totalTime += currentFocusElapsed;
+        } else if (!this.isActive && session.sessionPauseStartTime) {
+          const currentBreakElapsed = Math.floor(
+            (now - session.sessionPauseStartTime) / 1000
+          );
+          totalTime += currentBreakElapsed;
+        }
+      }
+
+      const hours = Math.floor(totalTime / 3600);
+      const minutes = Math.floor((totalTime % 3600) / 60);
       details.textContent = `${ruleSetName} • ${
         session.blocksCount || 0
       } block${
         (session.blocksCount || 0) !== 1 ? "s" : ""
-      } • ${hours}h ${minutes}m`;
+      } • ${hours}h${minutes}m`;
 
       info.appendChild(name);
       info.appendChild(details);
@@ -1696,7 +2079,11 @@ class ProducerPopup {
       buttonDiv.appendChild(toggleBtn);
 
       // Clear Stats button - only show if session has stats to clear
-      if ((session.totalTime || 0) > 0 || (session.blocksCount || 0) > 0) {
+      if (
+        (session.focusedTime || 0) > 0 ||
+        (session.breakTime || 0) > 0 ||
+        (session.blocksCount || 0) > 0
+      ) {
         const clearStatsBtn = document.createElement("button");
         clearStatsBtn.className = "btn btn-xsmall";
         clearStatsBtn.innerHTML = '<i class="bi bi-stars"></i>';
@@ -1743,11 +2130,14 @@ class ProducerPopup {
     );
     if (!confirmClear) return;
 
+    // Stop session stats tracking
+    this.stopSessionStatsTracking();
+
     this.sessions = [];
     this.currentSessionId = null;
     this.sessionBlocks = 0;
     this.sessionTime = 0;
-    this.focusedTime = 0;
+
     this.saveState();
     this.updateUI();
     this.showNotification("All sessions cleared");
@@ -1956,8 +2346,10 @@ class ProducerPopup {
         (s) => s.id === this.currentSessionId
       );
       if (currentSession) {
+        // Commit any accumulated focus or break time
+        this.commitCurrentSessionTime();
+
         currentSession.blocksCount = this.sessionBlocks;
-        currentSession.totalTime = this.focusedTime;
         currentSession.lastActive = Date.now();
       }
     }
@@ -1966,9 +2358,25 @@ class ProducerPopup {
     this.currentSessionId = sessionId;
     this.sessionBlocks = session.blocksCount || 0;
     this.sessionTime = 0; // Reset current timer (not cumulative)
-    this.focusedTime = session.totalTime || 0;
     this.activeRuleSetId = session.ruleSetId || null;
     session.lastActive = Date.now();
+
+    // Initialize session tracking times
+    if (!session.focusedTime) session.focusedTime = 0;
+    if (!session.breakTime) session.breakTime = 0;
+    if (!session.sessionStartTime) session.sessionStartTime = Date.now();
+
+    // Set tracking times in the session based on current state
+    if (this.isActive) {
+      session.sessionFocusStartTime = Date.now();
+      session.sessionPauseStartTime = null;
+    } else {
+      session.sessionPauseStartTime = Date.now();
+      session.sessionFocusStartTime = null;
+    }
+
+    // Start session stats tracking
+    this.startSessionStatsTracking();
 
     await this.saveState();
     this.updateUI();
@@ -1985,16 +2393,24 @@ class ProducerPopup {
 
     // If this is the current session, deactivate it
     if (this.currentSessionId === sessionId) {
+      // Commit any accumulated break or focus time
+      this.commitCurrentSessionTime();
+
       // Save current session state
       session.blocksCount = this.sessionBlocks;
-      session.totalTime = this.focusedTime;
       session.lastActive = Date.now();
+
+      // Clear session's tracking times
+      session.sessionFocusStartTime = null;
+      session.sessionPauseStartTime = null;
+
+      // Stop session stats tracking
+      this.stopSessionStatsTracking();
 
       // Clear current session
       this.currentSessionId = null;
       this.sessionBlocks = 0;
       this.sessionTime = 0;
-      this.focusedTime = 0;
 
       await this.saveState();
       this.updateUI();
@@ -2007,23 +2423,26 @@ class ProducerPopup {
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
+    const totalTime = (session.focusedTime || 0) + (session.breakTime || 0);
     const confirmDelete = confirm(
       `Delete session "${
         session.name
       }"?\n\nThis will permanently delete all session data including ${Math.floor(
-        session.totalTime / 3600
-      )}h ${Math.floor((session.totalTime % 3600) / 60)}m of focused time and ${
-        session.blocksCount
+        totalTime / 3600
+      )}h ${Math.floor((totalTime % 3600) / 60)}m of total time and ${
+        session.blocksCount || 0
       } blocks.`
     );
     if (!confirmDelete) return;
 
     // If deleting the current session, clear it
     if (this.currentSessionId === sessionId) {
+      // Stop session stats tracking
+      this.stopSessionStatsTracking();
+
       this.currentSessionId = null;
       this.sessionBlocks = 0;
       this.sessionTime = 0;
-      this.focusedTime = 0;
     }
 
     this.sessions = this.sessions.filter((s) => s.id !== sessionId);

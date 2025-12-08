@@ -163,6 +163,11 @@ class ProducerBackground {
         break;
 
       case "startTimer":
+        // If a focused time value is provided, use it as the base
+        if (message.focusedTime !== undefined) {
+          this.focusedTime = message.focusedTime;
+          this.focusedTimeBase = message.focusedTime;
+        }
         this.startTimer();
         break;
 
@@ -184,6 +189,14 @@ class ProducerBackground {
         sendResponse(response);
         break;
       }
+
+      case "setFocusedTime":
+        // Set the focused time to a specific value (used when activating sessions)
+        this.focusedTime = message.focusedTime || 0;
+        this.focusedTimeBase = this.focusedTime;
+        await this.saveTimerState();
+        sendResponse({ success: true });
+        break;
 
       case "clearTimers":
         this.focusedTime = 0;

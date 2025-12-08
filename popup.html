@@ -708,29 +708,92 @@
         <!-- Main Stats View -->
         <div id="stats-main-view">
           <div class="section">
-            <div class="section-title">📊 Session Statistics</div>
-            <div class="stats" style="grid-template-columns: 1fr 1fr">
-              <div class="stat-card">
-                <div class="stat-number" id="statsTabTotalSessions">0</div>
-                <div class="stat-label">Total Sessions</div>
+            <div class="section-title">
+              <span>📊 Current Session</span>
+              <span
+                id="currentSessionName"
+                style="font-size: 10px; opacity: 0.7; font-weight: 400"
+                >No session active</span
+              >
+            </div>
+            <div
+              class="stats"
+              style="grid-template-columns: 1fr 1fr 1fr; gap: 8px"
+            >
+              <div class="stat-card" style="padding: 8px">
+                <div
+                  class="stat-number"
+                  style="font-size: 16px"
+                  id="currentSessionFocusTime"
+                >
+                  00h00m
+                </div>
+                <div class="stat-label" style="font-size: 10px">Focus Time</div>
               </div>
-              <div class="stat-card">
-                <div class="stat-number" id="statsTabAvgSession">00h00m</div>
-                <div class="stat-label">Avg Session</div>
+              <div class="stat-card" style="padding: 8px">
+                <div
+                  class="stat-number"
+                  style="font-size: 16px"
+                  id="currentSessionBreakTime"
+                >
+                  00h00m
+                </div>
+                <div class="stat-label" style="font-size: 10px">Break Time</div>
+              </div>
+              <div class="stat-card" style="padding: 8px">
+                <div
+                  class="stat-number"
+                  style="font-size: 16px"
+                  id="currentSessionTotalTime"
+                >
+                  00h00m
+                </div>
+                <div class="stat-label" style="font-size: 10px">
+                  Session Time
+                </div>
               </div>
             </div>
           </div>
 
           <div class="section">
-            <div class="section-title">🔥 Productivity Stats</div>
-            <div class="stats">
-              <div class="stat-card">
-                <div class="stat-number" id="totalFocusedTime">00h00m</div>
-                <div class="stat-label">Total Focused Time</div>
+            <div class="section-title">🔥 Overall Stats</div>
+            <div
+              class="stats"
+              style="grid-template-columns: 1fr 1fr 1fr; gap: 8px"
+            >
+              <div class="stat-card" style="padding: 8px">
+                <div
+                  class="stat-number"
+                  style="font-size: 16px"
+                  id="totalFocusedTime"
+                >
+                  00h00m
+                </div>
+                <div class="stat-label" style="font-size: 10px">
+                  Avg Focus Time
+                </div>
               </div>
-              <div class="stat-card">
-                <div class="stat-number" id="totalBlockedCount">0</div>
-                <div class="stat-label">Total Sites Blocked</div>
+              <div class="stat-card" style="padding: 8px">
+                <div
+                  class="stat-number"
+                  style="font-size: 16px"
+                  id="statsTabTotalSessions"
+                >
+                  0
+                </div>
+                <div class="stat-label" style="font-size: 10px">Sessions</div>
+              </div>
+              <div class="stat-card" style="padding: 8px">
+                <div
+                  class="stat-number"
+                  style="font-size: 16px"
+                  id="totalBlockedCount"
+                >
+                  0
+                </div>
+                <div class="stat-label" style="font-size: 10px">
+                  Total Blocks
+                </div>
               </div>
             </div>
           </div>
