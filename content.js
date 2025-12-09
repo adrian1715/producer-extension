@@ -56,10 +56,13 @@ class ProducerContentScript {
 
   // Intercept all navigation attempts before they happen
   interceptNavigationAttempts() {
+    // Store reference to this instance for use in event listeners
+    const self = this;
+
     // Intercept all clicks on links
     document.addEventListener(
       "click",
-      async function (e) {
+      async (e) => {
         const link = e.target.closest("a[href]");
         if (link) {
           const href = link.getAttribute("href");
@@ -93,7 +96,10 @@ class ProducerContentScript {
               e.preventDefault();
               e.stopPropagation();
               e.stopImmediatePropagation();
-              this.blockPage();
+
+              // Show block page immediately with correct URL (this will report the block)
+              self.blockPage(targetUrl);
+
               return false;
             }
           } catch (err) {
@@ -107,7 +113,7 @@ class ProducerContentScript {
     // Intercept form submissions
     document.addEventListener(
       "submit",
-      async function (e) {
+      async (e) => {
         const form = e.target;
         if (form.action) {
           try {
@@ -119,7 +125,10 @@ class ProducerContentScript {
             if (response && response.shouldBlock) {
               e.preventDefault();
               e.stopPropagation();
-              this.blockPage();
+
+              // Show block page immediately with correct URL (this will report the block)
+              self.blockPage(form.action);
+
               return false;
             }
           } catch (err) {
@@ -168,6 +177,9 @@ class ProducerContentScript {
 
   // Intercept additional navigation methods
   interceptAdditionalNavigation() {
+    // Store reference to this instance
+    const self = this;
+
     // Override window.open (this one works reliably)
     const originalOpen = window.open;
     window.open = async function (url, ...args) {
@@ -180,7 +192,11 @@ class ProducerContentScript {
           });
 
           if (response && response.shouldBlock) {
-            this.blockPage();
+            // Report block (no block page shown for window.open, so report here)
+            chrome.runtime.sendMessage({
+              action: "reportBlock",
+              url: fullUrl,
+            });
             return null;
           }
         } catch (err) {
@@ -213,8 +229,22 @@ class ProducerContentScript {
     }
   }
 
-  async blockPage() {
+  async blockPage(blockedUrl = null) {
     const phrase = await this.getMotivationalQuote();
+
+    // Use provided URL or fall back to current location
+    const urlToReport = blockedUrl || window.location.href;
+
+    // Report the block to background script FIRST (before any early returns)
+    // This ensures every access attempt is counted
+    try {
+      chrome.runtime.sendMessage({
+        action: "reportBlock",
+        url: urlToReport,
+      });
+    } catch (err) {
+      console.error("Could not report block:", err);
+    }
 
     // Cleanup intervals and timeouts
     this.cleanup();
@@ -224,16 +254,6 @@ class ProducerContentScript {
 
     // Avoid injecting multiple overlays
     if (document.getElementById("producer-block-overlay")) return;
-
-    // Report the block to background script
-    try {
-      chrome.runtime.sendMessage({
-        action: "reportBlock",
-        url: window.location.href,
-      });
-    } catch (err) {
-      console.error("Could not report block:", err);
-    }
 
     // Replace page content with block message
     document.documentElement.innerHTML = `

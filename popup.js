@@ -99,9 +99,7 @@ class ProducerPopup {
     this.noSessionMessage = document.getElementById("noSessionMessage");
     this.deactivateSessionBtn = document.getElementById("deactivateSessionBtn");
     this.currentSessionInfo = document.getElementById("currentSessionInfo");
-    this.currentSessionRules = document.getElementById(
-      "currentSessionRules"
-    );
+    this.currentSessionRules = document.getElementById("currentSessionRules");
     this.currentSessionBlocksCount = document.getElementById(
       "currentSessionBlocksCount"
     );
@@ -412,7 +410,8 @@ class ProducerPopup {
           (s) => s.id === this.currentSessionId
         );
         if (currentSession) {
-          this.sessionBlocks = currentSession.blocksCount || 0;
+          // Use storage sessionBlocks as source of truth (updated by background script)
+          this.sessionBlocks = data.sessionBlocks || 0;
           this.sessionTime = 0; // Always start at zero when extension opens
           // focusedTime will be synced from background timer
           this.activeRuleSetId = currentSession.ruleSetId || null;
@@ -744,7 +743,11 @@ class ProducerPopup {
       }
 
       // Update session info display
-      if (this.currentSessionInfo && this.currentSessionRules && this.currentSessionBlocksCount) {
+      if (
+        this.currentSessionInfo &&
+        this.currentSessionRules &&
+        this.currentSessionBlocksCount
+      ) {
         this.currentSessionInfo.style.display = "block";
         const ruleSet = this.customRules.find(
           (rs) => rs.id === currentSession.ruleSetId
@@ -755,7 +758,8 @@ class ProducerPopup {
         this.currentSessionRules.textContent = ruleSetName;
 
         // Update blocks count
-        this.currentSessionBlocksCount.textContent = currentSession.blocksCount || 0;
+        this.currentSessionBlocksCount.textContent =
+          currentSession.blocksCount || 0;
       }
 
       // Initialize session time tracking fields if they don't exist
@@ -1002,6 +1006,25 @@ class ProducerPopup {
         action: "startTimer",
         focusedTime: sessionFocusedTime,
       });
+
+      // Count currently open blocked tabs and add to counter
+      chrome.runtime.sendMessage(
+        {
+          action: "countCurrentlyBlockedTabs",
+        },
+        (response) => {
+          if (response && response.blockedCount > 0) {
+            // Counter is already updated by background script
+            // Just show notification to user
+            this.showNotification(
+              `${response.blockedCount} blocked tab${
+                response.blockedCount !== 1 ? "s" : ""
+              } detected and counted`,
+              "success"
+            );
+          }
+        }
+      );
     } else {
       // Stopping focus session (pausing)
       this.stopTimerUpdates();
@@ -1065,6 +1088,26 @@ class ProducerPopup {
     this.blockedCount.textContent = this.sessionBlocks || 0;
     // Note: focusedTimeEl is updated in updateCurrentSessionStats() for real-time updates
 
+    // Update stats tab session blocks element
+    if (this.sessionBlocksEl) {
+      this.sessionBlocksEl.textContent = this.sessionBlocks || 0;
+    }
+
+    // Update current session's blocksCount from sessionBlocks (source of truth)
+    if (this.currentSessionId) {
+      const currentSession = this.sessions.find(
+        (s) => s.id === this.currentSessionId
+      );
+      if (currentSession) {
+        currentSession.blocksCount = this.sessionBlocks;
+      }
+    }
+
+    // Update Current Session section blocks count
+    if (this.currentSessionBlocksCount) {
+      this.currentSessionBlocksCount.textContent = this.sessionBlocks || 0;
+    }
+
     // Update stats in stats tab - Total Blocks across all sessions
     if (this.totalBlockedCountEl) {
       const totalBlocks = this.sessions.reduce(
@@ -1084,7 +1127,7 @@ class ProducerPopup {
       this.renderRulesList();
     }
 
-    // Update session history
+    // Update session history (will now have updated blocksCount)
     this.renderSessionHistory();
 
     // Update timer display
@@ -2598,10 +2641,44 @@ const popup = new ProducerPopup();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "updateBlockCount") {
     popup.sessionBlocks = message.count;
+
+    // Update home tab blocks count
+    if (popup.blockedCount) {
+      popup.blockedCount.textContent = popup.sessionBlocks;
+    }
+
+    // Update stats tab session blocks element
     if (popup.sessionBlocksEl) {
       popup.sessionBlocksEl.textContent = popup.sessionBlocks;
     }
-    chrome.storage.local.set({ sessionBlocks: popup.sessionBlocks });
+
+    // Update current session's blocks count if there's an active session
+    if (popup.currentSessionId) {
+      const currentSession = popup.sessions.find(
+        (s) => s.id === popup.currentSessionId
+      );
+      if (currentSession) {
+        // Update session data
+        currentSession.blocksCount = popup.sessionBlocks;
+
+        // Update Current Session section blocks count
+        if (popup.currentSessionBlocksCount) {
+          popup.currentSessionBlocksCount.textContent = popup.sessionBlocks;
+        }
+
+        // Update session history item for this session
+        popup.updateActiveSessionInHistory();
+
+        // Save session data to storage
+        chrome.storage.local.set({
+          sessions: popup.sessions,
+          sessionBlocks: popup.sessionBlocks,
+        });
+      }
+    } else {
+      // No active session, just save the blocks count
+      chrome.storage.local.set({ sessionBlocks: popup.sessionBlocks });
+    }
   }
 
   if (message.action === "timerUpdate") {
@@ -2609,6 +2686,60 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     popup.focusedTime = message.focusedTime;
     popup.lastTimerUpdate = Date.now(); // Track when we received the update
     popup.updateTimerDisplay();
+  }
+});
+
+// Listen for storage changes as a backup mechanism (catches missed runtime messages)
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+
+  // sessionBlocks change: update home/stats/current-session/history
+  if (changes.sessionBlocks) {
+    const newCount = changes.sessionBlocks.newValue || 0;
+    popup.sessionBlocks = newCount;
+
+    // Update home tab blocked count
+    if (popup.blockedCount) {
+      popup.blockedCount.textContent = popup.sessionBlocks;
+    }
+
+    // Update stats tab session blocks element
+    if (popup.sessionBlocksEl) {
+      popup.sessionBlocksEl.textContent = popup.sessionBlocks;
+    }
+
+    // Update current session object & UI if active
+    if (popup.currentSessionId) {
+      const currentSession = popup.sessions.find(
+        (s) => s.id === popup.currentSessionId
+      );
+      if (currentSession) {
+        currentSession.blocksCount = popup.sessionBlocks;
+
+        // Update Current Session section blocks count
+        if (popup.currentSessionBlocksCount) {
+          popup.currentSessionBlocksCount.textContent = popup.sessionBlocks;
+        }
+
+        // Update session history item for this session
+        if (typeof popup.updateActiveSessionInHistory === "function") {
+          popup.updateActiveSessionInHistory();
+        }
+
+        // Persist only the sessions array (don't write sessionBlocks back to avoid circular updates)
+        chrome.storage.local.set({ sessions: popup.sessions }).catch(() => {});
+      }
+    }
+  }
+
+  // sessions array changed: sync and re-render history & stats
+  if (changes.sessions) {
+    popup.sessions = changes.sessions.newValue || [];
+    // Re-render session history & update stats UI
+    if (typeof popup.renderSessionHistory === "function")
+      popup.renderSessionHistory();
+    if (typeof popup.updateCurrentSessionStats === "function")
+      popup.updateCurrentSessionStats();
   }
 });
 

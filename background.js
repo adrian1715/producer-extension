@@ -230,11 +230,47 @@ class ProducerBackground {
         break;
 
       case "reportBlock":
-        this.sessionBlocks++;
-        chrome.storage.local.set({ sessionBlocks: this.sessionBlocks });
-        // Notify popup if it's open
-        this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
+        // Only increment counter if focus mode is active
+        if (this.isActive) {
+          this.sessionBlocks++;
+          chrome.storage.local.set({ sessionBlocks: this.sessionBlocks });
+          // Notify popup if it's open
+          this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
+        }
         break;
+
+      case "countCurrentlyBlockedTabs":
+        // Count all currently open tabs that would be blocked
+        chrome.tabs.query({}, (tabs) => {
+          let blockedCount = 0;
+
+          tabs.forEach((tab) => {
+            // Skip chrome:// and extension:// URLs
+            if (
+              !tab.url ||
+              tab.url.startsWith("chrome://") ||
+              tab.url.startsWith("chrome-extension://")
+            ) {
+              return;
+            }
+
+            // Check if this tab would be blocked
+            if (this.shouldBlockUrl(tab.url)) {
+              blockedCount++;
+            }
+          });
+
+          // Add to session blocks counter
+          this.sessionBlocks += blockedCount;
+          chrome.storage.local.set({ sessionBlocks: this.sessionBlocks });
+
+          // Notify popup with updated count
+          this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
+
+          // Send response back
+          sendResponse({ blockedCount, totalCount: this.sessionBlocks });
+        });
+        return true; // Keep message channel open for async response
 
       case "getMotivationalQuote":
         this.fetchMotivationalQuote()
