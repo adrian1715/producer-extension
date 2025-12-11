@@ -897,6 +897,10 @@ class ProducerPopup {
       if (!this.currentSessionId) {
         // Create a new session automatically
         this.sessionStartTime = Date.now();
+
+        // Reset session blocks counter for the new session
+        this.sessionBlocks = 0;
+
         const sessionId = "session-" + Date.now();
         const sessionDate = new Date(this.sessionStartTime);
         const defaultName = `Session ${sessionDate.toLocaleDateString()} ${sessionDate.toLocaleTimeString(
@@ -909,7 +913,7 @@ class ProducerPopup {
           name: defaultName,
           ruleSetId: this.activeRuleSetId,
           startTime: this.sessionStartTime,
-          blocksCount: this.sessionBlocks || 0,
+          blocksCount: 0,
           created: this.sessionStartTime,
           lastActive: this.sessionStartTime,
           isActive: true,
@@ -923,6 +927,9 @@ class ProducerPopup {
         this.sessions.push(newSession);
         this.currentSessionId = sessionId;
         this.sessionTime = 0;
+
+        // Update storage to reset the block counter for the new session
+        await chrome.storage.local.set({ sessionBlocks: 0 });
 
         // Start session stats tracking
         this.startSessionStatsTracking();
@@ -2468,6 +2475,9 @@ class ProducerPopup {
       session.sessionPauseStartTime = Date.now();
       session.sessionFocusStartTime = null;
     }
+
+    // Update storage with the new session's block count to sync with background script
+    await chrome.storage.local.set({ sessionBlocks: this.sessionBlocks });
 
     // Start session stats tracking
     this.startSessionStatsTracking();
