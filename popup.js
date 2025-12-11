@@ -25,9 +25,6 @@ class ProducerPopup {
     this.sessionFocusStartTime = null; // When focus mode started for current session segment
     this.sessionPauseStartTime = null; // When session was paused (focus mode stopped)
 
-    // Hover state tracking
-    this.isHoveringSessionName = false; // Track if user is hovering over session name
-
     this.initializeElements();
     this.bindEvents();
     this.loadState();
@@ -49,6 +46,7 @@ class ProducerPopup {
     this.sessionStatusText = document.getElementById("sessionStatusText");
     this.sessionTimerEl = document.getElementById("sessionTimer");
     this.focusedTimeEl = document.getElementById("focusedTime");
+    this.breakTimeEl = document.getElementById("breakTime");
     this.exportRulesBtn = document.getElementById("exportRulesBtn");
     this.importRulesBtn = document.getElementById("importRulesBtn");
     this.importFileInput = document.getElementById("importFileInput");
@@ -77,8 +75,6 @@ class ProducerPopup {
     // Sessions elements
     this.sessionsList = document.getElementById("sessionsList");
     this.clearSessionsBtn = document.getElementById("clearSessionsBtn");
-    this.totalSessionsCount = document.getElementById("totalSessionsCount");
-    this.avgSessionDuration = document.getElementById("avgSessionDuration");
 
     // Stats tab navigation elements
     this.statsMainView = document.getElementById("stats-main-view");
@@ -93,7 +89,6 @@ class ProducerPopup {
     this.statsTabAvgSession = document.getElementById("statsTabAvgSession");
 
     // Current session stats elements
-    this.sessionNameContainer = document.getElementById("sessionNameContainer");
     this.currentSessionName = document.getElementById("currentSessionName");
     this.currentSessionStats = document.getElementById("currentSessionStats");
     this.noSessionMessage = document.getElementById("noSessionMessage");
@@ -286,41 +281,6 @@ class ProducerPopup {
         }
       });
     }
-
-    // Show/hide deactivate button on hover
-    if (
-      this.sessionNameContainer &&
-      this.deactivateSessionBtn &&
-      this.currentSessionName
-    ) {
-      this.sessionNameContainer.addEventListener("mouseenter", () => {
-        if (this.currentSessionId) {
-          this.isHoveringSessionName = true;
-          // Hide session name, show button
-          this.currentSessionName.style.opacity = "0";
-          this.deactivateSessionBtn.style.display = "block";
-          // Use setTimeout to ensure display is set before opacity animation
-          setTimeout(() => {
-            this.deactivateSessionBtn.style.opacity = "1";
-          }, 10);
-        }
-      });
-
-      this.sessionNameContainer.addEventListener("mouseleave", () => {
-        if (this.currentSessionId) {
-          this.isHoveringSessionName = false;
-          // Show session name, hide button
-          this.currentSessionName.style.opacity = "0.7";
-          this.deactivateSessionBtn.style.opacity = "0";
-          // Hide button after transition
-          setTimeout(() => {
-            if (this.deactivateSessionBtn.style.opacity === "0") {
-              this.deactivateSessionBtn.style.display = "none";
-            }
-          }, 200);
-        }
-      });
-    }
   }
 
   switchTab(tabName) {
@@ -475,6 +435,9 @@ class ProducerPopup {
         // No sessions - set displays to zero
         if (this.focusedTimeEl) {
           this.focusedTimeEl.textContent = "00h00m";
+        }
+        if (this.breakTimeEl) {
+          this.breakTimeEl.textContent = "00h00m";
         }
         if (this.totalFocusedTimeEl) {
           this.totalFocusedTimeEl.textContent = "00h00m";
@@ -687,10 +650,6 @@ class ProducerPopup {
 
       if (!this.currentSessionId) {
         // No session active - show message and hide stats
-        this.isHoveringSessionName = false; // Reset hover state
-        if (this.currentSessionName) {
-          this.currentSessionName.style.display = "none"; // Hide session name completely
-        }
         if (this.currentSessionStats) {
           this.currentSessionStats.style.display = "none";
         }
@@ -699,14 +658,16 @@ class ProducerPopup {
         }
         if (this.deactivateSessionBtn) {
           this.deactivateSessionBtn.style.display = "none";
-          this.deactivateSessionBtn.style.opacity = "0";
         }
         if (this.currentSessionInfo) {
           this.currentSessionInfo.style.display = "none";
         }
-        // Also update Home tab focused time
+        // Also update Home tab stats
         if (this.focusedTimeEl) {
           this.focusedTimeEl.textContent = "00h00m";
+        }
+        if (this.breakTimeEl) {
+          this.breakTimeEl.textContent = "00h00m";
         }
         return;
       }
@@ -718,44 +679,35 @@ class ProducerPopup {
       if (this.noSessionMessage) {
         this.noSessionMessage.style.display = "none";
       }
-      // Only restore session name visibility if not hovering
-      if (this.currentSessionName && !this.isHoveringSessionName) {
-        this.currentSessionName.style.opacity = "0.7";
+      // Show deactivate button
+      if (this.deactivateSessionBtn) {
+        this.deactivateSessionBtn.style.display = "block";
       }
 
       const currentSession = this.sessions.find(
         (s) => s.id === this.currentSessionId
       );
       if (!currentSession) {
-        if (this.currentSessionName) {
-          this.currentSessionName.style.display = "none";
-        }
         return;
       }
 
-      // Update session name and ensure it's visible (unless currently hovering)
-      if (this.currentSessionName) {
-        this.currentSessionName.style.display = "inline"; // Show session name
-        this.currentSessionName.textContent = currentSession.name;
-        if (!this.isHoveringSessionName) {
-          this.currentSessionName.style.opacity = "0.7";
-        }
-      }
-
-      // Update session info display
+      // Update session info display (now includes session name in the info line)
       if (
         this.currentSessionInfo &&
+        this.currentSessionName &&
         this.currentSessionRules &&
         this.currentSessionBlocksCount
       ) {
         this.currentSessionInfo.style.display = "block";
+
+        // Update session name
+        this.currentSessionName.textContent = currentSession.name;
+
+        // Update rule set name
         const ruleSet = this.customRules.find(
           (rs) => rs.id === currentSession.ruleSetId
         );
-        const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
-
-        // Update rule set name
-        this.currentSessionRules.textContent = ruleSetName;
+        this.currentSessionRules.textContent = ruleSet ? ruleSet.name : "None";
 
         // Update blocks count
         this.currentSessionBlocksCount.textContent =
@@ -812,9 +764,12 @@ class ProducerPopup {
         this.currentSessionTotalTime.textContent = formatTime(totalSessionTime);
       }
 
-      // Also update the focused time in Home tab to match Stats tab
+      // Also update the Home tab stats to match Stats tab
       if (this.focusedTimeEl) {
         this.focusedTimeEl.textContent = formatTime(totalFocusedTime);
+      }
+      if (this.breakTimeEl) {
+        this.breakTimeEl.textContent = formatTime(totalBreakTime);
       }
     } catch (error) {
       console.error("Error updating current session stats:", error);
@@ -1138,8 +1093,8 @@ class ProducerPopup {
 
     // Update session status text
     this.sessionStatusText.textContent = this.isActive
-      ? "Session Active"
-      : "Session Inactive";
+      ? "Focus Active"
+      : "Focus Inactive";
     this.sessionStatusText.style.color = this.isActive ? "#2ecc71" : "#e74c3c";
 
     // Clear parameter inputs if they exist
@@ -2024,16 +1979,13 @@ class ProducerPopup {
 
     this.sessionsList.innerHTML = "";
 
-    // Update statistics based on new session structure
+    // Update statistics in main stats view
     const totalSessions = this.sessions.length;
-    if (this.totalSessionsCount) {
-      this.totalSessionsCount.textContent = totalSessions;
-    }
     if (this.statsTabTotalSessions) {
       this.statsTabTotalSessions.textContent = totalSessions;
     }
 
-    if (this.avgSessionDuration && totalSessions > 0) {
+    if (totalSessions > 0) {
       const totalFocusedTime = this.sessions.reduce(
         (sum, s) => sum + (s.focusedTime || 0),
         0
@@ -2044,17 +1996,12 @@ class ProducerPopup {
       const avgString = `${hours.toString().padStart(2, "0")}h${minutes
         .toString()
         .padStart(2, "0")}m`;
-      this.avgSessionDuration.textContent = avgString;
 
-      // Also update stats in main stats view
       if (this.statsTabAvgSession) {
         this.statsTabAvgSession.textContent = avgString;
       }
-    } else if (this.avgSessionDuration) {
-      this.avgSessionDuration.textContent = "00h00m";
-      if (this.statsTabAvgSession) {
-        this.statsTabAvgSession.textContent = "00h00m";
-      }
+    } else if (this.statsTabAvgSession) {
+      this.statsTabAvgSession.textContent = "00h00m";
     }
 
     // Update average focused time in Overall Stats (real-time updates handled separately)
@@ -2527,13 +2474,16 @@ class ProducerPopup {
   }
 
   async deactivateSession(sessionId) {
-    if (this.isActive) await this.toggleProducing();
-
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
     // If this is the current session, deactivate it
     if (this.currentSessionId === sessionId) {
+      // Turn off focus mode if it's active
+      if (this.isActive) {
+        await this.toggleProducing();
+      }
+
       // Commit any accumulated break or focus time
       this.commitCurrentSessionTime();
 
@@ -2552,6 +2502,10 @@ class ProducerPopup {
       this.currentSessionId = null;
       this.sessionBlocks = 0;
       this.sessionTime = 0;
+
+      // Ensure focus mode is off and stopped
+      this.isActive = false;
+      this.stopTimerUpdates();
 
       await this.saveState();
       this.updateUI();

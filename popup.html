@@ -395,10 +395,6 @@
         max-height: 100px;
       }
 
-      #sessionsList {
-        max-height: 220px;
-      }
-
       .flex-row {
         display: flex;
         gap: 6px;
@@ -685,20 +681,24 @@
         <div class="session-status">
           <div class="session-label">
             <span id="sessionStatusText" class="session-status-text"
-              >Session Inactive</span
+              >Focus Inactive</span
             >
           </div>
           <div class="session-timer" id="sessionTimer">00:00:00</div>
         </div>
 
-        <div class="stats">
-          <div class="stat-card">
-            <div class="stat-number" id="blockedCount">0</div>
-            <div class="stat-label">Sites Blocked</div>
+        <div class="stats" style="grid-template-columns: 1fr 1fr 1fr; gap: 8px">
+          <div class="stat-card" style="padding: 8px">
+            <div class="stat-number" style="font-size: 16px" id="blockedCount">0</div>
+            <div class="stat-label" style="font-size: 10px">Sites Blocked</div>
           </div>
-          <div class="stat-card">
-            <div class="stat-number" id="focusedTime">00h00m</div>
-            <div class="stat-label">Focused Time</div>
+          <div class="stat-card" style="padding: 8px">
+            <div class="stat-number" style="font-size: 16px" id="focusedTime">00h00m</div>
+            <div class="stat-label" style="font-size: 10px">Focus Time</div>
+          </div>
+          <div class="stat-card" style="padding: 8px">
+            <div class="stat-number" style="font-size: 16px" id="breakTime">00h00m</div>
+            <div class="stat-label" style="font-size: 10px">Break Time</div>
           </div>
         </div>
       </div>
@@ -710,40 +710,19 @@
           <div class="section">
             <div class="section-title">
               <span>📊 Current Session</span>
-              <div
-                id="sessionNameContainer"
-                style="position: relative; display: inline-block"
+              <span
+                id="deactivateSessionBtn"
+                class="btn btn-danger"
+                title="Deactivate Session"
+                style="
+                  display: none;
+                  font-size: 10px;
+                  padding: 1px 6px;
+                  white-space: nowrap;
+                "
               >
-                <span
-                  id="currentSessionName"
-                  style="
-                    font-size: 10px;
-                    opacity: 0.7;
-                    font-weight: 400;
-                    transition: opacity 0.2s ease;
-                  "
-                  >No session active</span
-                >
-                <button
-                  id="deactivateSessionBtn"
-                  class="btn btn-danger"
-                  title="Deactivate Session"
-                  style="
-                    display: none;
-                    opacity: 0;
-                    position: absolute;
-                    right: 0;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    font-size: 10px;
-                    padding: 4px 8px;
-                    white-space: nowrap;
-                    transition: opacity 0.2s ease;
-                  "
-                >
-                  Deactivate Session
-                </button>
-              </div>
+                End Session
+              </span>
             </div>
             <div
               id="currentSessionStats"
@@ -789,7 +768,7 @@
               style="display: none"
             >
               No active session.<br />
-              Start or activate a session to see its stats!
+              Start or activate a session to see the stats!
             </div>
             <div
               id="currentSessionInfo"
@@ -802,12 +781,18 @@
               "
             >
               <span>
-                <span style="opacity: 0.7">Active Rules: </span>
+                <span style="opacity: 0.7">Session: </span>
+                <span id="currentSessionName" style="font-weight: 600"
+                  >None</span
+                >
+                <span style="opacity: 0.7"> • Rules: </span>
                 <span id="currentSessionRules" style="font-weight: 600"
-                  >No Rules</span
+                  >None</span
                 >
                 <span style="opacity: 0.7"> • Sites Blocked: </span>
-                <span id="currentSessionBlocksCount" style="font-weight: 600">0</span>
+                <span id="currentSessionBlocksCount" style="font-weight: 600"
+                  >0</span
+                >
               </span>
             </div>
           </div>
@@ -868,11 +853,11 @@
 
         <!-- Session History View (previously separate Sessions tab) -->
         <div id="session-history-view" style="display: none">
-          <div class="section" style="margin-top: 0">
-            <div
-              class="section-title"
-              style="justify-content: space-between; display: flex; width: 100%"
-            >
+          <div
+            class="section"
+            style="margin-top: 0; margin-bottom: 0; max-height: 310px"
+          >
+            <div class="section-title">
               <div style="display: flex; gap: 8px; align-items: center">
                 <button id="backToStatsBtn" class="btn btn-xsmall">
                   <i class="bi bi-arrow-left"></i>
@@ -888,28 +873,12 @@
                 <i class="bi bi-trash"></i>
               </button>
             </div>
-            <div class="scroll-container" style="max-height: 112px">
+            <div class="scroll-container" style="max-height: 244px">
               <div id="sessionsList">
                 <div class="empty-state">
                   No sessions yet.<br />
                   Start focus mode to create your first session!
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">
-              <span>📊 Overall Statistics</span>
-            </div>
-            <div class="stats">
-              <div class="stat-card">
-                <div class="stat-number" id="totalSessionsCount">0</div>
-                <div class="stat-label">Total Sessions</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-number" id="avgSessionDuration">00h00m</div>
-                <div class="stat-label">Avg Focus Time</div>
               </div>
             </div>
           </div>
