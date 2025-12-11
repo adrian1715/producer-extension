@@ -7,6 +7,7 @@ class ProducerBackground {
     this.focusedTime = 0; // persisted cumulative total
     this.focusedTimeBase = 0; // snapshot of cumulative total at session start
     this.timerInterval = null;
+    this.heartbeatInterval = null; // Heartbeat for detecting browser closure
 
     this.init();
   }
@@ -32,9 +33,21 @@ class ProducerBackground {
     // Set up listeners
     this.setupListeners();
 
+    // Check for browser closure on init
+    await this.checkForBrowserClosure();
+
+    // Reload state after potential session deactivation
+    await this.loadState();
+
     // Restore timer if was active - improved logic
     if (this.isActive) {
       this.ensureTimerRunning();
+    } else {
+      // If there's an active session but focus mode is paused, start heartbeat
+      const data = await chrome.storage.local.get(["currentSessionId"]);
+      if (data.currentSessionId) {
+        this.startHeartbeat();
+      }
     }
   }
 
@@ -138,14 +151,25 @@ class ProducerBackground {
       return true; // Keep message channel open for async responses
     });
 
-    // Reset session blocks when extension is restarted
-    chrome.runtime.onStartup.addListener(() => {
-      this.sessionBlocks = 0;
-      chrome.storage.local.set({ sessionBlocks: 0 });
+    // Check for browser closure on startup
+    chrome.runtime.onStartup.addListener(async () => {
+      await this.checkForBrowserClosure();
+    });
+
+    // Detect when all browser windows are closed
+    chrome.windows.onRemoved.addListener(async (windowId) => {
+      const windows = await chrome.windows.getAll();
+      if (windows.length === 0) {
+        // All windows closed - update timestamp for closure detection
+        await chrome.storage.local.set({ lastActiveTimestamp: Date.now() });
+      }
     });
 
     // Handle service worker lifecycle in manifest v3
     chrome.runtime.onSuspend?.addListener(() => {
+      // Stop heartbeat
+      this.stopHeartbeat();
+
       if (this.isActive && this.sessionStartTime) {
         // Save current focused time before suspension
         const { totalFocused } = this.getTimes();
@@ -153,6 +177,100 @@ class ProducerBackground {
         this.saveTimerState();
       }
     });
+  }
+
+  // Start heartbeat to track browser activity
+  startHeartbeat() {
+    // Clear any existing heartbeat
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+
+    // Update timestamp every second when active
+    this.heartbeatInterval = setInterval(() => {
+      chrome.storage.local.set({ lastActiveTimestamp: Date.now() });
+    }, 1000);
+
+    // Set initial timestamp
+    chrome.storage.local.set({ lastActiveTimestamp: Date.now() });
+  }
+
+  // Stop heartbeat
+  stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  // Check if browser was closed and deactivate session if needed
+  async checkForBrowserClosure() {
+    try {
+      const data = await chrome.storage.local.get([
+        "lastActiveTimestamp",
+        "sessions",
+        "currentSessionId",
+        "isActive",
+      ]);
+
+      const lastActiveTimestamp = data.lastActiveTimestamp;
+      const currentTime = Date.now();
+
+      // If there's a timestamp and the difference is > 30 seconds, browser was likely closed
+      if (lastActiveTimestamp && currentTime - lastActiveTimestamp > 30000) {
+        console.log(
+          "Browser was closed, deactivating session...",
+          Math.floor((currentTime - lastActiveTimestamp) / 1000),
+          "seconds elapsed"
+        );
+
+        // Load current state
+        const sessions = data.sessions || [];
+        const currentSessionId = data.currentSessionId;
+
+        // Deactivate the active session if one exists
+        if (currentSessionId) {
+          const session = sessions.find((s) => s.id === currentSessionId);
+          if (session) {
+            // Mark session as inactive
+            session.isActive = false;
+
+            // Set end time if not already set
+            if (!session.endTime) {
+              session.endTime = lastActiveTimestamp; // Use last known active time
+            }
+
+            // Clear session tracking times
+            session.sessionFocusStartTime = null;
+            session.sessionPauseStartTime = null;
+
+            // Update last active timestamp
+            session.lastActive = lastActiveTimestamp;
+
+            console.log(`Session "${session.name}" deactivated due to browser closure`);
+          }
+
+          // Save updated sessions and clear current session
+          await chrome.storage.local.set({
+            sessions: sessions,
+            currentSessionId: null,
+            isActive: false,
+            sessionBlocks: 0,
+          });
+
+          // Update internal state
+          this.isActive = false;
+          this.sessionBlocks = 0;
+          this.sessionStartTime = null;
+
+          // Stop any running timers
+          await this.stopTimer();
+          this.stopHeartbeat();
+        }
+      }
+    } catch (error) {
+      console.error("Error checking for browser closure:", error);
+    }
   }
 
   async handleMessage(message, sender, sendResponse) {
@@ -306,6 +424,9 @@ class ProducerBackground {
 
     this.saveTimerState();
 
+    // Start heartbeat to track browser activity
+    this.startHeartbeat();
+
     this.timerInterval = setInterval(() => {
       const { sessionElapsed, totalFocused } = this.getTimes();
 
@@ -323,7 +444,7 @@ class ProducerBackground {
     }, 1000);
   }
 
-  stopTimer() {
+  async stopTimer() {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
@@ -335,6 +456,18 @@ class ProducerBackground {
 
     this.sessionStartTime = null;
     this.saveTimerState();
+
+    // Check if there's still an active session (focus mode paused but session active)
+    const data = await chrome.storage.local.get(["currentSessionId"]);
+    if (data.currentSessionId) {
+      // Keep heartbeat running for active session even when timer is stopped
+      if (!this.heartbeatInterval) {
+        this.startHeartbeat();
+      }
+    } else {
+      // No active session, stop heartbeat
+      this.stopHeartbeat();
+    }
   }
 
   getCurrentSessionTime() {
