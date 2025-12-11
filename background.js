@@ -359,7 +359,7 @@ class ProducerBackground {
 
       case "countCurrentlyBlockedTabs":
         // Count all currently open tabs that would be blocked
-        chrome.tabs.query({}, (tabs) => {
+        chrome.tabs.query({}, async (tabs) => {
           let blockedCount = 0;
 
           tabs.forEach((tab) => {
@@ -378,15 +378,20 @@ class ProducerBackground {
             }
           });
 
+          // Get current session blocks from storage (source of truth)
+          const data = await chrome.storage.local.get(["sessionBlocks"]);
+          const currentSessionBlocks = data.sessionBlocks || 0;
+
           // Add to session blocks counter
-          this.sessionBlocks += blockedCount;
-          chrome.storage.local.set({ sessionBlocks: this.sessionBlocks });
+          const newTotal = currentSessionBlocks + blockedCount;
+          this.sessionBlocks = newTotal;
+          chrome.storage.local.set({ sessionBlocks: newTotal });
 
           // Notify popup with updated count
-          this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
+          this.notifyPopup("updateBlockCount", { count: newTotal });
 
           // Send response back
-          sendResponse({ blockedCount, totalCount: this.sessionBlocks });
+          sendResponse({ blockedCount, totalCount: newTotal });
         });
         return true; // Keep message channel open for async response
 
