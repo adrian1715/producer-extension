@@ -892,13 +892,11 @@ class ProducerPopup {
     this.isActive = !this.isActive;
 
     if (this.isActive) {
-      // Starting focus mode
-      this.sessionStartTime = Date.now();
-      this.startTimerUpdates();
-
+      // Starting focus mode - ensure there's an active session
       // Only create a new session if there's no active session selected
       if (!this.currentSessionId) {
-        // Create a new session
+        // Create a new session automatically
+        this.sessionStartTime = Date.now();
         const sessionId = "session-" + Date.now();
         const sessionDate = new Date(this.sessionStartTime);
         const defaultName = `Session ${sessionDate.toLocaleDateString()} ${sessionDate.toLocaleTimeString(
@@ -926,11 +924,11 @@ class ProducerPopup {
         this.currentSessionId = sessionId;
         this.sessionTime = 0;
 
-        // Session already has tracking times set in initialization
         // Start session stats tracking
         this.startSessionStatsTracking();
       } else {
         // Continue with existing session
+        this.sessionStartTime = Date.now();
         const currentSession = this.sessions.find(
           (s) => s.id === this.currentSessionId
         );
@@ -948,6 +946,9 @@ class ProducerPopup {
           currentSession.sessionPauseStartTime = null;
         }
       }
+
+      // Start timer updates
+      this.startTimerUpdates();
 
       // Tell background script to start timer with current session's focused time
       const currentSession = this.currentSessionId
@@ -1028,6 +1029,11 @@ class ProducerPopup {
   }
 
   updateUI() {
+    // Ensure focus mode is off when there's no active session
+    if (!this.currentSessionId && this.isActive) {
+      this.isActive = false;
+    }
+
     // Update toggle button
     this.toggleBtn.textContent = this.isActive
       ? "Stop Producing"
@@ -2514,7 +2520,7 @@ class ProducerPopup {
     }
   }
 
-  deleteSession(sessionId) {
+  async deleteSession(sessionId) {
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
@@ -2532,16 +2538,26 @@ class ProducerPopup {
 
     // If deleting the current session, clear it
     if (this.currentSessionId === sessionId) {
+      // Turn off focus mode if active
+      if (this.isActive) await this.toggleProducing();
+
+      // Commit any accumulated break or focus time
+      this.commitCurrentSessionTime();
+
       // Stop session stats tracking
       this.stopSessionStatsTracking();
 
       this.currentSessionId = null;
       this.sessionBlocks = 0;
       this.sessionTime = 0;
+
+      // Ensure focus mode is off and stopped
+      this.isActive = false;
+      this.stopTimerUpdates();
     }
 
     this.sessions = this.sessions.filter((s) => s.id !== sessionId);
-    this.saveState();
+    await this.saveState();
     this.updateUI();
     this.showNotification("Session deleted");
   }
