@@ -173,7 +173,7 @@
       }
 
       .btn-small {
-        padding: 0;
+        padding: 4px 8px;
         border-radius: 6px;
         cursor: pointer;
         font-size: 12px;
@@ -181,16 +181,13 @@
         font-weight: 500;
         transition: all 0.3s ease;
         backdrop-filter: blur(5px);
-        width: 28px;
-        min-width: 28px;
-        height: 28px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
       }
 
       .btn-xsmall {
-        padding: 0;
+        padding: 3px 6px;
         border-radius: 6px;
         cursor: pointer;
         font-size: 12px;
@@ -198,9 +195,6 @@
         font-weight: 500;
         transition: all 0.3s ease;
         backdrop-filter: blur(5px);
-        width: 28px;
-        min-width: 28px;
-        height: 28px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -209,6 +203,11 @@
       .btn-small:hover,
       .btn-xsmall:hover {
         transform: translateY(-1px);
+      }
+
+      .btn-squared {
+        width: 28px !important;
+        height: 28px !important;
       }
 
       i {
@@ -383,16 +382,6 @@
       .scroll-container::-webkit-scrollbar-thumb {
         background: rgba(255, 255, 255, 0.3);
         border-radius: 2px;
-      }
-
-      /* Specific scroll container heights for different views */
-      #ruleSetsList {
-        max-height: 180px;
-      }
-
-      /* Rules list needs smaller max-height to fit within section with title */
-      #rulesList {
-        max-height: 100px;
       }
 
       .flex-row {
@@ -645,18 +634,24 @@
         padding: 6px 10px;
       }
 
-      /* Session active button hover effect */
-      .session-active-btn {
-        transition: all 0.3s ease;
+      /* ACTIVE/INACTIVE BUTTONS */
+      .btn.active {
+        background: rgba(46, 204, 113, 0.3);
+        border-color: rgba(46, 204, 113, 0.5);
       }
 
-      .session-active-btn:hover {
+      .btn.active:hover {
         background: rgba(231, 76, 60, 0.3) !important;
         border-color: rgba(231, 76, 60, 0.5) !important;
       }
 
-      .session-active-btn:hover i::before {
+      .btn.active:hover i::before {
         content: "\f623" !important; /* bi-x-circle-fill */
+      }
+
+      .btn.inactive {
+        background: rgba(52, 152, 219, 0.3);
+        border-color: rgba(52, 152, 219, 0.5);
       }
     </style>
     <link
@@ -672,7 +667,7 @@
     <!-- Main Content Area -->
     <div class="content-area">
       <!-- HOME TAB -->
-      <div id="tab-home" class="tab-content active">
+      <div id="tab-home" class="tab-content active" style="margin: auto 0">
         <div class="status-indicator" id="statusIndicator">
           <span id="statusIcon">🎯</span>
         </div>
@@ -689,15 +684,21 @@
 
         <div class="stats" style="grid-template-columns: 1fr 1fr 1fr; gap: 8px">
           <div class="stat-card" style="padding: 8px">
-            <div class="stat-number" style="font-size: 16px" id="blockedCount">0</div>
+            <div class="stat-number" style="font-size: 16px" id="blockedCount">
+              0
+            </div>
             <div class="stat-label" style="font-size: 10px">Sites Blocked</div>
           </div>
           <div class="stat-card" style="padding: 8px">
-            <div class="stat-number" style="font-size: 16px" id="focusedTime">00h00m</div>
+            <div class="stat-number" style="font-size: 16px" id="focusedTime">
+              00h00m
+            </div>
             <div class="stat-label" style="font-size: 10px">Focus Time</div>
           </div>
           <div class="stat-card" style="padding: 8px">
-            <div class="stat-number" style="font-size: 16px" id="breakTime">00h00m</div>
+            <div class="stat-number" style="font-size: 16px" id="breakTime">
+              00h00m
+            </div>
             <div class="stat-label" style="font-size: 10px">Break Time</div>
           </div>
         </div>
@@ -714,12 +715,7 @@
                 id="deactivateSessionBtn"
                 class="btn btn-danger"
                 title="Deactivate Session"
-                style="
-                  display: none;
-                  font-size: 10px;
-                  padding: 1px 6px;
-                  white-space: nowrap;
-                "
+                style="display: none; font-size: 10px; padding: 1px 6px"
               >
                 End Session
               </span>
@@ -859,14 +855,14 @@
           >
             <div class="section-title">
               <div style="display: flex; gap: 8px; align-items: center">
-                <button id="backToStatsBtn" class="btn btn-xsmall">
+                <button id="backToStatsBtn" class="btn btn-xsmall btn-squared">
                   <i class="bi bi-arrow-left"></i>
                 </button>
                 <span>🕐 Session History</span>
               </div>
               <button
                 id="clearSessionsBtn"
-                class="btn btn-xsmall btn-danger"
+                class="btn btn-xsmall btn-squared btn-danger"
                 title="Delete All Sessions"
                 style="display: none"
               >
@@ -889,43 +885,37 @@
       <div id="tab-rules" class="tab-content">
         <!-- Main view: List of custom rule sets -->
         <div id="rules-main-view">
-          <div class="section">
+          <div class="section" style="max-height: 255px">
             <div class="section-title">
               <span>📋 Custom Rules</span>
-              <div style="display: flex; margin-left: 4px; gap: 4px">
-                <button
-                  id="clearAllRuleSetsBtn"
-                  class="btn btn-xsmall btn-danger"
-                  title="Delete All Custom Rules"
-                  style="display: none"
-                >
-                  <i class="bi bi-trash"></i>
-                </button>
-                <button
-                  id="createRuleSetBtn"
-                  class="btn btn-xsmall btn-success"
-                  title="Create New Custom Rules"
-                >
-                  <i class="bi bi-plus"></i>
-                </button>
-              </div>
+              <button
+                id="clearAllRuleSetsBtn"
+                class="btn btn-xsmall btn-danger"
+                title="Delete All Custom Rules"
+                style="display: none; padding: 1px 6px; font-size: 10px"
+              >
+                Delete All
+              </button>
             </div>
-            <div class="scroll-container" style="max-height: 130px">
-              <div id="ruleSetsList">
-                <div class="empty-state">
-                  No custom rule sets yet.<br />
-                  Create one to get started!
-                </div>
+            <div
+              id="ruleSetsList"
+              class="scroll-container"
+              style="max-height: 194px"
+            >
+              <div class="empty-state">
+                No custom rules yet.<br />
+                Create one to get started!
               </div>
             </div>
           </div>
 
-          <div class="section">
-            <div class="section-title">✔️ Active Rules</div>
-            <select id="activeRuleSetSelect" style="width: 100%">
-              <option value="" selected>No Rules</option>
-            </select>
-          </div>
+          <button
+            id="createRuleSetBtn"
+            class="btn btn-success"
+            style="width: 100%"
+          >
+            <i class="bi bi-plus-circle"></i> Create New Custom Rules
+          </button>
         </div>
 
         <!-- Edit view: Edit or create a rule set -->
@@ -948,7 +938,10 @@
           <!-- Add block rule section -->
           <div class="section">
             <div class="section-title" style="justify-content: initial">
-              <button id="backToRuleSetListBtn" class="btn btn-xsmall">
+              <button
+                id="backToRuleSetListBtn"
+                class="btn btn-xsmall btn-squared"
+              >
                 <i class="bi bi-arrow-left"></i>
               </button>
               <span>🚫 Add Rule</span>
@@ -996,14 +989,14 @@
           </div>
 
           <!-- Rules list -->
-          <div class="section" style="height: 144px">
+          <div class="section">
             <div class="section-title">
               <span>📋 Rules (<span id="ruleCount">0</span>)</span>
 
               <div id="rulesOptionBtn">
                 <button
                   id="importRulesBtn"
-                  class="btn btn-xsmall btn-primary"
+                  class="btn btn-xsmall btn-squared btn-primary"
                   title="Import Rules"
                 >
                   <input
@@ -1016,7 +1009,7 @@
                 </button>
                 <button
                   id="exportRulesBtn"
-                  class="btn btn-xsmall btn-success"
+                  class="btn btn-xsmall btn-squared btn-success"
                   title="Export Rules"
                   style="display: none"
                 >
@@ -1024,7 +1017,7 @@
                 </button>
                 <button
                   id="clearRulesBtn"
-                  class="btn btn-xsmall btn-danger"
+                  class="btn btn-xsmall btn-squared btn-danger"
                   title="Clear Rules"
                   style="display: none"
                 >
@@ -1033,7 +1026,7 @@
               </div>
             </div>
 
-            <div class="scroll-container" style="max-height: 76px">
+            <div class="scroll-container" style="max-height: 80px">
               <div id="rulesList">
                 <div class="empty-state">
                   No blocking rules configured yet.<br />
@@ -1169,7 +1162,7 @@
             <div class="section-title">
               <button
                 id="backToThemeBtn"
-                class="btn btn-xsmall"
+                class="btn btn-xsmall btn-squared"
                 title="Back to Theme"
               >
                 <i class="bi bi-arrow-left"></i>
@@ -1201,7 +1194,7 @@
               <span>👁️ Preview</span>
               <button
                 id="resetPersonalizationBtn"
-                class="btn btn-xsmall btn-danger"
+                class="btn btn-xsmall btn-squared btn-danger"
                 title="Reset to Defaults"
               >
                 <i class="bi bi-arrow-counterclockwise"></i>

@@ -60,7 +60,6 @@ class ProducerPopup {
     // Custom rule sets elements
     this.createRuleSetBtn = document.getElementById("createRuleSetBtn");
     this.ruleSetsList = document.getElementById("ruleSetsList");
-    this.activeRuleSetSelect = document.getElementById("activeRuleSetSelect");
     this.rulesMainView = document.getElementById("rules-main-view");
     this.rulesEditView = document.getElementById("rules-edit-view");
     this.backToRuleSetListBtn = document.getElementById("backToRuleSetListBtn");
@@ -239,11 +238,6 @@ class ProducerPopup {
     if (this.backToRuleSetListBtn) {
       this.backToRuleSetListBtn.addEventListener("click", () =>
         this.showRulesMainView()
-      );
-    }
-    if (this.activeRuleSetSelect) {
-      this.activeRuleSetSelect.addEventListener("change", () =>
-        this.selectActiveRuleSet()
       );
     }
 
@@ -1086,9 +1080,8 @@ class ProducerPopup {
     }
     // Note: totalFocusedTimeEl (Avg Focus Time) is updated in updateAverageFocusedTime()
 
-    // Update rule sets list and active dropdown
+    // Update rule sets list
     this.renderRuleSetsList();
-    this.renderActiveRuleSetDropdown();
 
     // Update rules list (if in edit view)
     if (this.currentEditingRuleSetId) {
@@ -1338,7 +1331,7 @@ class ProducerPopup {
       info.appendChild(type);
 
       const removeBtn = document.createElement("button");
-      removeBtn.className = "btn btn-xsmall btn-danger";
+      removeBtn.className = "btn btn-xsmall btn-squared btn-danger";
       removeBtn.textContent = "✕";
       removeBtn.title = "Delete Rule";
       removeBtn.addEventListener("click", () => {
@@ -1695,6 +1688,24 @@ class ProducerPopup {
     // Add to custom rules
     this.customRules.push(this.tempRuleSet);
 
+    // Auto-activate if no active rule set exists
+    if (!this.activeRuleSetId) {
+      this.activeRuleSetId = this.tempRuleSet.id;
+
+      // Update current session's rule set if there's an active session
+      if (this.currentSessionId) {
+        const currentSession = this.sessions.find(
+          (s) => s.id === this.currentSessionId
+        );
+        if (currentSession) {
+          currentSession.ruleSetId = this.activeRuleSetId;
+        }
+      }
+
+      // Reload affected tabs with the new active rules
+      chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
+    }
+
     // Clear temporary state
     this.tempRuleSet = null;
     this.isCreatingNewRuleSet = false;
@@ -1705,7 +1716,13 @@ class ProducerPopup {
     this.updateUI();
 
     // Show success message and return to main view
-    this.showNotification("Custom rules saved successfully!");
+    const activationMessage =
+      this.activeRuleSetId === this.customRules[this.customRules.length - 1].id
+        ? " and activated"
+        : "";
+    this.showNotification(
+      `Custom rules successfully saved${activationMessage}!`
+    );
     this.showRulesMainView();
   }
 
@@ -1770,11 +1787,13 @@ class ProducerPopup {
     this.showNotification("Name saved!");
   }
 
-  selectActiveRuleSet() {
-    if (!this.activeRuleSetSelect) return;
+  activateRuleSet(ruleSetId) {
+    if (!ruleSetId) return;
 
-    const selectedId = this.activeRuleSetSelect.value;
-    this.activeRuleSetId = selectedId || null;
+    const ruleSet = this.customRules.find((rs) => rs.id === ruleSetId);
+    if (!ruleSet) return;
+
+    this.activeRuleSetId = ruleSetId;
 
     // Update current session's rule set if there's an active session
     if (this.currentSessionId) {
@@ -1788,9 +1807,31 @@ class ProducerPopup {
 
     this.saveState();
     this.updateUI();
-    this.showNotification(
-      selectedId ? "Active rule set changed!" : "No rule set active"
-    );
+    this.showNotification(`Custom Rules "${ruleSet.name}" activated!`);
+
+    // Reload affected tabs with the new rules
+    chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
+  }
+
+  deactivateRuleSet() {
+    this.activeRuleSetId = null;
+
+    // Update current session's rule set if there's an active session
+    if (this.currentSessionId) {
+      const currentSession = this.sessions.find(
+        (s) => s.id === this.currentSessionId
+      );
+      if (currentSession) {
+        currentSession.ruleSetId = null;
+      }
+    }
+
+    this.saveState();
+    this.updateUI();
+    this.showNotification("Custom Rules deactivated!");
+
+    // Reload affected tabs to remove blocking
+    chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
   }
 
   showRulesMainView() {
@@ -1936,8 +1977,32 @@ class ProducerPopup {
       buttonDiv.style.gap = "4px";
       buttonDiv.style.marginLeft = "4px";
 
+      // Check if this rule set is active
+      const isActive = this.activeRuleSetId === ruleSet.id;
+
+      // Activate/Deactivate button
+      const toggleBtn = document.createElement("button");
+      toggleBtn.className = isActive
+        ? "btn btn-xsmall btn-squared active"
+        : "btn btn-xsmall btn-squared inactive";
+      toggleBtn.innerHTML = isActive
+        ? '<i class="bi bi-check-circle-fill"></i>'
+        : '<i class="bi bi-play-circle"></i>';
+      toggleBtn.title = isActive
+        ? "Deactivate Custom Rules"
+        : "Activate Custom Rules";
+
+      toggleBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (isActive) {
+          this.deactivateRuleSet();
+        } else {
+          this.activateRuleSet(ruleSet.id);
+        }
+      });
+
       const editBtn = document.createElement("button");
-      editBtn.className = "btn btn-xsmall btn-secondary";
+      editBtn.className = "btn btn-xsmall btn-squared btn-secondary";
       editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
       editBtn.title = "Edit Rules";
       editBtn.addEventListener("click", (e) => {
@@ -1946,7 +2011,7 @@ class ProducerPopup {
       });
 
       const deleteBtn = document.createElement("button");
-      deleteBtn.className = "btn btn-small btn-danger";
+      deleteBtn.className = "btn btn-small btn-squared btn-danger";
       deleteBtn.textContent = "✕";
       deleteBtn.title = "Delete Rule Set";
       deleteBtn.addEventListener("click", (e) => {
@@ -1955,35 +2020,12 @@ class ProducerPopup {
       });
 
       item.appendChild(info);
+      buttonDiv.appendChild(toggleBtn);
       buttonDiv.appendChild(editBtn);
       buttonDiv.appendChild(deleteBtn);
       item.appendChild(buttonDiv);
       this.ruleSetsList.appendChild(item);
     });
-  }
-
-  renderActiveRuleSetDropdown() {
-    if (!this.activeRuleSetSelect) return;
-
-    // Save current selection
-    const currentValue = this.activeRuleSetSelect.value;
-
-    // Clear and repopulate
-    this.activeRuleSetSelect.innerHTML = '<option value="">No Rules</option>';
-
-    this.customRules.forEach((ruleSet) => {
-      const option = document.createElement("option");
-      option.value = ruleSet.id;
-      option.textContent = ruleSet.name;
-      this.activeRuleSetSelect.appendChild(option);
-    });
-
-    // Restore selection
-    if (this.activeRuleSetId) {
-      this.activeRuleSetSelect.value = this.activeRuleSetId;
-    } else {
-      this.activeRuleSetSelect.value = "";
-    }
   }
 
   // Session history methods
@@ -2030,7 +2072,7 @@ class ProducerPopup {
       this.sessionsList.innerHTML = `
         <div class="empty-state">
           No sessions created yet.<br />
-          Create a session from the Home tab!
+          Start the focus mode to create a new session!
         </div>
       `;
       return;
@@ -2162,8 +2204,8 @@ class ProducerPopup {
       // Activate/Deactivate button
       const toggleBtn = document.createElement("button");
       toggleBtn.className = isActive
-        ? "btn btn-xsmall btn-success session-active-btn"
-        : "btn btn-xsmall btn-primary";
+        ? "btn btn-xsmall btn-squared active"
+        : "btn btn-xsmall btn-squared inactive";
       toggleBtn.innerHTML = isActive
         ? '<i class="bi bi-check-circle-fill"></i>'
         : '<i class="bi bi-play-circle"></i>';
@@ -2186,7 +2228,7 @@ class ProducerPopup {
         (session.blocksCount || 0) > 0
       ) {
         const clearStatsBtn = document.createElement("button");
-        clearStatsBtn.className = "btn btn-xsmall";
+        clearStatsBtn.className = "btn btn-xsmall btn-squared";
         clearStatsBtn.innerHTML = '<i class="bi bi-stars"></i>';
         clearStatsBtn.title = "Clear Stats";
         clearStatsBtn.addEventListener("click", () => {
@@ -2205,7 +2247,7 @@ class ProducerPopup {
       }
 
       const deleteBtn = document.createElement("button");
-      deleteBtn.className = "btn btn-small btn-danger";
+      deleteBtn.className = "btn btn-small btn-squared btn-danger";
       deleteBtn.textContent = "✕";
       deleteBtn.title = "Delete Session";
       deleteBtn.addEventListener("click", () => {
