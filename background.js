@@ -247,7 +247,9 @@ class ProducerBackground {
             // Update last active timestamp
             session.lastActive = lastActiveTimestamp;
 
-            console.log(`Session "${session.name}" deactivated due to browser closure`);
+            console.log(
+              `Session "${session.name}" deactivated due to browser closure`
+            );
           }
 
           // Save updated sessions and clear current session
@@ -542,6 +544,9 @@ class ProducerBackground {
 
     switch (rule.type) {
       case "domain":
+        // Wildcard "*" matches all URLs
+        if (ruleUrl === "*") return true;
+
         // Block entire domain and all subdomains
         const hostname = new URL("https://" + url).hostname.replace(
           /^www\./,
@@ -550,6 +555,9 @@ class ProducerBackground {
         return hostname === ruleUrl || hostname.endsWith("." + ruleUrl);
 
       case "url":
+        // Wildcard "*" matches all URLs
+        if (ruleUrl === "*") return true;
+
         // Block only the specific URL - exact match for base domain or exact path match
         try {
           const urlObj = new URL("https://" + checkUrl);

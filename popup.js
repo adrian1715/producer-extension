@@ -1146,11 +1146,42 @@ class ProducerPopup {
       this.ruleType.value !== "allowParam"
     ) {
       this.showNotification("Please enter a valid URL or domain", "error");
+      this.urlInput.value = ""; // Clear invalid input
       return;
     }
 
     // Clean and validate URL
     const cleanUrl = this.cleanUrl(url);
+
+    // Check if trying to add wildcard "*" rule when one already exists
+    if (cleanUrl === "*" && (type === "domain" || type === "url")) {
+      // Find the rule set
+      let ruleSet;
+      if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+        ruleSet = this.tempRuleSet;
+      } else {
+        ruleSet = this.customRules.find(
+          (rs) => rs.id === this.currentEditingRuleSetId
+        );
+      }
+
+      if (ruleSet) {
+        // Check if a wildcard rule already exists (in either domain or url type)
+        const wildcardExists = ruleSet.rules.some(
+          (rule) =>
+            rule.url === "*" && (rule.type === "domain" || rule.type === "url")
+        );
+
+        if (wildcardExists) {
+          this.showNotification(
+            "'Block All Websites' rule already exists",
+            "error"
+          );
+          this.urlInput.value = ""; // Clear input
+          return;
+        }
+      }
+    }
 
     // For parameter-based rules, validate parameter inputs
     let paramKey = "";
@@ -1164,6 +1195,8 @@ class ProducerPopup {
       paramValue = this.paramValueInput.value.trim();
       if (!paramKey) {
         this.showNotification("Please enter a parameter key", "error");
+        if (this.paramKeyInput) this.paramKeyInput.value = ""; // Clear input
+        if (this.paramValueInput) this.paramValueInput.value = ""; // Clear input
         return;
       }
     }
@@ -1183,20 +1216,37 @@ class ProducerPopup {
       return;
     }
 
-    // Check for duplicates
-    const exists = ruleSet.rules.some((rule) => {
-      if (rule.type === type) {
-        if (type === "allowParam") {
-          return rule.paramKey === paramKey && rule.paramValue === paramValue;
-        } else {
-          return rule.url === cleanUrl;
-        }
+    // Check for duplicates - prevent same URL across all rule types
+    if (type !== "allowParam") {
+      // For domain/url/allow rules, check if URL already exists in any rule type
+      const existingRule = ruleSet.rules.find(
+        (rule) => rule.type !== "allowParam" && rule.url === cleanUrl
+      );
+
+      if (existingRule) {
+        const existingTypeLabel = this.formatRuleType(existingRule);
+        this.showNotification(
+          `URL already added as "${existingTypeLabel}"`,
+          "error"
+        );
+        this.urlInput.value = ""; // Clear input
+        return;
       }
-      return false;
-    });
-    if (exists) {
-      this.showNotification("This rule already exists", "error");
-      return;
+    } else {
+      // For allowParam rules, check for exact param match
+      const exists = ruleSet.rules.some(
+        (rule) =>
+          rule.type === "allowParam" &&
+          rule.paramKey === paramKey &&
+          rule.paramValue === paramValue
+      );
+
+      if (exists) {
+        this.showNotification("Parameter rule already exists", "error");
+        if (this.paramKeyInput) this.paramKeyInput.value = ""; // Clear input
+        if (this.paramValueInput) this.paramValueInput.value = ""; // Clear input
+        return;
+      }
     }
 
     // Add rule
@@ -1325,7 +1375,7 @@ class ProducerPopup {
 
       const type = document.createElement("div");
       type.className = "rule-type";
-      type.textContent = this.formatRuleType(rule.type);
+      type.textContent = this.formatRuleType(rule);
 
       info.appendChild(url);
       info.appendChild(type);
@@ -1350,24 +1400,48 @@ class ProducerPopup {
   }
 
   isValidUrl(url) {
-    // Basic URL validation
-    const urlPattern =
-      /^[a-zA-Z0-9][a-zA-Z0-9-._]*[a-zA-Z0-9](\.[a-zA-Z]{2,})?([\/\w\-._~:?#[\]@!$&'()*+,;=]*)?$/;
+    // Allow wildcard "*" to block all websites
+    if (url === "*") return true;
+
+    // Must have at least one character
+    if (!url || url.length === 0) return false;
+
+    // Reject URLs with spaces
+    if (/\s/.test(url)) return false;
+
+    // Reject consecutive dots
+    if (url.includes("..")) return false;
+
+    // Reject if starts or ends with invalid characters
+    if (url.startsWith(".") || url.startsWith("-")) return false;
+    if (url.endsWith(".")) return false;
+
+    // Basic validation - allow alphanumeric, dots, hyphens, slashes, and common URL characters
+    // More permissive to allow domains like "localhost", "example.com/path", etc.
+    const urlPattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-._\/\w~:?#[\]@!$&'()*+,;=%]*)?$/;
     return urlPattern.test(url);
   }
 
   formatUrl(url) {
+    // Show descriptive text for wildcard rule
+    if (url === "*") return "* (All Websites)";
+
     return url.length > 35 ? url.substring(0, 35) + "..." : url;
   }
 
-  formatRuleType(type) {
+  formatRuleType(rule) {
+    // Show special indicator for wildcard block-all rule (both domain and url types)
+    if (rule.url === "*" && (rule.type === "domain" || rule.type === "url")) {
+      return "🌐 Block All Websites";
+    }
+
     const typeMap = {
       domain: "🚫 Block Domain",
       url: "🎯 Block URL",
       allow: "✅ Allow URL",
       allowParam: "🔗 Allow with Parameter",
     };
-    return typeMap[type] || type;
+    return typeMap[rule.type] || rule.type;
   }
 
   showNotification(message, type = "success") {
