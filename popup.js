@@ -694,18 +694,70 @@ class ProducerPopup {
       ) {
         this.currentSessionInfo.style.display = "block";
 
-        // Update session name
-        this.currentSessionName.textContent = currentSession.name;
-
-        // Update rule set name
+        // Get original values
+        let sessionName = currentSession.name;
         const ruleSet = this.customRules.find(
           (rs) => rs.id === currentSession.ruleSetId
         );
-        this.currentSessionRules.textContent = ruleSet ? ruleSet.name : "None";
+        let rulesName = ruleSet ? ruleSet.name : "None";
+        const blocksCount = String(currentSession.blocksCount || 0);
 
-        // Update blocks count
-        this.currentSessionBlocksCount.textContent =
-          currentSession.blocksCount || 0;
+        // Static text: "Session: " (9) + " • Rules: " (10) + " • Blocks: " (11) = 30 chars
+        const staticLength = 30; // Length of static text parts
+        const maxTotalLength = 69; // Max total length for the entire line
+        const ellipsis = "...";
+        const ellipsisLength = 3;
+
+        // Calculate total length without truncation
+        let totalLength =
+          staticLength +
+          sessionName.length +
+          rulesName.length +
+          blocksCount.length;
+
+        // If total exceeds maxTotalLength characters, apply smart truncation
+        if (totalLength > maxTotalLength) {
+          // Step 1: Truncate session name to max characters (with ellipsis)
+          const sessionMaxLength = 24; // Max chars for session name
+          if (sessionName.length > sessionMaxLength) {
+            sessionName = sessionName.substring(0, sessionMaxLength) + ellipsis;
+          }
+
+          // Recalculate total with possibly truncated session name
+          totalLength =
+            staticLength +
+            sessionName.length +
+            rulesName.length +
+            blocksCount.length;
+
+          // Step 2: If still over maxTotalLength, truncate rules name
+          if (totalLength > maxTotalLength) {
+            // Calculate available space for rules name (including "..." if truncated)
+            const availableForRules =
+              maxTotalLength -
+              staticLength -
+              sessionName.length -
+              blocksCount.length;
+
+            if (rulesName.length > availableForRules) {
+              const maxRulesChars = availableForRules - ellipsisLength;
+              if (maxRulesChars > 0) {
+                rulesName = rulesName.substring(0, maxRulesChars) + ellipsis;
+              } else {
+                // Not even enough room for "...", just truncate to available space
+                rulesName = rulesName.substring(
+                  0,
+                  Math.max(0, availableForRules)
+                );
+              }
+            }
+          }
+        }
+
+        // Apply the values
+        this.currentSessionName.textContent = sessionName;
+        this.currentSessionRules.textContent = rulesName;
+        this.currentSessionBlocksCount.textContent = blocksCount;
       }
 
       // Initialize session time tracking fields if they don't exist
@@ -1418,7 +1470,8 @@ class ProducerPopup {
 
     // Basic validation - allow alphanumeric, dots, hyphens, slashes, and common URL characters
     // More permissive to allow domains like "localhost", "example.com/path", etc.
-    const urlPattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-._\/\w~:?#[\]@!$&'()*+,;=%]*)?$/;
+    const urlPattern =
+      /^[a-zA-Z0-9]([a-zA-Z0-9\-._\/\w~:?#[\]@!$&'()*+,;=%]*)?$/;
     return urlPattern.test(url);
   }
 
@@ -1442,6 +1495,13 @@ class ProducerPopup {
       allowParam: "🔗 Allow with Parameter",
     };
     return typeMap[rule.type] || rule.type;
+  }
+
+  truncateText(text, maxLength) {
+    if (!text || text.length <= maxLength) {
+      return text;
+    }
+    return text.substring(0, maxLength) + "...";
   }
 
   showNotification(message, type = "success") {
@@ -2177,7 +2237,7 @@ class ProducerPopup {
 
       const name = document.createElement("div");
       name.className = "session-date";
-      name.textContent = session.name;
+      name.textContent = this.truncateText(session.name, 35);
       name.style.cursor = "pointer";
       name.title = "Double-click to edit name";
       name.style.marginBottom = "4px";
@@ -2205,13 +2265,13 @@ class ProducerPopup {
           } else if (!newName) {
             this.showNotification("Name cannot be empty", "error");
           }
-          name.textContent = session.name;
+          name.textContent = this.truncateText(session.name, 35);
           name.style.display = "";
           input.remove();
         };
 
         const cancelEdit = () => {
-          name.textContent = session.name;
+          name.textContent = this.truncateText(session.name, 35);
           name.style.display = "";
           input.remove();
         };
