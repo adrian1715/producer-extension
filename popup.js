@@ -1813,6 +1813,16 @@ class ProducerPopup {
       return;
     }
 
+    // Check if a rule set with this name already exists
+    const nameExists = this.customRules.some((rs) => rs.name === name);
+    if (nameExists) {
+      this.showNotification(
+        "A rule set with this name already exists",
+        "error"
+      );
+      return;
+    }
+
     // Update temp rule set name
     this.tempRuleSet.name = name;
 
@@ -2063,13 +2073,24 @@ class ProducerPopup {
 
         const saveEdit = () => {
           const newName = input.value.trim();
-          if (newName && newName !== ruleSet.name) {
-            ruleSet.name = newName;
-            this.saveState();
-            this.updateUI();
-            this.showNotification("Name updated!");
-          } else if (!newName) {
+          if (!newName) {
             this.showNotification("Name cannot be empty", "error");
+          } else if (newName !== ruleSet.name) {
+            // Check if another rule set already has this name
+            const nameExists = this.customRules.some(
+              (rs) => rs.id !== ruleSet.id && rs.name === newName
+            );
+            if (nameExists) {
+              this.showNotification(
+                "A rule set with this name already exists",
+                "error"
+              );
+            } else {
+              ruleSet.name = newName;
+              this.saveState();
+              this.updateUI();
+              this.showNotification("Name updated!");
+            }
           }
           name.textContent = ruleSet.name;
           name.style.display = "";
@@ -2257,13 +2278,24 @@ class ProducerPopup {
 
         const saveEdit = () => {
           const newName = input.value.trim();
-          if (newName && newName !== session.name) {
-            session.name = newName;
-            this.saveState();
-            this.updateUI();
-            this.showNotification("Session name updated!");
-          } else if (!newName) {
+          if (!newName) {
             this.showNotification("Name cannot be empty", "error");
+          } else if (newName !== session.name) {
+            // Check if another session already has this name
+            const nameExists = this.sessions.some(
+              (s) => s.id !== session.id && s.name === newName
+            );
+            if (nameExists) {
+              this.showNotification(
+                "A session with this name already exists",
+                "error"
+              );
+            } else {
+              session.name = newName;
+              this.saveState();
+              this.updateUI();
+              this.showNotification("Session name updated!");
+            }
           }
           name.textContent = this.truncateText(session.name, 35);
           name.style.display = "";
