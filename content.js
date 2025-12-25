@@ -235,13 +235,16 @@ class ProducerContentScript {
     // Use provided URL or fall back to current location
     const urlToReport = blockedUrl || window.location.href;
 
-    // Report the block to background script FIRST (before any early returns)
-    // This ensures every access attempt is counted
+    // Report the block to background script and get block number
+    let blockNumber = 0;
     try {
-      chrome.runtime.sendMessage({
+      const response = await chrome.runtime.sendMessage({
         action: "reportBlock",
         url: urlToReport,
       });
+      if (response && response.blockNumber) {
+        blockNumber = response.blockNumber;
+      }
     } catch (err) {
       console.error("Could not report block:", err);
     }
@@ -287,7 +290,8 @@ class ProducerContentScript {
                     }
                     
                     .block-container {
-                        max-width: 500px;
+                        width: 600px;
+                        max-height: 100vh;
                         padding: 40px;
                         background: rgba(255, 255, 255, 0.1);
                         border-radius: 20px;
@@ -309,7 +313,7 @@ class ProducerContentScript {
                     .title {
                         font-size: 32px;
                         font-weight: 700;
-                        margin-bottom: 16px;
+                        margin-bottom: 8px;
                         background: linear-gradient(45deg, #fff, #f0f0f0);
                         -webkit-background-clip: text;
                         -webkit-text-fill-color: transparent;
@@ -319,7 +323,7 @@ class ProducerContentScript {
                     .message {
                         font-size: 18px;
                         opacity: 0.9;
-                        margin-bottom: 8px;
+                        margin-bottom: 16px;
                         line-height: 1.5;
                     }
                     
@@ -330,7 +334,7 @@ class ProducerContentScript {
                         padding: 8px 16px;
                         border-radius: 20px;
                         display: inline-block;
-                        margin: 20px 0;
+                        margin-bottom: 8px;
                         word-break: break-all;
                     }
                     
@@ -380,7 +384,24 @@ class ProducerContentScript {
                     .btn-primary:hover {
                         background: rgba(46, 204, 113, 0.5);
                     }
-                    
+
+                    .btn-warning {
+                        background: rgba(231, 76, 60, 0.2);
+                        border-color: rgba(231, 76, 60, 0.5);
+                        font-size: 14px;
+                        padding: 10px 20px;
+                    }
+
+                    .btn-warning:hover {
+                        background: rgba(231, 76, 60, 0.4);
+                    }
+
+                    .block-number {
+                        font-size: 14px;
+                        opacity: 0.7;
+                        margin-bottom: 8px;
+                    }
+
                     .stats {
                         margin-top: 20px;
                         padding: 16px;
@@ -402,16 +423,22 @@ class ProducerContentScript {
                 <div class="block-container" id="producer-block-overlay">
                     <div class="icon">🎯</div>
                     <div class="title">Stay Focused!</div>
-                    <div class="message">This site is blocked during your focus session.</div>
-                    <div class="blocked-url">${window.location.href}</div>
-                    
+                    <div class="message">Site blocked during your focus session.</div>
+                    <div style="margin: 20px 0;">
+                      <div class="block-number">Block #${blockNumber}</div>                    
+                      <div class="blocked-url">${urlToReport}</div>
+                      <div class="actions" style="margin-top: 0;">
+                          <button id="allow-once-btn" class="btn btn-warning" title="Allow this site only this time">Allow Once</button>
+                          <button id="add-exception-btn" class="btn btn-warning" title="Add allowed URL in the rules list">Add Exception</button>
+                      </div>
+                    </div>
                     <div class="motivational">${phrase}</div>
-                    
+
                     <div class="stats">
                         <div class="time" id="sessionTime">Focus Session Active</div>
                         <div>Keep going! Every moment of focus counts.</div>
                     </div>
-                    
+
                     <div class="actions">
                         <button id="go-back-btn" class="btn">← Go Back</button>
                         <button id="close-btn" class="btn btn-primary">Close Tab</button>
@@ -425,11 +452,54 @@ class ProducerContentScript {
     setTimeout(() => {
       const backBtn = document.getElementById("go-back-btn");
       const closeBtn = document.getElementById("close-btn");
+      const allowOnceBtn = document.getElementById("allow-once-btn");
+      const addExceptionBtn = document.getElementById("add-exception-btn");
+
       backBtn.addEventListener("click", () => {
         history.back();
+        // Reload the page to actually navigate to the previous URL
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
       });
-      closeBtn.addEventListener("click", () => {
-        window.close();
+      closeBtn.addEventListener("click", async () => {
+        try {
+          await chrome.runtime.sendMessage({
+            action: "closeTab",
+          });
+        } catch (err) {
+          console.error("Could not close tab:", err);
+        }
+      });
+      allowOnceBtn.addEventListener("click", async () => {
+        try {
+          // Request temporary exception for this URL
+          await chrome.runtime.sendMessage({
+            action: "allowOnce",
+            url: urlToReport,
+          });
+          // Refresh the page to load the allowed content
+          window.location.reload();
+        } catch (err) {
+          console.error("Could not allow once:", err);
+        }
+      });
+      addExceptionBtn.addEventListener("click", async () => {
+        try {
+          // Add URL as permanent allow rule to the active rule set
+          const response = await chrome.runtime.sendMessage({
+            action: "addException",
+            url: urlToReport,
+          });
+          if (response && response.success) {
+            // Refresh the page to load the allowed content
+            window.location.reload();
+          } else {
+            console.error("Could not add exception:", response?.error);
+          }
+        } catch (err) {
+          console.error("Could not add exception:", err);
+        }
       });
 
       // Format time helper function
@@ -452,12 +522,14 @@ class ProducerContentScript {
 
           if (response) {
             const focusedTimeFormatted = formatTime(response.focusedTime);
-            const sessionTimeFormatted = formatTime(response.sessionTime);
+            const totalSessionTimeFormatted = formatTime(
+              response.totalSessionTime
+            );
 
             const el = document.getElementById("sessionTime");
             if (el) {
               el.textContent = "Focus Session Active\r\n";
-              el.textContent += `Session Time: ${sessionTimeFormatted} | Total Focused: ${focusedTimeFormatted}`;
+              el.textContent += `Focused Time: ${focusedTimeFormatted} | Session Time: ${totalSessionTimeFormatted}`;
             }
           }
         } catch (error) {
