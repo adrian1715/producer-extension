@@ -8,6 +8,7 @@ class ProducerBackground {
     this.focusedTimeBase = 0; // snapshot of cumulative total at session start
     this.timerInterval = null;
     this.heartbeatInterval = null; // Heartbeat for detecting browser closure
+    this.temporaryExceptions = new Set(); // URLs allowed once (temporary bypass)
 
     this.init();
   }
@@ -302,9 +303,37 @@ class ProducerBackground {
 
       case "getTimerState": {
         const { sessionElapsed, totalFocused } = this.getTimes();
+
+        // Calculate current session's focused time and total session time
+        let currentSessionFocusedTime = 0;
+        let totalSessionTime = 0;
+        const data = await chrome.storage.local.get(["currentSessionId", "sessions"]);
+        if (data.currentSessionId && data.sessions) {
+          const currentSession = data.sessions.find((s) => s.id === data.currentSessionId);
+          if (currentSession) {
+            const sessionFocusedTime = currentSession.focusedTime || 0;
+            const sessionBreakTime = currentSession.breakTime || 0;
+            const now = Date.now();
+
+            let currentFocusElapsed = 0;
+            let currentBreakElapsed = 0;
+            if (this.isActive && currentSession.sessionFocusStartTime) {
+              // Currently in focus mode - add elapsed focus time
+              currentFocusElapsed = Math.floor((now - currentSession.sessionFocusStartTime) / 1000);
+            } else if (!this.isActive && currentSession.sessionPauseStartTime) {
+              // Currently paused - add elapsed break time
+              currentBreakElapsed = Math.floor((now - currentSession.sessionPauseStartTime) / 1000);
+            }
+
+            currentSessionFocusedTime = sessionFocusedTime + currentFocusElapsed;
+            totalSessionTime = sessionFocusedTime + sessionBreakTime + currentFocusElapsed + currentBreakElapsed;
+          }
+        }
+
         const response = {
           sessionTime: sessionElapsed,
-          focusedTime: totalFocused,
+          focusedTime: currentSessionFocusedTime, // Use current session's focused time instead of global
+          totalSessionTime: totalSessionTime,
         };
         sendResponse(response);
         break;
@@ -344,10 +373,17 @@ class ProducerBackground {
         this.notifyPopup("updateBlockCount", { count: 0 });
         break;
 
-      case "checkBlock":
+      case "checkBlock": {
+        // Check if URL has a temporary exception (one-time bypass)
+        if (this.temporaryExceptions.has(message.url)) {
+          this.temporaryExceptions.delete(message.url);
+          sendResponse({ shouldBlock: false });
+          break;
+        }
         const shouldBlock = this.shouldBlockUrl(message.url);
         sendResponse({ shouldBlock });
         break;
+      }
 
       case "reportBlock":
         // Only increment counter if focus mode is active
@@ -357,7 +393,92 @@ class ProducerBackground {
           // Notify popup if it's open
           this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
         }
+        // Return the current block number
+        sendResponse({ blockNumber: this.sessionBlocks });
         break;
+
+      case "allowOnce":
+        // Add URL to temporary exceptions (one-time bypass)
+        if (message.url) {
+          this.temporaryExceptions.add(message.url);
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false });
+        }
+        break;
+
+      case "closeTab": {
+        // Close the tab that sent this message
+        if (sender.tab && sender.tab.id) {
+          chrome.tabs.remove(sender.tab.id);
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false });
+        }
+        break;
+      }
+
+      case "addException": {
+        // Add URL as permanent allow rule to the active rule set
+        if (!message.url) {
+          sendResponse({ success: false, error: "No URL provided" });
+          break;
+        }
+
+        try {
+          const data = await chrome.storage.local.get(["customRules", "activeRuleSetId"]);
+          const customRules = data.customRules || [];
+          const activeRuleSetId = data.activeRuleSetId;
+
+          if (!activeRuleSetId) {
+            sendResponse({ success: false, error: "No active rule set" });
+            break;
+          }
+
+          const activeRuleSet = customRules.find((rs) => rs.id === activeRuleSetId);
+          if (!activeRuleSet) {
+            sendResponse({ success: false, error: "Active rule set not found" });
+            break;
+          }
+
+          // Extract domain from URL for the allow rule
+          let urlToAllow = message.url;
+          try {
+            const urlObj = new URL(message.url);
+            urlToAllow = urlObj.hostname + urlObj.pathname;
+          } catch (e) {
+            // Use the URL as-is if parsing fails
+          }
+
+          // Check if rule already exists
+          const ruleExists = activeRuleSet.rules.some(
+            (rule) => rule.type === "allow" && rule.url === urlToAllow
+          );
+
+          if (ruleExists) {
+            sendResponse({ success: false, error: "Rule already exists" });
+            break;
+          }
+
+          // Add the allow rule
+          activeRuleSet.rules.push({
+            type: "allow",
+            url: urlToAllow,
+          });
+
+          // Save to storage
+          await chrome.storage.local.set({ customRules });
+
+          // Update internal rules
+          this.rules = activeRuleSet.rules;
+
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error("Error adding exception:", error);
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+      }
 
       case "countCurrentlyBlockedTabs":
         // Count all currently open tabs that would be blocked
