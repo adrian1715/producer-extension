@@ -2167,7 +2167,7 @@ class ProducerPopup {
 
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "btn btn-small btn-squared btn-danger";
-      deleteBtn.textContent = "✕";
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
       deleteBtn.title = "Delete Rule Set";
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -2414,7 +2414,7 @@ class ProducerPopup {
 
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "btn btn-small btn-squared btn-danger";
-      deleteBtn.textContent = "✕";
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
       deleteBtn.title = "Delete Session";
       deleteBtn.addEventListener("click", () => {
         this.deleteSession(session.id);
