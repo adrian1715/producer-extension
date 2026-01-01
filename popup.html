@@ -300,7 +300,31 @@
       }
 
       select option {
-        background: rgb(139, 127, 204);
+        background: #667eea;
+      }
+
+      body.theme-blue select option {
+        background: #667eea;
+      }
+
+      body.theme-red select option {
+        background: #e74c3c;
+      }
+
+      body.theme-blackwhite select option {
+        background: #1a1a1a;
+      }
+
+      body.theme-orange select option {
+        background: #f39c12;
+      }
+
+      body.theme-purple select option {
+        background: #9b59b6;
+      }
+
+      body.theme-teal select option {
+        background: #1abc9c;
       }
 
       input[type="text"]::placeholder {
@@ -608,8 +632,8 @@
         background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
       }
 
-      body.theme-green {
-        background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+      body.theme-blackwhite {
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
       }
 
       body.theme-orange {
@@ -622,6 +646,16 @@
 
       body.theme-teal {
         background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+      }
+
+      /* Toggle Switch Styles */
+      #grayscaleToggle:checked + span {
+        background-color: rgba(46, 204, 113, 0.5) !important;
+        border-color: #2ecc71 !important;
+      }
+
+      #grayscaleToggle:checked + span + span {
+        transform: translateX(24px);
       }
 
       /* Block Page Settings Navigation */
@@ -922,8 +956,19 @@
         <div id="rules-edit-view" style="display: none">
           <!-- Rule set name input (only shown when creating new) -->
           <div id="ruleSetNameSection" class="section" style="display: none">
-            <div class="section-title" id="ruleSetEditTitle">
-              📝 Add Custom Rule
+            <div
+              class="section-title"
+              id="ruleSetEditTitle"
+              style="justify-content: normal"
+            >
+              <button
+                id="backToRuleSetListBtn"
+                class="btn btn-xsmall btn-squared"
+                title="Back to Rules"
+              >
+                <i class="bi bi-arrow-left"></i>
+              </button>
+              <span>📝 Add Custom Rule</span>
             </div>
             <div class="input-group" style="margin: 0">
               <input
@@ -939,7 +984,7 @@
           <div class="section">
             <div class="section-title" style="justify-content: initial">
               <button
-                id="backToRuleSetListBtn"
+                id="backToRuleSetListBtn2"
                 class="btn btn-xsmall btn-squared"
               >
                 <i class="bi bi-arrow-left"></i>
@@ -1092,19 +1137,6 @@
                 ></div>
                 <span>Red</span>
               </button>
-              <button class="theme-option" data-theme="green" title="Green">
-                <div
-                  class="theme-preview"
-                  style="
-                    background: linear-gradient(
-                      135deg,
-                      #2ecc71 0%,
-                      #27ae60 100%
-                    );
-                  "
-                ></div>
-                <span>Green</span>
-              </button>
               <button class="theme-option" data-theme="orange" title="Orange">
                 <div
                   class="theme-preview"
@@ -1144,6 +1176,85 @@
                 ></div>
                 <span>Teal</span>
               </button>
+              <button class="theme-option" data-theme="blackwhite" title="Dark">
+                <div
+                  class="theme-preview"
+                  style="
+                    background: linear-gradient(
+                      135deg,
+                      #1a1a1a 0%,
+                      #2d2d2d 100%
+                    );
+                  "
+                ></div>
+                <span>Dark</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="section">
+            <!-- <div class="section-title">🎨 Focus Mode Options</div> -->
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 10px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+              "
+            >
+              <div style="text-align: left">
+                <div
+                  style="font-size: 14px; font-weight: 600; margin-bottom: 4px"
+                >
+                  Grayscale Mode
+                </div>
+                <div style="font-size: 11px; opacity: 0.8">
+                  Remove all colors from websites during focus mode
+                </div>
+              </div>
+              <label
+                style="
+                  position: relative;
+                  display: inline-block;
+                  width: 48px;
+                  height: 24px;
+                  cursor: pointer;
+                "
+              >
+                <input
+                  type="checkbox"
+                  id="grayscaleToggle"
+                  style="opacity: 0; width: 0; height: 0"
+                />
+                <span
+                  style="
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: rgba(255, 255, 255, 0.2);
+                    border-radius: 24px;
+                    transition: 0.3s;
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                  "
+                ></span>
+                <span
+                  style="
+                    position: absolute;
+                    content: '';
+                    height: 16px;
+                    width: 16px;
+                    left: 4px;
+                    bottom: 4px;
+                    background-color: white;
+                    border-radius: 50%;
+                    transition: 0.3s;
+                  "
+                ></span>
+              </label>
             </div>
           </div>
 
@@ -1159,7 +1270,7 @@
         <!-- Block Page Settings Sub-page -->
         <div id="block-page-settings-view" style="display: none">
           <div class="section" style="margin-top: 0">
-            <div class="section-title">
+            <div class="section-title" style="justify-content: normal">
               <button
                 id="backToThemeBtn"
                 class="btn btn-xsmall btn-squared"

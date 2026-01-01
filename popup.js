@@ -63,6 +63,9 @@ class ProducerPopup {
     this.rulesMainView = document.getElementById("rules-main-view");
     this.rulesEditView = document.getElementById("rules-edit-view");
     this.backToRuleSetListBtn = document.getElementById("backToRuleSetListBtn");
+    this.backToRuleSetListBtn2 = document.getElementById(
+      "backToRuleSetListBtn2"
+    );
     this.ruleSetNameInput = document.getElementById("ruleSetNameInput");
     this.ruleSetNameSection = document.getElementById("ruleSetNameSection");
     this.saveRuleSetBtn = document.getElementById("saveRuleSetBtn");
@@ -123,6 +126,7 @@ class ProducerPopup {
     this.resetPersonalizationBtn = document.getElementById(
       "resetPersonalizationBtn"
     );
+    this.grayscaleToggle = document.getElementById("grayscaleToggle");
 
     // Navigation elements for block page settings
     this.openBlockPageSettingsBtn = document.getElementById(
@@ -207,6 +211,13 @@ class ProducerPopup {
       );
     }
 
+    // Grayscale toggle event
+    if (this.grayscaleToggle) {
+      this.grayscaleToggle.addEventListener("change", () =>
+        this.toggleGrayscaleMode()
+      );
+    }
+
     // Block page settings navigation
     if (this.openBlockPageSettingsBtn) {
       this.openBlockPageSettingsBtn.addEventListener("click", () =>
@@ -237,6 +248,11 @@ class ProducerPopup {
     }
     if (this.backToRuleSetListBtn) {
       this.backToRuleSetListBtn.addEventListener("click", () =>
+        this.showRulesMainView()
+      );
+    }
+    if (this.backToRuleSetListBtn2) {
+      this.backToRuleSetListBtn2.addEventListener("click", () =>
         this.showRulesMainView()
       );
     }
@@ -325,6 +341,7 @@ class ProducerPopup {
         "theme",
         "blockPageTitle",
         "blockPageMessage",
+        "grayscaleEnabled",
       ]);
 
       // Data migration: Convert old rules to custom rules structure
@@ -388,10 +405,16 @@ class ProducerPopup {
       this.currentBlockPageMessage =
         data.blockPageMessage ||
         "This site is blocked during your focus session.";
+      this.grayscaleEnabled = data.grayscaleEnabled || false;
 
       // Apply loaded personalization
       this.applyTheme(this.currentTheme);
       this.loadPersonalizationUI();
+
+      // Update grayscale toggle UI
+      if (this.grayscaleToggle) {
+        this.grayscaleToggle.checked = this.grayscaleEnabled;
+      }
 
       // Request current timer state from background script
       if (this.isActive) {
@@ -1000,6 +1023,11 @@ class ProducerPopup {
         }
       }
 
+      // Apply grayscale filter if enabled
+      if (this.grayscaleEnabled) {
+        this.broadcastGrayscaleState(true);
+      }
+
       // Start timer updates
       this.startTimerUpdates();
 
@@ -1067,6 +1095,9 @@ class ProducerPopup {
       chrome.runtime.sendMessage({
         action: "stopTimer",
       });
+
+      // Remove grayscale filter when focus mode stops
+      this.broadcastGrayscaleState(false);
 
       this.sessionStartTime = null;
       // Don't clear currentSessionId - keep the session active for next time
@@ -1999,24 +2030,30 @@ class ProducerPopup {
       if (this.ruleSetNameSection) {
         this.ruleSetNameSection.style.display = "block";
       }
-      // Show save/cancel buttons, hide back button
+      // Show save/cancel buttons, show first back button, hide second back button
       if (this.ruleSetActionButtons) {
         this.ruleSetActionButtons.style.display = "flex";
       }
       if (this.backToRuleSetListBtn) {
-        this.backToRuleSetListBtn.style.display = "none";
+        this.backToRuleSetListBtn.style.display = "block";
+      }
+      if (this.backToRuleSetListBtn2) {
+        this.backToRuleSetListBtn2.style.display = "none";
       }
     } else {
       // Hide name section when editing
       if (this.ruleSetNameSection) {
         this.ruleSetNameSection.style.display = "none";
       }
-      // Hide save/cancel buttons, show back button
+      // Hide save/cancel buttons, hide first back button, show second back button
       if (this.ruleSetActionButtons) {
         this.ruleSetActionButtons.style.display = "none";
       }
       if (this.backToRuleSetListBtn) {
-        this.backToRuleSetListBtn.style.display = "block";
+        this.backToRuleSetListBtn.style.display = "none";
+      }
+      if (this.backToRuleSetListBtn2) {
+        this.backToRuleSetListBtn2.style.display = "block";
       }
     }
 
@@ -2604,6 +2641,69 @@ class ProducerPopup {
     this.loadPersonalizationUI();
 
     this.showNotification("Reset to default settings");
+  }
+
+  async toggleGrayscaleMode() {
+    this.grayscaleEnabled = this.grayscaleToggle.checked;
+
+    // Save to storage
+    await chrome.storage.local.set({
+      grayscaleEnabled: this.grayscaleEnabled,
+    });
+
+    // Apply grayscale filter if focus mode is active
+    if (this.isActive) {
+      this.broadcastGrayscaleState(this.grayscaleEnabled);
+    }
+
+    this.showNotification(
+      this.grayscaleEnabled
+        ? "Grayscale mode enabled"
+        : "Grayscale mode disabled"
+    );
+  }
+
+  broadcastGrayscaleState(enabled) {
+    console.log("[Producer Popup] Broadcasting grayscale state:", enabled);
+
+    // Send message to all tabs to toggle grayscale filter
+    chrome.tabs.query({}, (tabs) => {
+      console.log("[Producer Popup] Found tabs:", tabs.length);
+
+      tabs.forEach((tab) => {
+        if (
+          tab.id &&
+          tab.url &&
+          !tab.url.startsWith("chrome://") &&
+          !tab.url.startsWith("chrome-extension://")
+        ) {
+          console.log(
+            "[Producer Popup] Sending grayscale message to tab:",
+            tab.id,
+            tab.url
+          );
+
+          chrome.tabs
+            .sendMessage(tab.id, {
+              action: "toggleGrayscale",
+              enabled: enabled,
+            })
+            .then(() => {
+              console.log(
+                "[Producer Popup] Message sent successfully to tab:",
+                tab.id
+              );
+            })
+            .catch((error) => {
+              console.log(
+                "[Producer Popup] Failed to send message to tab:",
+                tab.id,
+                error.message
+              );
+            });
+        }
+      });
+    });
   }
 
   // Navigation methods for block page settings

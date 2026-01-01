@@ -5,9 +5,103 @@ class ProducerContentScript {
     this.checkTimeout = null;
     this.pollInterval = null;
     this.observer = null;
+    this.blockPageTheme = 'blue'; // Default theme
+    this.blockPageTitle = '🎯 Stay Focused!';
+    this.blockPageMessage = 'This site is blocked during your focus session.';
     this.init();
     this.interceptNavigationAttempts();
     this.observeUrlChanges();
+    this.setupThemeListener();
+  }
+
+  setupThemeListener() {
+    // Listen for theme updates from background script
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      console.log('[Producer] Received message:', message);
+
+      if (message.action === "applyBlockPageTheme") {
+        this.blockPageTheme = message.theme || 'blue';
+        this.blockPageTitle = message.blockPageTitle || '🎯 Stay Focused!';
+        this.blockPageMessage = message.blockPageMessage || 'This site is blocked during your focus session.';
+      } else if (message.action === "toggleGrayscale") {
+        console.log('[Producer] Received toggleGrayscale message, enabled:', message.enabled);
+        this.toggleGrayscaleFilter(message.enabled);
+      }
+    });
+
+    // Load current theme and grayscale setting from storage on initialization
+    chrome.storage.local.get(['theme', 'blockPageTitle', 'blockPageMessage', 'grayscaleEnabled', 'isActive'], (data) => {
+      console.log('[Producer] Initial storage data:', data);
+
+      if (data.theme) {
+        this.blockPageTheme = data.theme;
+      }
+      if (data.blockPageTitle) {
+        this.blockPageTitle = data.blockPageTitle;
+      }
+      if (data.blockPageMessage) {
+        this.blockPageMessage = data.blockPageMessage;
+      }
+      // Apply grayscale if it's enabled AND focus mode is active
+      if (data.grayscaleEnabled && data.isActive) {
+        console.log('[Producer] Applying grayscale on init - grayscaleEnabled:', data.grayscaleEnabled, 'isActive:', data.isActive);
+        this.toggleGrayscaleFilter(true);
+      }
+    });
+  }
+
+  toggleGrayscaleFilter(enabled) {
+    // Check if we're on a blocked page - don't apply grayscale to block pages
+    if (document.getElementById("producer-block-overlay")) {
+      return;
+    }
+
+    console.log('[Producer] Toggling grayscale filter:', enabled);
+
+    const styleId = 'producer-grayscale-filter';
+    let style = document.getElementById(styleId);
+
+    if (enabled) {
+      // Remove existing style first to ensure clean state
+      if (style) {
+        style.remove();
+      }
+
+      // Wait for DOM to be ready
+      const applyFilter = () => {
+        if (!document.head && !document.documentElement) {
+          setTimeout(applyFilter, 10);
+          return;
+        }
+
+        const newStyle = document.createElement('style');
+        newStyle.id = styleId;
+        newStyle.textContent = `
+          html {
+            filter: grayscale(100%) !important;
+            -webkit-filter: grayscale(100%) !important;
+          }
+        `;
+
+        // Append to head if available, otherwise to documentElement
+        const target = document.head || document.documentElement;
+        target.appendChild(newStyle);
+
+        console.log('[Producer] Grayscale filter applied');
+
+        // Force reflow to ensure filter is applied
+        if (document.documentElement) {
+          document.documentElement.offsetHeight;
+        }
+      };
+
+      applyFilter();
+    } else {
+      if (style) {
+        style.remove();
+        console.log('[Producer] Grayscale filter removed');
+      }
+    }
   }
 
   async init() {
@@ -258,6 +352,55 @@ class ProducerContentScript {
     // Avoid injecting multiple overlays
     if (document.getElementById("producer-block-overlay")) return;
 
+    // Define theme styles
+    const themeStyles = {
+      blackwhite: {
+        background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+        containerBg: 'rgba(255, 255, 255, 0.05)',
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+        textColor: '#ffffff',
+        accentColor: '#ffffff'
+      },
+      blue: {
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        containerBg: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        textColor: '#ffffff',
+        accentColor: '#2ecc71'
+      },
+      red: {
+        background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+        containerBg: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        textColor: '#ffffff',
+        accentColor: '#2ecc71'
+      },
+      orange: {
+        background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
+        containerBg: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        textColor: '#ffffff',
+        accentColor: '#2ecc71'
+      },
+      purple: {
+        background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
+        containerBg: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        textColor: '#ffffff',
+        accentColor: '#2ecc71'
+      },
+      teal: {
+        background: 'linear-gradient(135deg, #1abc9c 0%, #16a085 100%)',
+        containerBg: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        textColor: '#ffffff',
+        accentColor: '#3498db'
+      }
+    };
+
+    // Get current theme or default to blue
+    const currentTheme = themeStyles[this.blockPageTheme] || themeStyles.blue;
+
     // Replace page content with block message
     document.documentElement.innerHTML = `
             <!DOCTYPE html>
@@ -271,11 +414,11 @@ class ProducerContentScript {
                         padding: 0;
                         box-sizing: border-box;
                     }
-                    
+
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
+                        background: ${currentTheme.background};
+                        color: ${currentTheme.textColor};
                         height: 100vh;
                         display: flex;
                         align-items: center;
@@ -293,10 +436,11 @@ class ProducerContentScript {
                         width: 600px;
                         max-height: 100vh;
                         padding: 40px;
-                        background: rgba(255, 255, 255, 0.1);
+                        background: ${currentTheme.containerBg};
                         border-radius: 20px;
                         backdrop-filter: blur(10px);
                         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                        border: 1px solid ${currentTheme.borderColor};
                     }
                     
                     .icon {
@@ -413,7 +557,7 @@ class ProducerContentScript {
                     .time {
                         font-size: 18px;
                         font-weight: 600;
-                        color: #2ecc71;
+                        color: ${currentTheme.accentColor};
                         margin-bottom: 8px;
                         white-space: pre;
                     }
@@ -422,8 +566,8 @@ class ProducerContentScript {
             <body>
                 <div class="block-container" id="producer-block-overlay">
                     <div class="icon">🎯</div>
-                    <div class="title">Stay Focused!</div>
-                    <div class="message">Site blocked during your focus session.</div>
+                    <div class="title">${this.blockPageTitle}</div>
+                    <div class="message">${this.blockPageMessage}</div>
                     <div style="margin: 20px 0;">
                       <div class="block-number">Block #${blockNumber}</div>                    
                       <div class="blocked-url">${urlToReport}</div>

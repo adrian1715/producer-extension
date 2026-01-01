@@ -283,6 +283,30 @@ class ProducerBackground {
         this.isActive = message.isActive;
         break;
 
+      case "updatePersonalization":
+        // Store theme and broadcast to all content scripts
+        this.currentTheme = message.theme;
+        this.blockPageTitle = message.blockPageTitle;
+        this.blockPageMessage = message.blockPageMessage;
+
+        // Notify all tabs about the theme change
+        chrome.tabs.query({}, (tabs) => {
+          tabs.forEach(tab => {
+            if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("chrome-extension://")) {
+              chrome.tabs.sendMessage(tab.id, {
+                action: "applyBlockPageTheme",
+                theme: message.theme,
+                blockPageTitle: message.blockPageTitle,
+                blockPageMessage: message.blockPageMessage
+              }).catch(() => {
+                // Tab may not have content script loaded, ignore error
+              });
+            }
+          });
+        });
+        sendResponse({ success: true });
+        break;
+
       case "startTimer":
         // If a focused time value is provided, use it as the base
         if (message.focusedTime !== undefined) {
