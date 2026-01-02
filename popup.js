@@ -95,6 +95,7 @@ class ProducerPopup {
     this.currentSessionStats = document.getElementById("currentSessionStats");
     this.noSessionMessage = document.getElementById("noSessionMessage");
     this.deactivateSessionBtn = document.getElementById("deactivateSessionBtn");
+    this.createNewSessionBtn = document.getElementById("createNewSessionBtn");
     this.currentSessionInfo = document.getElementById("currentSessionInfo");
     this.currentSessionRules = document.getElementById("currentSessionRules");
     this.currentSessionBlocksCount = document.getElementById(
@@ -289,6 +290,13 @@ class ProducerPopup {
         if (this.currentSessionId) {
           this.deactivateSession(this.currentSessionId);
         }
+      });
+    }
+
+    // Create new session button
+    if (this.createNewSessionBtn) {
+      this.createNewSessionBtn.addEventListener("click", () => {
+        this.createNewSession();
       });
     }
   }
@@ -676,6 +684,9 @@ class ProducerPopup {
         if (this.deactivateSessionBtn) {
           this.deactivateSessionBtn.style.display = "none";
         }
+        if (this.createNewSessionBtn) {
+          this.createNewSessionBtn.style.display = "block";
+        }
         if (this.currentSessionInfo) {
           this.currentSessionInfo.style.display = "none";
         }
@@ -696,9 +707,12 @@ class ProducerPopup {
       if (this.noSessionMessage) {
         this.noSessionMessage.style.display = "none";
       }
-      // Show deactivate button
+      // Show deactivate button and hide create new session button
       if (this.deactivateSessionBtn) {
         this.deactivateSessionBtn.style.display = "block";
+      }
+      if (this.createNewSessionBtn) {
+        this.createNewSessionBtn.style.display = "none";
       }
 
       const currentSession = this.sessions.find(
@@ -954,6 +968,52 @@ class ProducerPopup {
     } catch (error) {
       console.error("Failed to save state:", error);
     }
+  }
+
+  async createNewSession() {
+    // Create a new session without starting focus mode
+    const now = Date.now();
+    const sessionId = "session-" + now;
+    const sessionDate = new Date(now);
+    const defaultName = `Session ${sessionDate.toLocaleDateString()} ${sessionDate.toLocaleTimeString(
+      [],
+      { hour: "2-digit", minute: "2-digit" }
+    )}`;
+
+    // Reset session blocks counter for the new session
+    this.sessionBlocks = 0;
+
+    const newSession = {
+      id: sessionId,
+      name: defaultName,
+      ruleSetId: this.activeRuleSetId,
+      startTime: now,
+      blocksCount: 0,
+      created: now,
+      lastActive: now,
+      isActive: false, // Session is created but not in focus mode
+      focusedTime: 0,
+      breakTime: 0,
+      sessionStartTime: now,
+      sessionFocusStartTime: null, // Not in focus mode yet
+      sessionPauseStartTime: now, // Start in paused/break state
+    };
+
+    this.sessions.push(newSession);
+    this.currentSessionId = sessionId;
+    this.sessionTime = 0;
+
+    // Update storage to reset the block counter for the new session
+    await chrome.storage.local.set({ sessionBlocks: 0 });
+
+    // Start session stats tracking (to track break time)
+    this.startSessionStatsTracking();
+
+    await this.saveState("createNewSession");
+    this.updateUI();
+
+    // Show feedback
+    this.showNotification("New session created! Click 'Start Producing' to begin.");
   }
 
   async toggleProducing() {
