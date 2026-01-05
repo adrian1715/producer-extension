@@ -1044,8 +1044,16 @@ class ProducerPopup {
           currentSession.blocksCount = this.sessionBlocks;
           currentSession.ruleSetId = this.activeRuleSetId;
           currentSession.lastActive = Date.now();
+          currentSession.isActive = true; // Ensure active flag is set
         }
       }
+
+      // Ensure all other sessions have isActive = false
+      this.sessions.forEach((s) => {
+        if (s.id !== this.currentSessionId) {
+          s.isActive = false;
+        }
+      });
 
       await chrome.storage.local.set({
         isActive: this.isActive,
@@ -1103,6 +1111,11 @@ class ProducerPopup {
     // Reset session blocks counter for the new session
     this.sessionBlocks = 0;
 
+    // Clear isActive flag from ALL sessions
+    this.sessions.forEach((s) => {
+      s.isActive = false;
+    });
+
     const newSession = {
       id: sessionId,
       name: defaultName,
@@ -1152,6 +1165,11 @@ class ProducerPopup {
         // Reset session blocks counter for the new session
         this.sessionBlocks = 0;
 
+        // Clear isActive flag from ALL sessions
+        this.sessions.forEach((s) => {
+          s.isActive = false;
+        });
+
         const sessionId = "session-" + Date.now();
         const sessionDate = new Date(this.sessionStartTime);
         const defaultName = `Session ${sessionDate.toLocaleDateString()} ${sessionDate.toLocaleTimeString(
@@ -1187,6 +1205,12 @@ class ProducerPopup {
       } else {
         // Continue with existing session
         this.sessionStartTime = Date.now();
+
+        // Clear isActive flag from ALL sessions first
+        this.sessions.forEach((s) => {
+          s.isActive = false;
+        });
+
         const currentSession = this.sessions.find(
           (s) => s.id === this.currentSessionId
         );
@@ -3241,15 +3265,28 @@ class ProducerPopup {
 
         currentSession.blocksCount = this.sessionBlocks;
         currentSession.lastActive = Date.now();
+        currentSession.isActive = false; // Clear active flag from previous session
       }
     }
+
+    // Clear isActive flag from ALL sessions to ensure only one is active
+    this.sessions.forEach((s) => {
+      s.isActive = false;
+    });
 
     // Restore the selected session data
     this.currentSessionId = sessionId;
     this.sessionBlocks = session.blocksCount || 0;
     this.sessionTime = 0; // Reset current timer (not cumulative)
     this.activeRuleSetId = session.ruleSetId || null;
-    session.lastActive = Date.now();
+
+    // BUG FIX: Ensure this session has the most recent lastActive timestamp
+    // to guarantee it moves to the top of the session list
+    const maxLastActive = Math.max(
+      ...this.sessions.map(s => s.lastActive || 0),
+      Date.now() - 1
+    );
+    session.lastActive = maxLastActive + 1;
     session.isActive = true; // Mark session as active
 
     // Initialize session tracking times
@@ -3312,6 +3349,7 @@ class ProducerPopup {
       // Save current session state
       session.blocksCount = this.sessionBlocks;
       session.lastActive = Date.now();
+      session.isActive = false; // Clear active flag
 
       // Clear session's tracking times
       session.sessionFocusStartTime = null;
