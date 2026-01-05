@@ -401,6 +401,14 @@ class ProducerContentScript {
     // Get current theme or default to blue
     const currentTheme = themeStyles[this.blockPageTheme] || themeStyles.blue;
 
+    // Truncate URL if too long (keep beginning and end, add ellipsis in middle)
+    const maxUrlLength = 100;
+    let displayUrl = urlToReport;
+    if (urlToReport.length > maxUrlLength) {
+      const keepLength = Math.floor((maxUrlLength - 3) / 2); // Reserve 3 chars for "..."
+      displayUrl = urlToReport.substring(0, keepLength) + "..." + urlToReport.substring(urlToReport.length - keepLength);
+    }
+
     // Replace page content with block message
     document.documentElement.innerHTML = `
             <!DOCTYPE html>
@@ -569,8 +577,8 @@ class ProducerContentScript {
                     <div class="title">${this.blockPageTitle}</div>
                     <div class="message">${this.blockPageMessage}</div>
                     <div style="margin: 20px 0;">
-                      <div class="block-number">Block #${blockNumber}</div>                    
-                      <div class="blocked-url">${urlToReport}</div>
+                      <div class="block-number">Block #${blockNumber}</div>
+                      <div class="blocked-url" title="${urlToReport}">${displayUrl}</div>
                       <div class="actions" style="margin-top: 0;">
                           <button id="allow-once-btn" class="btn btn-warning" title="Allow this site only this time">Allow Once</button>
                           <button id="add-exception-btn" class="btn btn-warning" title="Add allowed URL in the rules list">Add Exception</button>
@@ -617,12 +625,12 @@ class ProducerContentScript {
       });
       allowOnceBtn.addEventListener("click", async () => {
         try {
-          // Request temporary exception for this URL
+          // Request temporary bypass for this URL
           await chrome.runtime.sendMessage({
             action: "allowOnce",
             url: urlToReport,
           });
-          // Refresh the page to load the allowed content
+          // Reload the page
           window.location.reload();
         } catch (err) {
           console.error("Could not allow once:", err);

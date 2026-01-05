@@ -1,11 +1,11 @@
 class ProducerPopup {
   constructor() {
     this.isActive = false;
-    this.customRules = []; // Array of rule sets
-    this.activeRuleSetId = null; // ID of currently active rule set
-    this.currentEditingRuleSetId = null; // ID of rule set being edited
-    this.isCreatingNewRuleSet = false; // Flag to track if we're creating a new rule set
-    this.tempRuleSet = null; // Temporary rule set for unsaved changes
+    this.customModes = []; // Array of modes (previously customRules)
+    this.activeRuleSetId = null; // ID of currently active mode
+    this.currentEditingRuleSetId = null; // ID of mode being edited
+    this.isCreatingNewRuleSet = false; // Flag to track if we're creating a new mode
+    this.tempRuleSet = null; // Temporary mode for unsaved changes
 
     // New session management structure
     this.sessions = []; // Array of all sessions (both active and paused)
@@ -73,6 +73,53 @@ class ProducerPopup {
     this.ruleSetActionButtons = document.getElementById("ruleSetActionButtons");
     this.ruleSetEditTitle = document.getElementById("ruleSetEditTitle");
     this.clearAllRuleSetsBtn = document.getElementById("clearAllRuleSetsBtn");
+
+    // Mode settings elements
+    this.modeGrayscaleToggle = document.getElementById("modeGrayscaleToggle");
+    this.modePomodoroToggle = document.getElementById("modePomodoroToggle");
+    this.pomodoroWork = document.getElementById("pomodoroWork");
+    this.pomodoroBreak = document.getElementById("pomodoroBreak");
+    this.modeSettingsSection = document.getElementById("modeSettingsSection");
+    this.configureModeSettingsBtn = document.getElementById(
+      "configureModeSettingsBtn"
+    );
+
+    // Mode settings view elements
+    this.modeSettingsView = document.getElementById("mode-settings-view");
+    this.backFromModeSettingsBtn = document.getElementById(
+      "backFromModeSettingsBtn"
+    );
+    this.modeGrayscaleToggleView = document.getElementById(
+      "modeGrayscaleToggleView"
+    );
+    this.modePomodoroToggleView = document.getElementById(
+      "modePomodoroToggleView"
+    );
+    this.pomodoroWorkView = document.getElementById("pomodoroWorkView");
+    this.pomodoroBreakView = document.getElementById("pomodoroBreakView");
+    this.pomodoroOptionsView = document.getElementById("pomodoroOptionsView");
+
+    // Rules preview and management elements
+    this.rulesPreview = document.getElementById("rulesPreview");
+    this.rulesPreviewCount = document.getElementById("rulesPreviewCount");
+    this.rulesPreviewSection = document.getElementById("rulesPreviewSection");
+    this.viewAllRulesBtn = document.getElementById("viewAllRulesBtn");
+    this.rulesManagementView = document.getElementById("rules-management-view");
+    this.rulesManagementList = document.getElementById("rulesManagementList");
+    this.rulesManagementCount = document.getElementById("rulesManagementCount");
+    this.backToModeEditBtn = document.getElementById("backToModeEditBtn");
+    this.importRulesFromManagementBtn = document.getElementById(
+      "importRulesFromManagementBtn"
+    );
+    this.exportRulesFromManagementBtn = document.getElementById(
+      "exportRulesFromManagementBtn"
+    );
+    this.clearRulesFromManagementBtn = document.getElementById(
+      "clearRulesFromManagementBtn"
+    );
+    this.importFileInputManagement = document.getElementById(
+      "importFileInputManagement"
+    );
 
     // Sessions elements
     this.sessionsList = document.getElementById("sessionsList");
@@ -146,16 +193,24 @@ class ProducerPopup {
     this.urlInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter") this.addRule();
     });
-    this.clearRulesBtn.addEventListener("click", () => this.clearRules());
-    this.importRulesBtn.addEventListener("click", async () =>
-      this.importFileInput.click()
-    );
-    this.importFileInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) this.importRules(file);
-      e.target.value = ""; // Reset file input
-    });
-    this.exportRulesBtn.addEventListener("click", () => this.exportRules());
+    if (this.clearRulesBtn) {
+      this.clearRulesBtn.addEventListener("click", () => this.clearRules());
+    }
+    if (this.importRulesBtn) {
+      this.importRulesBtn.addEventListener("click", async () =>
+        this.importFileInput.click()
+      );
+    }
+    if (this.importFileInput) {
+      this.importFileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) this.importRules(file);
+        e.target.value = ""; // Reset file input
+      });
+    }
+    if (this.exportRulesBtn) {
+      this.exportRulesBtn.addEventListener("click", () => this.exportRules());
+    }
     this.ruleType.addEventListener("change", () => {
       if (this.paramInputsContainer) {
         const isParamRule = this.ruleType.value === "allowParam";
@@ -212,13 +267,6 @@ class ProducerPopup {
       );
     }
 
-    // Grayscale toggle event
-    if (this.grayscaleToggle) {
-      this.grayscaleToggle.addEventListener("change", () =>
-        this.toggleGrayscaleMode()
-      );
-    }
-
     // Block page settings navigation
     if (this.openBlockPageSettingsBtn) {
       this.openBlockPageSettingsBtn.addEventListener("click", () =>
@@ -255,6 +303,97 @@ class ProducerPopup {
     if (this.backToRuleSetListBtn2) {
       this.backToRuleSetListBtn2.addEventListener("click", () =>
         this.showRulesMainView()
+      );
+    }
+
+    // Mode settings events
+    if (this.modeGrayscaleToggle) {
+      this.modeGrayscaleToggle.addEventListener("change", () =>
+        this.saveModeSettings()
+      );
+    }
+    if (this.modePomodoroToggle) {
+      this.modePomodoroToggle.addEventListener("change", () =>
+        this.saveModeSettings()
+      );
+    }
+    if (this.pomodoroWork) {
+      this.pomodoroWork.addEventListener("change", () =>
+        this.saveModeSettings()
+      );
+    }
+    if (this.pomodoroBreak) {
+      this.pomodoroBreak.addEventListener("change", () =>
+        this.saveModeSettings()
+      );
+    }
+    if (this.configureModeSettingsBtn) {
+      this.configureModeSettingsBtn.addEventListener("click", () =>
+        this.showModeSettingsView()
+      );
+    }
+
+    // Mode settings view events
+    if (this.backFromModeSettingsBtn) {
+      this.backFromModeSettingsBtn.addEventListener("click", () =>
+        this.showModeEditFromSettings()
+      );
+    }
+    if (this.modeGrayscaleToggleView) {
+      this.modeGrayscaleToggleView.addEventListener("change", () =>
+        this.saveModeSettingsFromView()
+      );
+    }
+    if (this.modePomodoroToggleView) {
+      this.modePomodoroToggleView.addEventListener("change", () => {
+        this.saveModeSettingsFromView();
+        this.updatePomodoroOptionsVisibility();
+      });
+    }
+    if (this.pomodoroWorkView) {
+      this.pomodoroWorkView.addEventListener("change", () =>
+        this.saveModeSettingsFromView()
+      );
+    }
+    if (this.pomodoroBreakView) {
+      this.pomodoroBreakView.addEventListener("change", () =>
+        this.saveModeSettingsFromView()
+      );
+    }
+
+    // Rules management navigation events
+    if (this.viewAllRulesBtn) {
+      this.viewAllRulesBtn.addEventListener("click", () =>
+        this.showRulesManagementPage()
+      );
+    }
+    if (this.backToModeEditBtn) {
+      this.backToModeEditBtn.addEventListener("click", () =>
+        this.showModeEditFromRulesManagement()
+      );
+    }
+
+    // Rules management action buttons
+    if (this.importRulesFromManagementBtn) {
+      this.importRulesFromManagementBtn.addEventListener("click", () =>
+        this.importFileInputManagement.click()
+      );
+    }
+    if (this.importFileInputManagement) {
+      this.importFileInputManagement.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) this.importRules(file);
+        e.target.value = ""; // Reset file input
+      });
+    }
+    if (this.exportRulesFromManagementBtn) {
+      this.exportRulesFromManagementBtn.addEventListener("click", () =>
+        this.exportRules()
+      );
+    }
+    if (this.clearRulesFromManagementBtn) {
+      this.clearRulesFromManagementBtn.addEventListener("click", () =>
+        this.clearRulesFromCurrentMode()
       );
     }
 
@@ -339,7 +478,8 @@ class ProducerPopup {
       const data = await chrome.storage.local.get([
         "isActive",
         "rules", // Old format for migration
-        "customRules",
+        "customRules", // Old name for migration
+        "customModes", // New name
         "activeRuleSetId",
         "sessions", // New session structure
         "currentSessionId",
@@ -349,29 +489,67 @@ class ProducerPopup {
         "theme",
         "blockPageTitle",
         "blockPageMessage",
-        "grayscaleEnabled",
+        "grayscaleEnabled", // Global setting (will be removed)
       ]);
 
-      // Data migration: Convert old rules to custom rules structure
-      if (!data.customRules && data.rules && data.rules.length > 0) {
-        // Migrate old rules to a default rule set
-        const defaultRuleSet = {
+      // Data migration #1: Convert very old "rules" to customModes
+      if (
+        !data.customModes &&
+        !data.customRules &&
+        data.rules &&
+        data.rules.length > 0
+      ) {
+        const defaultMode = {
           id: "default-" + Date.now(),
           name: "Default",
           rules: data.rules,
+          settings: {
+            grayscaleEnabled: data.grayscaleEnabled || false,
+            pomodoroEnabled: false,
+            pomodoroWork: 25,
+            pomodoroBreak: 5,
+          },
         };
-        this.customRules = [defaultRuleSet];
-        this.activeRuleSetId = defaultRuleSet.id;
+        this.customModes = [defaultMode];
+        this.activeRuleSetId = defaultMode.id;
 
-        // Save migrated data
         await chrome.storage.local.set({
-          customRules: this.customRules,
+          customModes: this.customModes,
           activeRuleSetId: this.activeRuleSetId,
         });
 
-        console.log("Migrated old rules to custom rules structure");
-      } else {
-        this.customRules = data.customRules || [];
+        console.log("Migrated old rules to customModes structure");
+      }
+      // Data migration #2: Convert customRules to customModes with settings
+      else if (
+        !data.customModes &&
+        data.customRules &&
+        data.customRules.length > 0
+      ) {
+        this.customModes = data.customRules.map((ruleSet) => ({
+          ...ruleSet,
+          settings: {
+            grayscaleEnabled: data.grayscaleEnabled || false,
+            pomodoroEnabled: false,
+            pomodoroWork: 25,
+            pomodoroBreak: 5,
+          },
+        }));
+        this.activeRuleSetId = data.activeRuleSetId || null;
+
+        await chrome.storage.local.set({
+          customModes: this.customModes,
+          activeRuleSetId: this.activeRuleSetId,
+        });
+
+        // Remove old storage keys
+        await chrome.storage.local.remove(["customRules", "grayscaleEnabled"]);
+
+        console.log("Migrated customRules to customModes with settings");
+      }
+      // No migration needed
+      else {
+        this.customModes = data.customModes || [];
         this.activeRuleSetId = data.activeRuleSetId || null;
       }
 
@@ -413,16 +591,10 @@ class ProducerPopup {
       this.currentBlockPageMessage =
         data.blockPageMessage ||
         "This site is blocked during your focus session.";
-      this.grayscaleEnabled = data.grayscaleEnabled || false;
 
       // Apply loaded personalization
       this.applyTheme(this.currentTheme);
       this.loadPersonalizationUI();
-
-      // Update grayscale toggle UI
-      if (this.grayscaleToggle) {
-        this.grayscaleToggle.checked = this.grayscaleEnabled;
-      }
 
       // Request current timer state from background script
       if (this.isActive) {
@@ -656,7 +828,7 @@ class ProducerPopup {
     const hours = Math.floor(totalTime / 3600);
     const minutes = Math.floor((totalTime % 3600) / 60);
 
-    const ruleSet = this.customRules.find(
+    const ruleSet = this.customModes.find(
       (rs) => rs.id === currentSession.ruleSetId
     );
     const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
@@ -733,7 +905,7 @@ class ProducerPopup {
 
         // Get original values
         let sessionName = currentSession.name;
-        const ruleSet = this.customRules.find(
+        const ruleSet = this.customModes.find(
           (rs) => rs.id === currentSession.ruleSetId
         );
         let rulesName = ruleSet ? ruleSet.name : "None";
@@ -911,7 +1083,7 @@ class ProducerPopup {
       const before =
         oldData ||
         (await chrome.storage.local.get([
-          "customRules",
+          "customModes",
           "activeRuleSetId",
           "isActive",
         ]));
@@ -930,7 +1102,7 @@ class ProducerPopup {
 
       await chrome.storage.local.set({
         isActive: this.isActive,
-        customRules: this.customRules,
+        customModes: this.customModes,
         activeRuleSetId: this.activeRuleSetId,
         sessions: this.sessions,
         currentSessionId: this.currentSessionId,
@@ -951,10 +1123,11 @@ class ProducerPopup {
       // Only reload affected tabs
       if (
         (this.isActive || action === "toggleProducing") &&
-        action !== "clearInfo"
+        action !== "clearInfo" &&
+        action !== "modeSettings"
       ) {
         const beforeRules = this.getRulesFromData(
-          before.customRules,
+          before.customModes,
           before.activeRuleSetId
         );
         chrome.runtime.sendMessage({
@@ -1013,7 +1186,9 @@ class ProducerPopup {
     this.updateUI();
 
     // Show feedback
-    this.showNotification("New session created! Click 'Start Producing' to begin.");
+    this.showNotification(
+      "New session created! Click 'Start Producing' to begin."
+    );
   }
 
   async toggleProducing() {
@@ -1083,8 +1258,11 @@ class ProducerPopup {
         }
       }
 
-      // Apply grayscale filter if enabled
-      if (this.grayscaleEnabled) {
+      // Apply grayscale filter if enabled in active mode
+      const activeMode = this.customModes.find(
+        (mode) => mode.id === this.activeRuleSetId
+      );
+      if (activeMode?.settings?.grayscaleEnabled) {
         this.broadcastGrayscaleState(true);
       }
 
@@ -1270,7 +1448,7 @@ class ProducerPopup {
 
   addRule() {
     if (!this.currentEditingRuleSetId) {
-      this.showNotification("No rule set selected", "error");
+      this.showNotification("No mode selected", "error");
       return;
     }
 
@@ -1303,7 +1481,7 @@ class ProducerPopup {
       if (this.isCreatingNewRuleSet && this.tempRuleSet) {
         ruleSet = this.tempRuleSet;
       } else {
-        ruleSet = this.customRules.find(
+        ruleSet = this.customModes.find(
           (rs) => rs.id === this.currentEditingRuleSetId
         );
       }
@@ -1344,18 +1522,18 @@ class ProducerPopup {
       }
     }
 
-    // Find the rule set (from temp if creating, otherwise from custom rules)
+    // Find the rule set (from temp if creating, otherwise from custom modes)
     let ruleSet;
     if (this.isCreatingNewRuleSet && this.tempRuleSet) {
       ruleSet = this.tempRuleSet;
     } else {
-      ruleSet = this.customRules.find(
+      ruleSet = this.customModes.find(
         (rs) => rs.id === this.currentEditingRuleSetId
       );
     }
 
     if (!ruleSet) {
-      this.showNotification("Rule set not found", "error");
+      this.showNotification("Mode not found", "error");
       return;
     }
 
@@ -1422,12 +1600,12 @@ class ProducerPopup {
   removeRule(ruleId) {
     if (!this.currentEditingRuleSetId) return;
 
-    // Find the rule set (from temp if creating, otherwise from custom rules)
+    // Find the rule set (from temp if creating, otherwise from custom modes)
     let ruleSet;
     if (this.isCreatingNewRuleSet && this.tempRuleSet) {
       ruleSet = this.tempRuleSet;
     } else {
-      ruleSet = this.customRules.find(
+      ruleSet = this.customModes.find(
         (rs) => rs.id === this.currentEditingRuleSetId
       );
     }
@@ -1441,6 +1619,7 @@ class ProducerPopup {
       this.saveState();
     }
     this.updateUI();
+    this.renderRulesPreview(); // Ensure preview updates immediately
     this.showNotification("Rule removed");
   }
 
@@ -1457,12 +1636,12 @@ class ProducerPopup {
       return;
     }
 
-    // Get rule set from temp if creating, otherwise from custom rules
+    // Get rule set from temp if creating, otherwise from custom modes
     let ruleSet;
     if (this.isCreatingNewRuleSet && this.tempRuleSet) {
       ruleSet = this.tempRuleSet;
     } else {
-      ruleSet = this.customRules.find(
+      ruleSet = this.customModes.find(
         (rs) => rs.id === this.currentEditingRuleSetId
       );
     }
@@ -1535,6 +1714,9 @@ class ProducerPopup {
       item.appendChild(removeBtn);
       this.rulesList.appendChild(item);
     });
+
+    // Update rules preview when rules list changes
+    this.renderRulesPreview();
   }
 
   cleanUrl(url) {
@@ -1626,7 +1808,7 @@ class ProducerPopup {
 
   async importRules(file) {
     if (!this.currentEditingRuleSetId) {
-      this.showNotification("No rule set selected", "error");
+      this.showNotification("No mode selected", "error");
       return;
     }
 
@@ -1669,13 +1851,13 @@ class ProducerPopup {
       if (this.isCreatingNewRuleSet && this.tempRuleSet) {
         ruleSet = this.tempRuleSet;
       } else {
-        ruleSet = this.customRules.find(
+        ruleSet = this.customModes.find(
           (rs) => rs.id === this.currentEditingRuleSetId
         );
       }
 
       if (!ruleSet) {
-        this.showNotification("Rule set not found", "error");
+        this.showNotification("Mode not found", "error");
         return;
       }
 
@@ -1696,7 +1878,7 @@ class ProducerPopup {
 
   exportRules() {
     if (!this.currentEditingRuleSetId) {
-      this.showNotification("No rule set selected", "error");
+      this.showNotification("No mode selected", "error");
       return;
     }
 
@@ -1705,7 +1887,7 @@ class ProducerPopup {
     if (this.isCreatingNewRuleSet && this.tempRuleSet) {
       ruleSet = this.tempRuleSet;
     } else {
-      ruleSet = this.customRules.find(
+      ruleSet = this.customModes.find(
         (rs) => rs.id === this.currentEditingRuleSetId
       );
     }
@@ -1743,7 +1925,7 @@ class ProducerPopup {
 
   clearRules() {
     if (!this.currentEditingRuleSetId) {
-      this.showNotification("No rule set selected", "error");
+      this.showNotification("No mode selected", "error");
       return;
     }
 
@@ -1752,7 +1934,7 @@ class ProducerPopup {
     if (this.isCreatingNewRuleSet && this.tempRuleSet) {
       ruleSet = this.tempRuleSet;
     } else {
-      ruleSet = this.customRules.find(
+      ruleSet = this.customModes.find(
         (rs) => rs.id === this.currentEditingRuleSetId
       );
     }
@@ -1837,15 +2019,15 @@ class ProducerPopup {
   // Helper methods
   getActiveRules() {
     if (!this.activeRuleSetId) return [];
-    const ruleSet = this.customRules.find(
+    const ruleSet = this.customModes.find(
       (rs) => rs.id === this.activeRuleSetId
     );
     return ruleSet ? ruleSet.rules : [];
   }
 
-  getRulesFromData(customRules, activeRuleSetId) {
-    if (!activeRuleSetId || !customRules) return [];
-    const ruleSet = customRules.find((rs) => rs.id === activeRuleSetId);
+  getRulesFromData(customModes, activeRuleSetId) {
+    if (!activeRuleSetId || !customModes) return [];
+    const ruleSet = customModes.find((rs) => rs.id === activeRuleSetId);
     return ruleSet ? ruleSet.rules : [];
   }
 
@@ -1874,11 +2056,17 @@ class ProducerPopup {
   }
 
   startCreatingRuleSet() {
-    // Create a temporary rule set
+    // Create a temporary rule set with default settings
     this.tempRuleSet = {
       id: "temp-" + Date.now(),
       name: "",
       rules: [],
+      settings: {
+        grayscaleEnabled: false,
+        pomodoroEnabled: false,
+        pomodoroWork: 25,
+        pomodoroBreak: 5,
+      },
     };
     this.isCreatingNewRuleSet = true;
     this.currentEditingRuleSetId = this.tempRuleSet.id;
@@ -1894,23 +2082,20 @@ class ProducerPopup {
 
   saveNewRuleSet() {
     if (!this.tempRuleSet || !this.ruleSetNameInput) {
-      this.showNotification("Configure a custom rule to save", "error");
+      this.showNotification("Configure a mode to save", "error");
       return;
     }
 
     const name = this.ruleSetNameInput.value.trim();
     if (!name) {
-      this.showNotification("Please enter a name for the rule set", "error");
+      this.showNotification("Please enter a name for the mode", "error");
       return;
     }
 
-    // Check if a rule set with this name already exists
-    const nameExists = this.customRules.some((rs) => rs.name === name);
+    // Check if a mode with this name already exists
+    const nameExists = this.customModes.some((rs) => rs.name === name);
     if (nameExists) {
-      this.showNotification(
-        "A rule set with this name already exists",
-        "error"
-      );
+      this.showNotification("A mode with this name already exists", "error");
       return;
     }
 
@@ -1920,8 +2105,8 @@ class ProducerPopup {
     // Generate proper ID
     this.tempRuleSet.id = "ruleset-" + Date.now();
 
-    // Add to custom rules
-    this.customRules.push(this.tempRuleSet);
+    // Add to custom modes
+    this.customModes.push(this.tempRuleSet);
 
     // Auto-activate if no active rule set exists
     if (!this.activeRuleSetId) {
@@ -1952,11 +2137,11 @@ class ProducerPopup {
 
     // Show success message and return to main view
     const activationMessage =
-      this.activeRuleSetId === this.customRules[this.customRules.length - 1].id
+      this.activeRuleSetId === this.customModes[this.customModes.length - 1].id
         ? " and activated"
         : "";
     this.showNotification(
-      `Custom rules successfully saved${activationMessage}!`
+      `Custom mode successfully saved${activationMessage}!`
     );
     this.showRulesMainView();
   }
@@ -1972,23 +2157,23 @@ class ProducerPopup {
   }
 
   deleteRuleSet(id) {
-    const ruleSet = this.customRules.find((rs) => rs.id === id);
+    const ruleSet = this.customModes.find((rs) => rs.id === id);
     if (!ruleSet) return;
 
     const confirmDelete = confirm(
-      `Delete rule set "${ruleSet.name}"?\n\nThis will permanently delete ${ruleSet.rules.length} rules.`
+      `Delete mode "${ruleSet.name}"?\n\nThis will permanently delete ${ruleSet.rules.length} rules.`
     );
     if (!confirmDelete) return;
 
-    // If deleting the active rule set, clear active selection
+    // If deleting the active mode, clear active selection
     if (this.activeRuleSetId === id) {
       this.activeRuleSetId = null;
     }
 
-    this.customRules = this.customRules.filter((rs) => rs.id !== id);
+    this.customModes = this.customModes.filter((rs) => rs.id !== id);
     this.saveState();
     this.updateUI();
-    this.showNotification("Rule set deleted");
+    this.showNotification("Mode deleted");
   }
 
   editRuleSet(id) {
@@ -1996,7 +2181,7 @@ class ProducerPopup {
     this.showRulesEditView();
 
     // Populate name after inputs are cleared
-    const ruleSet = this.customRules.find((rs) => rs.id === id);
+    const ruleSet = this.customModes.find((rs) => rs.id === id);
     if (ruleSet && this.ruleSetNameInput) {
       this.ruleSetNameInput.value = ruleSet.name;
     }
@@ -2011,7 +2196,7 @@ class ProducerPopup {
       return;
     }
 
-    const ruleSet = this.customRules.find(
+    const ruleSet = this.customModes.find(
       (rs) => rs.id === this.currentEditingRuleSetId
     );
     if (!ruleSet) return;
@@ -2025,10 +2210,13 @@ class ProducerPopup {
   activateRuleSet(ruleSetId) {
     if (!ruleSetId) return;
 
-    const ruleSet = this.customRules.find((rs) => rs.id === ruleSetId);
+    const ruleSet = this.customModes.find((rs) => rs.id === ruleSetId);
     if (!ruleSet) return;
 
     this.activeRuleSetId = ruleSetId;
+
+    // Update lastActivated timestamp for sorting
+    ruleSet.lastActivated = Date.now();
 
     // Update current session's rule set if there's an active session
     if (this.currentSessionId) {
@@ -2042,7 +2230,13 @@ class ProducerPopup {
 
     this.saveState();
     this.updateUI();
-    this.showNotification(`Custom Rules "${ruleSet.name}" activated!`);
+    this.showNotification(`Mode "${ruleSet.name}" activated!`);
+
+    // Scroll to top of modes list to show the newly activated mode
+    // ruleSetsList itself is the scroll-container element
+    if (this.ruleSetsList) {
+      this.ruleSetsList.scrollTop = 0;
+    }
 
     // Reload affected tabs with the new rules
     chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
@@ -2063,7 +2257,7 @@ class ProducerPopup {
 
     this.saveState();
     this.updateUI();
-    this.showNotification("Custom Rules deactivated!");
+    this.showNotification("Mode deactivated!");
 
     // Reload affected tabs to remove blocking
     chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
@@ -2072,6 +2266,9 @@ class ProducerPopup {
   showRulesMainView() {
     if (this.rulesMainView) this.rulesMainView.style.display = "block";
     if (this.rulesEditView) this.rulesEditView.style.display = "none";
+    if (this.rulesManagementView)
+      this.rulesManagementView.style.display = "none";
+    if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
     this.currentEditingRuleSetId = null;
     this.isCreatingNewRuleSet = false;
     this.tempRuleSet = null;
@@ -2083,6 +2280,9 @@ class ProducerPopup {
 
     if (this.rulesMainView) this.rulesMainView.style.display = "none";
     if (this.rulesEditView) this.rulesEditView.style.display = "block";
+    if (this.rulesManagementView)
+      this.rulesManagementView.style.display = "none";
+    if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
 
     // Show/hide name section and appropriate buttons based on whether we're creating or editing
     if (this.isCreatingNewRuleSet) {
@@ -2118,6 +2318,405 @@ class ProducerPopup {
     }
 
     this.updateUI();
+    this.loadModeSettings(); // Load mode settings when showing edit view
+    this.renderRulesPreview(); // Render rules preview
+  }
+
+  showRulesManagementPage() {
+    if (this.rulesEditView) this.rulesEditView.style.display = "none";
+    if (this.rulesManagementView)
+      this.rulesManagementView.style.display = "block";
+    this.renderRulesManagementList();
+  }
+
+  showModeEditFromRulesManagement() {
+    if (this.rulesManagementView)
+      this.rulesManagementView.style.display = "none";
+    if (this.rulesEditView) this.rulesEditView.style.display = "block";
+    this.renderRulesPreview();
+  }
+
+  showModeSettingsView() {
+    // Show the mode settings configuration view
+    if (this.rulesEditView) this.rulesEditView.style.display = "none";
+    if (this.modeSettingsView) this.modeSettingsView.style.display = "block";
+    this.loadModeSettingsToView();
+  }
+
+  showModeEditFromSettings() {
+    // Go back to mode edit view from settings
+    if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
+    if (this.rulesEditView) this.rulesEditView.style.display = "block";
+  }
+
+  loadModeSettingsToView() {
+    // Load settings from the current rule set into the view elements
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (ruleSet && ruleSet.settings) {
+      if (this.modeGrayscaleToggleView) {
+        this.modeGrayscaleToggleView.checked =
+          ruleSet.settings.grayscaleEnabled || false;
+      }
+      if (this.modePomodoroToggleView) {
+        this.modePomodoroToggleView.checked =
+          ruleSet.settings.pomodoroEnabled || false;
+      }
+      if (this.pomodoroWorkView) {
+        this.pomodoroWorkView.value = ruleSet.settings.pomodoroWork || 25;
+      }
+      if (this.pomodoroBreakView) {
+        this.pomodoroBreakView.value = ruleSet.settings.pomodoroBreak || 5;
+      }
+    }
+    this.updatePomodoroOptionsVisibility();
+  }
+
+  updatePomodoroOptionsVisibility() {
+    // Show/hide pomodoro options based on toggle state
+    if (this.pomodoroOptionsView && this.modePomodoroToggleView) {
+      this.pomodoroOptionsView.style.display = this.modePomodoroToggleView
+        .checked
+        ? "block"
+        : "none";
+    }
+  }
+
+  saveModeSettingsFromView() {
+    // Save mode settings from the view to the mode object
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet) return;
+
+    // Initialize settings if they don't exist
+    if (!ruleSet.settings) {
+      ruleSet.settings = {};
+    }
+
+    // Update settings from view UI
+    ruleSet.settings.grayscaleEnabled =
+      this.modeGrayscaleToggleView?.checked || false;
+    ruleSet.settings.pomodoroEnabled =
+      this.modePomodoroToggleView?.checked || false;
+    ruleSet.settings.pomodoroWork = parseInt(
+      this.pomodoroWorkView?.value || 25
+    );
+    ruleSet.settings.pomodoroBreak = parseInt(
+      this.pomodoroBreakView?.value || 5
+    );
+
+    // Also sync to hidden elements for backward compatibility
+    if (this.modeGrayscaleToggle) {
+      this.modeGrayscaleToggle.checked = ruleSet.settings.grayscaleEnabled;
+    }
+    if (this.modePomodoroToggle) {
+      this.modePomodoroToggle.checked = ruleSet.settings.pomodoroEnabled;
+    }
+    if (this.pomodoroWork) {
+      this.pomodoroWork.value = ruleSet.settings.pomodoroWork;
+    }
+    if (this.pomodoroBreak) {
+      this.pomodoroBreak.value = ruleSet.settings.pomodoroBreak;
+    }
+
+    // Save to storage (with special action to prevent tab reloading)
+    this.saveState("modeSettings");
+
+    // If this is the active mode and focus is active, broadcast the grayscale update immediately
+    if (
+      !this.isCreatingNewRuleSet &&
+      this.activeRuleSetId === this.currentEditingRuleSetId &&
+      this.isActive
+    ) {
+      this.broadcastGrayscaleState();
+    }
+  }
+
+  loadModeSettings() {
+    // Load mode settings into the UI when editing a mode
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet || !ruleSet.settings) {
+      // If no settings exist yet, initialize with defaults
+      if (ruleSet) {
+        ruleSet.settings = {
+          grayscaleEnabled: false,
+          pomodoroEnabled: false,
+          pomodoroWork: 25,
+          pomodoroBreak: 5,
+        };
+      }
+    }
+
+    if (ruleSet && ruleSet.settings) {
+      // Update UI elements with mode settings
+      if (this.modeGrayscaleToggle) {
+        this.modeGrayscaleToggle.checked =
+          ruleSet.settings.grayscaleEnabled || false;
+      }
+      if (this.modePomodoroToggle) {
+        this.modePomodoroToggle.checked =
+          ruleSet.settings.pomodoroEnabled || false;
+      }
+      if (this.pomodoroWork) {
+        this.pomodoroWork.value = ruleSet.settings.pomodoroWork || 25;
+      }
+      if (this.pomodoroBreak) {
+        this.pomodoroBreak.value = ruleSet.settings.pomodoroBreak || 5;
+      }
+    }
+  }
+
+  saveModeSettings() {
+    // Save mode settings from UI to the mode object
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet) return;
+
+    // Initialize settings if they don't exist
+    if (!ruleSet.settings) {
+      ruleSet.settings = {};
+    }
+
+    // Update settings from UI
+    ruleSet.settings.grayscaleEnabled =
+      this.modeGrayscaleToggle?.checked || false;
+    ruleSet.settings.pomodoroEnabled =
+      this.modePomodoroToggle?.checked || false;
+    ruleSet.settings.pomodoroWork = parseInt(this.pomodoroWork?.value || 25);
+    ruleSet.settings.pomodoroBreak = parseInt(this.pomodoroBreak?.value || 5);
+
+    // Save to storage (with special action to prevent tab reloading)
+    this.saveState("modeSettings");
+
+    // If this is the active mode and focus is active, broadcast the grayscale update immediately
+    if (
+      !this.isCreatingNewRuleSet &&
+      this.activeRuleSetId === this.currentEditingRuleSetId &&
+      this.isActive
+    ) {
+      this.broadcastGrayscaleState();
+    }
+  }
+
+  renderRulesPreview() {
+    if (!this.rulesPreview || !this.rulesPreviewCount) return;
+
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet || !ruleSet.rules || ruleSet.rules.length === 0) {
+      this.rulesPreviewCount.textContent = "0";
+      this.rulesPreview.innerHTML = `
+        <div class="empty-state" style="font-size: 11px; padding: 8px;">
+          No rules configured yet
+        </div>
+      `;
+      return;
+    }
+
+    this.rulesPreviewCount.textContent = ruleSet.rules.length;
+
+    // Show only the last added rule
+    const lastRule = ruleSet.rules[ruleSet.rules.length - 1];
+
+    const ruleText =
+      lastRule.type === "allowParam"
+        ? `?${lastRule.paramKey}=${lastRule.paramValue || "any"}`
+        : lastRule.url;
+
+    this.rulesPreview.innerHTML = `
+      <div class="rule-item">
+        <div class="rule-info">
+          <div class="rule-url">${ruleText}</div>
+          <div class="rule-type">${this.formatRuleType(lastRule)}</div>
+        </div>
+        <button class="btn btn-xsmall btn-squared btn-danger" id="deleteLastRuleBtn">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `;
+
+    // Add event listener to delete button
+    const deleteBtn = document.getElementById("deleteLastRuleBtn");
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", () => {
+        this.removeRule(lastRule.id);
+      });
+    }
+  }
+
+  renderRulesManagementList() {
+    if (!this.rulesManagementList) return;
+
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    // Update the count
+    if (this.rulesManagementCount) {
+      this.rulesManagementCount.textContent = ruleSet?.rules?.length || 0;
+    }
+
+    // Show/hide Clear All button based on rules count
+    const hasRules = ruleSet && ruleSet.rules && ruleSet.rules.length > 0;
+    if (this.clearRulesFromManagementBtn) {
+      this.clearRulesFromManagementBtn.style.display = hasRules
+        ? "inline-flex"
+        : "none";
+    }
+    if (this.exportRulesFromManagementBtn) {
+      this.exportRulesFromManagementBtn.style.display = hasRules
+        ? "inline-flex"
+        : "none";
+    }
+
+    if (!ruleSet || !ruleSet.rules || ruleSet.rules.length === 0) {
+      this.rulesManagementList.innerHTML = `
+        <div class="empty-state">
+          No blocking rules configured yet.<br />
+          Go back and add some rules to get started!
+        </div>
+      `;
+      return;
+    }
+
+    this.rulesManagementList.innerHTML = "";
+
+    // Reverse the rules array to show latest first (without mutating original)
+    const reversedRules = [...ruleSet.rules].reverse();
+
+    reversedRules.forEach((rule, reversedIndex) => {
+      // Calculate the actual index in the original array
+      const index = ruleSet.rules.length - 1 - reversedIndex;
+
+      const ruleText =
+        rule.type === "allowParam"
+          ? `?${rule.paramKey}=${rule.paramValue || "any"}`
+          : rule.url;
+
+      const item = document.createElement("div");
+      item.className = "rule-item";
+
+      const info = document.createElement("div");
+      info.className = "rule-info";
+
+      const url = document.createElement("div");
+      url.className = "rule-url";
+      url.textContent = ruleText;
+
+      const type = document.createElement("div");
+      type.className = "rule-type";
+      type.textContent = this.formatRuleType(rule);
+
+      info.appendChild(url);
+      info.appendChild(type);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "btn btn-xsmall btn-squared btn-danger";
+      removeBtn.textContent = "✕";
+      removeBtn.title = "Delete Rule";
+      removeBtn.addEventListener("click", () => {
+        this.deleteRuleFromManagement(index);
+      });
+
+      item.appendChild(info);
+      item.appendChild(removeBtn);
+      this.rulesManagementList.appendChild(item);
+    });
+  }
+
+  deleteRuleFromManagement(index) {
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet || !ruleSet.rules) return;
+
+    ruleSet.rules.splice(index, 1);
+    this.saveState();
+    this.renderRulesManagementList();
+    this.renderRulesPreview();
+    this.showNotification("Rule deleted");
+
+    // Broadcast rules update to background
+    chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
+  }
+
+  clearRulesFromCurrentMode() {
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet || !ruleSet.rules || ruleSet.rules.length === 0) {
+      this.showNotification("No rules to clear", "error");
+      return;
+    }
+
+    const confirmClear = confirm(
+      `Clear all ${ruleSet.rules.length} rule${
+        ruleSet.rules.length !== 1 ? "s" : ""
+      } from this mode?\n\nThis cannot be undone.`
+    );
+    if (!confirmClear) return;
+
+    ruleSet.rules = [];
+    this.saveState();
+    this.renderRulesManagementList();
+    this.renderRulesPreview();
+    this.showNotification("All rules cleared");
+
+    // Broadcast rules update to background
+    chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
   }
 
   renderRuleSetsList() {
@@ -2128,20 +2727,33 @@ class ProducerPopup {
     // Show/hide clear all button
     if (this.clearAllRuleSetsBtn) {
       this.clearAllRuleSetsBtn.style.display =
-        this.customRules.length > 0 ? "inline-block" : "none";
+        this.customModes.length > 0 ? "inline-block" : "none";
     }
 
-    if (this.customRules.length === 0) {
+    if (this.customModes.length === 0) {
       this.ruleSetsList.innerHTML = `
         <div class="empty-state">
-          No custom rule sets yet.<br />
+          No custom modes yet.<br />
           Create one to get started!
         </div>
       `;
       return;
     }
 
-    this.customRules.forEach((ruleSet) => {
+    // Sort modes by lastActivated (most recent first), with never-activated modes at the end
+    const sortedModes = [...this.customModes].sort((a, b) => {
+      // If both have lastActivated, sort by it
+      if (a.lastActivated && b.lastActivated) {
+        return b.lastActivated - a.lastActivated;
+      }
+      // If only one has lastActivated, put it first
+      if (a.lastActivated) return -1;
+      if (b.lastActivated) return 1;
+      // If neither has lastActivated, maintain original order
+      return 0;
+    });
+
+    sortedModes.forEach((ruleSet) => {
       const item = document.createElement("div");
       item.className = "rule-set-item";
 
@@ -2173,13 +2785,13 @@ class ProducerPopup {
           if (!newName) {
             this.showNotification("Name cannot be empty", "error");
           } else if (newName !== ruleSet.name) {
-            // Check if another rule set already has this name
-            const nameExists = this.customRules.some(
+            // Check if another mode already has this name
+            const nameExists = this.customModes.some(
               (rs) => rs.id !== ruleSet.id && rs.name === newName
             );
             if (nameExists) {
               this.showNotification(
-                "A rule set with this name already exists",
+                "A mode with this name already exists",
                 "error"
               );
             } else {
@@ -2240,9 +2852,7 @@ class ProducerPopup {
       toggleBtn.innerHTML = isActive
         ? '<i class="bi bi-check-circle-fill"></i>'
         : '<i class="bi bi-play-circle"></i>';
-      toggleBtn.title = isActive
-        ? "Deactivate Custom Rules"
-        : "Activate Custom Rules";
+      toggleBtn.title = isActive ? "Deactivate Mode" : "Activate Mode";
 
       toggleBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -2423,7 +3033,7 @@ class ProducerPopup {
       const details = document.createElement("div");
       details.className = "session-details";
       details.setAttribute("data-session-id", session.id); // For real-time updates
-      const ruleSet = this.customRules.find(
+      const ruleSet = this.customModes.find(
         (rs) => rs.id === session.ruleSetId
       );
       const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
@@ -2550,25 +3160,23 @@ class ProducerPopup {
   }
 
   clearAllRuleSets() {
-    if (this.customRules.length === 0) {
-      this.showNotification("No custom rules to clear", "error");
+    if (this.customModes.length === 0) {
+      this.showNotification("No custom modes to clear", "error");
       return;
     }
 
     const confirmClear = confirm(
-      `Clear all custom rules?\n\nThis will permanently delete all ${
-        this.customRules.length
-      } rule set${
-        this.customRules.length !== 1 ? "s" : ""
-      }. This cannot be undone.`
+      `Clear all custom modes?\n\nThis will permanently delete all ${
+        this.customModes.length
+      } mode${this.customModes.length !== 1 ? "s" : ""}. This cannot be undone.`
     );
     if (!confirmClear) return;
 
-    this.customRules = [];
+    this.customModes = [];
     this.activeRuleSetId = null;
     this.saveState();
     this.updateUI();
-    this.showNotification("All custom rules cleared");
+    this.showNotification("All modes cleared");
   }
 
   // Personalization methods
@@ -2703,27 +3311,15 @@ class ProducerPopup {
     this.showNotification("Reset to default settings");
   }
 
-  async toggleGrayscaleMode() {
-    this.grayscaleEnabled = this.grayscaleToggle.checked;
-
-    // Save to storage
-    await chrome.storage.local.set({
-      grayscaleEnabled: this.grayscaleEnabled,
-    });
-
-    // Apply grayscale filter if focus mode is active
-    if (this.isActive) {
-      this.broadcastGrayscaleState(this.grayscaleEnabled);
+  broadcastGrayscaleState(enabled = null) {
+    // If enabled is not provided, get it from the active mode's settings
+    if (enabled === null) {
+      const activeMode = this.customModes.find(
+        (mode) => mode.id === this.activeRuleSetId
+      );
+      enabled = activeMode?.settings?.grayscaleEnabled || false;
     }
 
-    this.showNotification(
-      this.grayscaleEnabled
-        ? "Grayscale mode enabled"
-        : "Grayscale mode disabled"
-    );
-  }
-
-  broadcastGrayscaleState(enabled) {
     console.log("[Producer Popup] Broadcasting grayscale state:", enabled);
 
     // Send message to all tabs to toggle grayscale filter
@@ -2829,6 +3425,7 @@ class ProducerPopup {
     this.sessionTime = 0; // Reset current timer (not cumulative)
     this.activeRuleSetId = session.ruleSetId || null;
     session.lastActive = Date.now();
+    session.isActive = true; // Mark session as active
 
     // Initialize session tracking times
     if (!session.focusedTime) session.focusedTime = 0;
@@ -2845,13 +3442,29 @@ class ProducerPopup {
     }
 
     // Update storage with the new session's block count to sync with background script
-    await chrome.storage.local.set({ sessionBlocks: this.sessionBlocks });
+    await chrome.storage.local.set({
+      sessionBlocks: this.sessionBlocks,
+      currentSessionId: this.currentSessionId,
+      activeRuleSetId: this.activeRuleSetId,
+    });
 
     // Start session stats tracking
     this.startSessionStatsTracking();
 
+    // Save state and wait for it to complete
     await this.saveState();
+
+    // Update UI to reflect changes
     this.updateUI();
+
+    // Ensure session list is re-rendered to show updated order
+    this.renderSessionHistory();
+
+    // Scroll to top of sessions list to show the newly activated session
+    if (this.sessionsList && this.sessionsList.parentElement) {
+      // The parent element is the scroll container
+      this.sessionsList.parentElement.scrollTop = 0;
+    }
 
     // Show notification
     this.showNotification(`Session "${session.name}" activated!`);
@@ -2944,26 +3557,26 @@ class ProducerPopup {
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
-    // Create a simple UI to select rule set
-    const currentRuleSet = this.customRules.find(
+    // Create a simple UI to select mode
+    const currentRuleSet = this.customModes.find(
       (rs) => rs.id === session.ruleSetId
     );
     const currentRuleSetName = currentRuleSet
       ? currentRuleSet.name
       : "No Rules";
 
-    // Cycle through rule sets: No Rules -> Rule Set 1 -> Rule Set 2 -> ... -> No Rules
+    // Cycle through modes: No Rules -> Mode 1 -> Mode 2 -> ... -> No Rules
     const currentIndex = currentRuleSet
-      ? this.customRules.findIndex((rs) => rs.id === session.ruleSetId)
+      ? this.customModes.findIndex((rs) => rs.id === session.ruleSetId)
       : -1;
-    const nextIndex = (currentIndex + 1) % (this.customRules.length + 1);
+    const nextIndex = (currentIndex + 1) % (this.customModes.length + 1);
 
-    if (nextIndex === this.customRules.length) {
+    if (nextIndex === this.customModes.length) {
       // Set to "No Rules"
       session.ruleSetId = null;
     } else {
-      // Set to next rule set
-      session.ruleSetId = this.customRules[nextIndex].id;
+      // Set to next mode
+      session.ruleSetId = this.customModes[nextIndex].id;
     }
 
     // If editing current session, update activeRuleSetId
@@ -2971,19 +3584,20 @@ class ProducerPopup {
       this.activeRuleSetId = session.ruleSetId;
     }
 
-    const newRuleSet = this.customRules.find(
+    const newRuleSet = this.customModes.find(
       (rs) => rs.id === session.ruleSetId
     );
     const newRuleSetName = newRuleSet ? newRuleSet.name : "No Rules";
 
     this.saveState();
     this.updateUI();
-    this.showNotification(`Rule set changed to: ${newRuleSetName}`);
+    this.showNotification(`Mode changed to: ${newRuleSetName}`);
   }
 }
 
 // Initialize popup
 const popup = new ProducerPopup();
+window.popupManager = popup; // Make accessible to onclick handlers
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

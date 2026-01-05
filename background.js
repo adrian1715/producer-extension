@@ -8,7 +8,7 @@ class ProducerBackground {
     this.focusedTimeBase = 0; // snapshot of cumulative total at session start
     this.timerInterval = null;
     this.heartbeatInterval = null; // Heartbeat for detecting browser closure
-    this.temporaryExceptions = new Set(); // URLs allowed once (temporary bypass)
+    this.temporaryAllowedUrls = new Set(); // For Allow Once button - temporary bypass
 
     this.init();
   }
@@ -398,12 +398,13 @@ class ProducerBackground {
         break;
 
       case "checkBlock": {
-        // Check if URL has a temporary exception (one-time bypass)
-        if (this.temporaryExceptions.has(message.url)) {
-          this.temporaryExceptions.delete(message.url);
+        // Check if URL is temporarily allowed (Allow Once)
+        if (this.temporaryAllowedUrls.has(message.url)) {
+          this.temporaryAllowedUrls.delete(message.url);
           sendResponse({ shouldBlock: false });
           break;
         }
+
         const shouldBlock = this.shouldBlockUrl(message.url);
         sendResponse({ shouldBlock });
         break;
@@ -422,9 +423,9 @@ class ProducerBackground {
         break;
 
       case "allowOnce":
-        // Add URL to temporary exceptions (one-time bypass)
+        // Temporarily allow this URL (one-time bypass)
         if (message.url) {
-          this.temporaryExceptions.add(message.url);
+          this.temporaryAllowedUrls.add(message.url);
           sendResponse({ success: true });
         } else {
           sendResponse({ success: false });
@@ -443,39 +444,46 @@ class ProducerBackground {
       }
 
       case "addException": {
-        // Add URL as permanent allow rule to the active rule set
+        // Add URL as permanent allow rule to the active mode
         if (!message.url) {
           sendResponse({ success: false, error: "No URL provided" });
           break;
         }
 
         try {
-          const data = await chrome.storage.local.get(["customRules", "activeRuleSetId"]);
-          const customRules = data.customRules || [];
+          const data = await chrome.storage.local.get(["customModes", "activeRuleSetId"]);
+          const customModes = data.customModes || [];
           const activeRuleSetId = data.activeRuleSetId;
 
           if (!activeRuleSetId) {
-            sendResponse({ success: false, error: "No active rule set" });
+            sendResponse({ success: false, error: "No active mode" });
             break;
           }
 
-          const activeRuleSet = customRules.find((rs) => rs.id === activeRuleSetId);
-          if (!activeRuleSet) {
-            sendResponse({ success: false, error: "Active rule set not found" });
+          const activeMode = customModes.find((m) => m.id === activeRuleSetId);
+          if (!activeMode) {
+            sendResponse({ success: false, error: "Active mode not found" });
             break;
           }
 
-          // Extract domain from URL for the allow rule
+          // Extract URL for the allow rule
           let urlToAllow = message.url;
           try {
             const urlObj = new URL(message.url);
-            urlToAllow = urlObj.hostname + urlObj.pathname;
+            // For file URLs, use the full pathname; for http/https, use hostname + pathname
+            if (urlObj.protocol === 'file:') {
+              urlToAllow = urlObj.pathname;
+            } else {
+              // Remove www. from hostname to ensure proper matching
+              const hostname = urlObj.hostname.replace(/^www\./, '');
+              urlToAllow = hostname + urlObj.pathname;
+            }
           } catch (e) {
             // Use the URL as-is if parsing fails
           }
 
           // Check if rule already exists
-          const ruleExists = activeRuleSet.rules.some(
+          const ruleExists = activeMode.rules.some(
             (rule) => rule.type === "allow" && rule.url === urlToAllow
           );
 
@@ -485,16 +493,16 @@ class ProducerBackground {
           }
 
           // Add the allow rule
-          activeRuleSet.rules.push({
+          activeMode.rules.push({
             type: "allow",
             url: urlToAllow,
           });
 
-          // Save to storage
-          await chrome.storage.local.set({ customRules });
+          // Save to storage with correct key
+          await chrome.storage.local.set({ customModes });
 
           // Update internal rules
-          this.rules = activeRuleSet.rules;
+          this.rules = activeMode.rules;
 
           sendResponse({ success: true });
         } catch (error) {

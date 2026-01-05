@@ -344,12 +344,18 @@
       .rule-info {
         flex: 1;
         text-align: left;
+        min-width: 0;
+        overflow: hidden;
       }
 
       .rule-url {
         font-size: 12px;
         font-weight: 500;
         margin-bottom: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 95%;
       }
 
       .rule-type {
@@ -483,7 +489,7 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
 
-      /* Rule Set Item Styles */
+      /* Mode Item Styles */
       .rule-set-item {
         background: rgba(255, 255, 255, 0.1);
         border-radius: 8px;
@@ -649,13 +655,21 @@
       }
 
       /* Toggle Switch Styles */
-      #grayscaleToggle:checked + span {
+      #grayscaleToggle:checked + span,
+      #modeGrayscaleToggle:checked + span,
+      #modePomodoroToggle:checked + span,
+      #modeGrayscaleToggleView:checked + span,
+      #modePomodoroToggleView:checked + span {
         background-color: rgba(46, 204, 113, 0.5) !important;
         border-color: #2ecc71 !important;
       }
 
-      #grayscaleToggle:checked + span + span {
-        transform: translateX(24px);
+      #grayscaleToggle:checked + span + span,
+      #modeGrayscaleToggle:checked + span + span,
+      #modePomodoroToggle:checked + span + span,
+      #modeGrayscaleToggleView:checked + span + span,
+      #modePomodoroToggleView:checked + span + span {
+        transform: translateX(22px);
       }
 
       /* Block Page Settings Navigation */
@@ -925,15 +939,15 @@
 
       <!-- RULES TAB (Merged Rules + Modes) -->
       <div id="tab-rules" class="tab-content">
-        <!-- Main view: List of custom rule sets -->
+        <!-- Main view: List of custom modes -->
         <div id="rules-main-view">
           <div class="section" style="max-height: 255px">
             <div class="section-title">
-              <span>📋 Custom Rules</span>
+              <span>📋 Custom Modes</span>
               <button
                 id="clearAllRuleSetsBtn"
                 class="btn btn-xsmall btn-danger"
-                title="Delete All Custom Rules"
+                title="Delete All Custom Modes"
                 style="display: none; padding: 1px 6px; font-size: 10px"
               >
                 Delete All
@@ -945,7 +959,7 @@
               style="max-height: 194px"
             >
               <div class="empty-state">
-                No custom rules yet.<br />
+                No custom modes yet.<br />
                 Create one to get started!
               </div>
             </div>
@@ -956,13 +970,13 @@
             class="btn btn-success"
             style="width: 100%"
           >
-            <i class="bi bi-plus-circle"></i> Create New Custom Rules
+            <i class="bi bi-plus-circle"></i> Create New Mode
           </button>
         </div>
 
-        <!-- Edit view: Edit or create a rule set -->
+        <!-- Edit view: Edit or create a mode -->
         <div id="rules-edit-view" style="display: none">
-          <!-- Rule set name input (only shown when creating new) -->
+          <!-- Mode name input (only shown when creating new) -->
           <div id="ruleSetNameSection" class="section" style="display: none">
             <div
               class="section-title"
@@ -976,120 +990,160 @@
               >
                 <i class="bi bi-arrow-left"></i>
               </button>
-              <span>📝 Add Custom Rule</span>
+              <span>📝 Configure Mode</span>
             </div>
             <div class="input-group" style="margin: 0">
               <input
                 type="text"
                 id="ruleSetNameInput"
-                placeholder="Enter rule set name (e.g., Work, Study)"
+                placeholder="Enter mode name (e.g., Work, Study)"
                 style="width: 100%"
               />
             </div>
           </div>
 
-          <!-- Add block rule section -->
-          <div class="section">
-            <div class="section-title" style="justify-content: initial">
-              <button
-                id="backToRuleSetListBtn2"
-                class="btn btn-xsmall btn-squared"
-              >
-                <i class="bi bi-arrow-left"></i>
-              </button>
-              <span>🚫 Add Rule</span>
-            </div>
-
-            <div class="input-group">
-              <select id="ruleType">
-                <option selected hidden>Select one option</option>
-                <option value="domain">Block Domain</option>
-                <option value="url">Block Specific URL</option>
-                <option value="allow">Allow Specific URL</option>
-                <option value="allowParam">Allow Parameter</option>
-              </select>
-            </div>
-
-            <div id="urlInputContainer" class="input-group" style="margin: 0">
-              <input
-                type="text"
-                id="urlInput"
-                placeholder="e.g., youtube.com, * (block all)"
-              />
-              <button id="addRule" class="btn" title="Add Rule">Add</button>
-            </div>
-
+          <!-- Mode Settings Section (compact with Configure button) -->
+          <div class="section" id="modeSettingsSection" style="padding: 10px">
             <div
-              id="paramInputsContainer"
-              class="input-group"
-              style="margin: 0; display: none"
+              class="section-title"
+              style="margin-bottom: 0; font-size: 13px"
             >
-              <input
-                type="text"
-                id="paramKeyInput"
-                placeholder="Key (e.g., list)"
-                style="width: 50%"
-              />
-              <input
-                type="text"
-                id="paramValueInput"
-                placeholder="Value (optional)"
-                style="width: 50%"
-              />
-
-              <button id="addParamRule" class="btn">Add</button>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <button
+                  id="backToRuleSetListBtn2"
+                  class="btn btn-xsmall btn-squared"
+                  title="Back to Modes"
+                >
+                  <i class="bi bi-arrow-left"></i>
+                </button>
+                <span>⚙️ Mode Settings</span>
+              </div>
+              <button
+                id="configureModeSettingsBtn"
+                class="btn btn-xsmall"
+                style="padding: 4px 12px; font-size: 11px"
+              >
+                Configure →
+              </button>
             </div>
-          </div>
 
-          <!-- Rules list -->
-          <div class="section">
-            <div class="section-title">
-              <span>📋 Rules (<span id="ruleCount">0</span>)</span>
+            <!-- Add Rule Section -->
+            <div class="section" id="addRuleSection" style="padding: 10px">
+              <div
+                class="section-title"
+                style="margin-bottom: 8px; font-size: 13px"
+              >
+                🚫 Add Rule
+              </div>
 
-              <div id="rulesOptionBtn">
-                <button
-                  id="importRulesBtn"
-                  class="btn btn-xsmall btn-squared btn-primary"
-                  title="Import Rules"
+              <div class="input-group" style="margin-bottom: 6px">
+                <select
+                  id="ruleType"
+                  style="padding: 6px 10px; font-size: 12px"
                 >
-                  <input
-                    type="file"
-                    id="importFileInput"
-                    accept=".txt"
-                    style="display: none"
-                  />
-                  <i class="bi bi-download"></i>
+                  <option selected hidden>Select one option</option>
+                  <option value="domain">Block Domain</option>
+                  <option value="url">Block Specific URL</option>
+                  <option value="allow">Allow Specific URL</option>
+                  <option value="allowParam">Allow Parameter</option>
+                </select>
+              </div>
+
+              <div id="urlInputContainer" class="input-group" style="margin: 0">
+                <input
+                  type="text"
+                  id="urlInput"
+                  placeholder="e.g., youtube.com, * (block all)"
+                  style="padding: 6px 10px; font-size: 12px"
+                />
+                <button id="addRule" class="btn btn-small" title="Add Rule">
+                  Add
                 </button>
-                <button
-                  id="exportRulesBtn"
-                  class="btn btn-xsmall btn-squared btn-success"
-                  title="Export Rules"
-                  style="display: none"
-                >
-                  <i class="bi bi-upload"></i>
-                </button>
-                <button
-                  id="clearRulesBtn"
-                  class="btn btn-xsmall btn-squared btn-danger"
-                  title="Clear Rules"
-                  style="display: none"
-                >
-                  <i class="bi bi-trash"></i>
-                </button>
+              </div>
+
+              <div
+                id="paramInputsContainer"
+                class="input-group"
+                style="margin: 0; display: none"
+              >
+                <input
+                  type="text"
+                  id="paramKeyInput"
+                  placeholder="Key (e.g., list)"
+                  style="width: 50%; padding: 6px 10px; font-size: 12px"
+                />
+                <input
+                  type="text"
+                  id="paramValueInput"
+                  placeholder="Value (optional)"
+                  style="width: 50%; padding: 6px 10px; font-size: 12px"
+                />
+                <button id="addParamRule" class="btn btn-small">Add</button>
               </div>
             </div>
 
-            <div class="scroll-container" style="height: 80px">
-              <div id="rulesList">
-                <div class="empty-state">
-                  No blocking rules configured yet.<br />
-                  Add or import some rules to get started!
+            <!-- Rules Preview Section (shows only last added rule) -->
+            <div
+              class="section"
+              id="rulesPreviewSection"
+              style="padding: 10px; margin-bottom: 0"
+            >
+              <div
+                class="section-title"
+                style="margin-bottom: 8px; font-size: 13px"
+              >
+                <span>📋 Rules (<span id="rulesPreviewCount">0</span>)</span>
+                <button
+                  id="viewAllRulesBtn"
+                  class="btn btn-xsmall"
+                  style="padding: 4px 12px; font-size: 11px"
+                >
+                  View All →
+                </button>
+              </div>
+              <div id="rulesPreview">
+                <div class="empty-state" style="font-size: 11px; padding: 8px">
+                  No rules configured yet
                 </div>
               </div>
             </div>
+
+            <!-- Hidden elements for backward compatibility -->
+            <input
+              type="checkbox"
+              id="modeGrayscaleToggle"
+              style="display: none"
+            />
+            <input
+              type="checkbox"
+              id="modePomodoroToggle"
+              style="display: none"
+            />
+            <input
+              type="number"
+              id="pomodoroWork"
+              value="25"
+              style="display: none"
+            />
+            <input
+              type="number"
+              id="pomodoroBreak"
+              value="5"
+              style="display: none"
+            />
           </div>
 
-          <!-- Footer buttons for creating new rule set (hidden when editing) -->
+          <!-- Hidden elements for backward compatibility -->
+          <input
+            type="file"
+            id="importFileInput"
+            accept=".txt"
+            style="display: none"
+          />
+          <div id="rulesList" style="display: none"></div>
+          <span id="ruleCount" style="display: none">0</span>
+
+          <!-- Footer buttons for creating new mode (hidden when editing) -->
           <div
             id="ruleSetActionButtons"
             style="display: none; gap: 8px; margin-top: 12px"
@@ -1102,8 +1156,306 @@
               Cancel
             </button>
             <button id="saveRuleSetBtn" class="btn btn-primary" style="flex: 1">
-              Save Custom Rules
+              Save Mode
             </button>
+          </div>
+        </div>
+
+        <!-- Rules Management View (full rules list page) -->
+        <div id="rules-management-view" style="display: none">
+          <div class="section" style="margin: 0">
+            <div class="section-title" style="justify-content: space-between">
+              <div style="display: flex; align-items: center; gap: 8px">
+                <button
+                  id="backToModeEditBtn"
+                  class="btn btn-xsmall btn-squared"
+                  title="Back to Mode Settings"
+                >
+                  <i class="bi bi-arrow-left"></i>
+                </button>
+                <span
+                  >📋 All Rules (<span id="rulesManagementCount">0</span>)</span
+                >
+              </div>
+              <div style="display: flex; gap: 4px">
+                <button
+                  id="importRulesFromManagementBtn"
+                  class="btn btn-xsmall btn-squared btn-primary"
+                  title="Import Rules"
+                >
+                  <i class="bi bi-download"></i>
+                </button>
+                <input
+                  type="file"
+                  id="importFileInputManagement"
+                  accept=".txt"
+                  style="display: none"
+                />
+                <button
+                  id="exportRulesFromManagementBtn"
+                  class="btn btn-xsmall btn-squared btn-success"
+                  title="Export Rules"
+                >
+                  <i class="bi bi-upload"></i>
+                </button>
+                <button
+                  id="clearRulesFromManagementBtn"
+                  class="btn btn-xsmall btn-squared btn-danger"
+                  title="Clear All Rules"
+                >
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="scroll-container" style="max-height: 247px">
+              <div id="rulesManagementList">
+                <div class="empty-state">
+                  No blocking rules configured yet.<br />
+                  Go back and add some rules to get started!
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode Settings Configuration View -->
+        <div id="mode-settings-view" style="display: none">
+          <div class="section" style="margin: 0">
+            <div
+              class="section-title"
+              style="justify-content: normal; gap: 8px"
+            >
+              <button
+                id="backFromModeSettingsBtn"
+                class="btn btn-xsmall btn-squared"
+                title="Back to Mode Edit"
+              >
+                <i class="bi bi-arrow-left"></i>
+              </button>
+              <span>⚙️ Configure Mode Settings</span>
+            </div>
+
+            <div class="scroll-container" style="max-height: 247px">
+              <!-- Grayscale Mode Card -->
+              <div
+                style="
+                  background: rgba(255, 255, 255, 0.1);
+                  border-radius: 8px;
+                  padding: 10px;
+                  margin-bottom: 8px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                  "
+                >
+                  <div style="flex: 1">
+                    <div
+                      style="
+                        font-size: 14px;
+                        font-weight: 600;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      🎨 Grayscale Mode
+                    </div>
+                    <div
+                      style="font-size: 11px; opacity: 0.85; line-height: 1.4"
+                    >
+                      Removes all colors from blocked websites, making them less
+                      appealing and reducing visual distractions during focus
+                      sessions.
+                    </div>
+                  </div>
+                  <label
+                    style="
+                      position: relative;
+                      display: inline-block;
+                      width: 44px;
+                      height: 22px;
+                      cursor: pointer;
+                      flex-shrink: 0;
+                      margin-left: 10px;
+                    "
+                  >
+                    <input
+                      type="checkbox"
+                      id="modeGrayscaleToggleView"
+                      style="opacity: 0; width: 0; height: 0"
+                    />
+                    <span
+                      style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background-color: rgba(255, 255, 255, 0.2);
+                        border-radius: 22px;
+                        transition: 0.3s;
+                        border: 2px solid rgba(255, 255, 255, 0.3);
+                      "
+                    ></span>
+                    <span
+                      style="
+                        position: absolute;
+                        content: '';
+                        height: 14px;
+                        width: 14px;
+                        left: 4px;
+                        bottom: 4px;
+                        background-color: white;
+                        border-radius: 50%;
+                        transition: 0.3s;
+                      "
+                    ></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Pomodoro Timer Card -->
+              <div
+                style="
+                  background: rgba(255, 255, 255, 0.1);
+                  border-radius: 8px;
+                  padding: 10px;
+                  margin-bottom: 8px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 8px;
+                  "
+                >
+                  <div style="flex: 1">
+                    <div
+                      style="
+                        font-size: 14px;
+                        font-weight: 600;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      ⏱️ Pomodoro Timer
+                    </div>
+                    <div
+                      style="font-size: 11px; opacity: 0.85; line-height: 1.4"
+                    >
+                      Automatically alternates between focused work sessions and
+                      short breaks. Focus mode will pause when break time
+                      starts.
+                    </div>
+                  </div>
+                  <label
+                    style="
+                      position: relative;
+                      display: inline-block;
+                      width: 44px;
+                      height: 22px;
+                      cursor: pointer;
+                      flex-shrink: 0;
+                      margin-left: 10px;
+                    "
+                  >
+                    <input
+                      type="checkbox"
+                      id="modePomodoroToggleView"
+                      style="opacity: 0; width: 0; height: 0"
+                    />
+                    <span
+                      style="
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background-color: rgba(255, 255, 255, 0.2);
+                        border-radius: 22px;
+                        transition: 0.3s;
+                        border: 2px solid rgba(255, 255, 255, 0.3);
+                      "
+                    ></span>
+                    <span
+                      style="
+                        position: absolute;
+                        content: '';
+                        height: 14px;
+                        width: 14px;
+                        left: 4px;
+                        bottom: 4px;
+                        background-color: white;
+                        border-radius: 50%;
+                        transition: 0.3s;
+                      "
+                    ></span>
+                  </label>
+                </div>
+
+                <!-- Pomodoro Options -->
+                <div
+                  id="pomodoroOptionsView"
+                  style="display: none; margin-top: 8px"
+                >
+                  <div
+                    style="
+                      display: flex;
+                      gap: 8px;
+                      align-items: center;
+                      flex-wrap: wrap;
+                      padding-top: 8px;
+                      border-top: 1px solid rgba(255, 255, 255, 0.15);
+                    "
+                  >
+                    <span style="font-size: 11px; opacity: 0.9">Work:</span>
+                    <input
+                      type="number"
+                      id="pomodoroWorkView"
+                      min="1"
+                      max="60"
+                      value="25"
+                      style="
+                        width: 50px;
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                        color: white;
+                        padding: 4px 8px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                      "
+                    />
+                    <span style="font-size: 11px; opacity: 0.9">min</span>
+                    <span
+                      style="font-size: 11px; opacity: 0.7; margin-left: 8px"
+                    >
+                      Break:
+                    </span>
+                    <input
+                      type="number"
+                      id="pomodoroBreakView"
+                      min="1"
+                      max="30"
+                      value="5"
+                      style="
+                        width: 50px;
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                        color: white;
+                        padding: 4px 8px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                      "
+                    />
+                    <span style="font-size: 11px; opacity: 0.9">min</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1197,72 +1549,6 @@
                 ></div>
                 <span>Dark</span>
               </button>
-            </div>
-          </div>
-
-          <div class="section">
-            <!-- <div class="section-title">🎨 Focus Mode Options</div> -->
-            <div
-              style="
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 10px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
-              "
-            >
-              <div style="text-align: left">
-                <div
-                  style="font-size: 14px; font-weight: 600; margin-bottom: 4px"
-                >
-                  Grayscale Mode
-                </div>
-                <div style="font-size: 11px; opacity: 0.8">
-                  Remove all colors from websites during focus mode
-                </div>
-              </div>
-              <label
-                style="
-                  position: relative;
-                  display: inline-block;
-                  width: 48px;
-                  height: 24px;
-                  cursor: pointer;
-                "
-              >
-                <input
-                  type="checkbox"
-                  id="grayscaleToggle"
-                  style="opacity: 0; width: 0; height: 0"
-                />
-                <span
-                  style="
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: rgba(255, 255, 255, 0.2);
-                    border-radius: 24px;
-                    transition: 0.3s;
-                    border: 2px solid rgba(255, 255, 255, 0.3);
-                  "
-                ></span>
-                <span
-                  style="
-                    position: absolute;
-                    content: '';
-                    height: 16px;
-                    width: 16px;
-                    left: 4px;
-                    bottom: 4px;
-                    background-color: white;
-                    border-radius: 50%;
-                    transition: 0.3s;
-                  "
-                ></span>
-              </label>
             </div>
           </div>
 
@@ -1383,8 +1669,8 @@
         <span>Home</span>
       </button>
       <button class="tab-btn" data-tab="rules">
-        <i class="bi bi-shield-fill-exclamation"></i>
-        <span>Rules</span>
+        <i class="bi bi-briefcase-fill"></i>
+        <span>Modes</span>
       </button>
       <button class="tab-btn" data-tab="stats">
         <i class="bi bi-bar-chart-fill"></i>
