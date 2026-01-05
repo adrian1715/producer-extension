@@ -103,23 +103,6 @@ class ProducerPopup {
     this.rulesPreview = document.getElementById("rulesPreview");
     this.rulesPreviewCount = document.getElementById("rulesPreviewCount");
     this.rulesPreviewSection = document.getElementById("rulesPreviewSection");
-    this.viewAllRulesBtn = document.getElementById("viewAllRulesBtn");
-    this.rulesManagementView = document.getElementById("rules-management-view");
-    this.rulesManagementList = document.getElementById("rulesManagementList");
-    this.rulesManagementCount = document.getElementById("rulesManagementCount");
-    this.backToModeEditBtn = document.getElementById("backToModeEditBtn");
-    this.importRulesFromManagementBtn = document.getElementById(
-      "importRulesFromManagementBtn"
-    );
-    this.exportRulesFromManagementBtn = document.getElementById(
-      "exportRulesFromManagementBtn"
-    );
-    this.clearRulesFromManagementBtn = document.getElementById(
-      "clearRulesFromManagementBtn"
-    );
-    this.importFileInputManagement = document.getElementById(
-      "importFileInputManagement"
-    );
 
     // Sessions elements
     this.sessionsList = document.getElementById("sessionsList");
@@ -358,42 +341,6 @@ class ProducerPopup {
     if (this.pomodoroBreakView) {
       this.pomodoroBreakView.addEventListener("change", () =>
         this.saveModeSettingsFromView()
-      );
-    }
-
-    // Rules management navigation events
-    if (this.viewAllRulesBtn) {
-      this.viewAllRulesBtn.addEventListener("click", () =>
-        this.showRulesManagementPage()
-      );
-    }
-    if (this.backToModeEditBtn) {
-      this.backToModeEditBtn.addEventListener("click", () =>
-        this.showModeEditFromRulesManagement()
-      );
-    }
-
-    // Rules management action buttons
-    if (this.importRulesFromManagementBtn) {
-      this.importRulesFromManagementBtn.addEventListener("click", () =>
-        this.importFileInputManagement.click()
-      );
-    }
-    if (this.importFileInputManagement) {
-      this.importFileInputManagement.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (file) this.importRules(file);
-        e.target.value = ""; // Reset file input
-      });
-    }
-    if (this.exportRulesFromManagementBtn) {
-      this.exportRulesFromManagementBtn.addEventListener("click", () =>
-        this.exportRules()
-      );
-    }
-    if (this.clearRulesFromManagementBtn) {
-      this.clearRulesFromManagementBtn.addEventListener("click", () =>
-        this.clearRulesFromCurrentMode()
       );
     }
 
@@ -1672,7 +1619,7 @@ class ProducerPopup {
 
     if (ruleSet.rules.length === 0) {
       this.rulesList.innerHTML = `
-        <div class="empty-state">
+        <div class="empty-state" style="padding: 0 10px 10px; font-size: 11px;">
           No blocking rules configured yet.<br>
           Add or import some rules to get started!
         </div>
@@ -1680,7 +1627,10 @@ class ProducerPopup {
       return;
     }
 
-    ruleSet.rules.forEach((rule) => {
+    // Reverse the rules array to show latest first (without mutating original)
+    const reversedRules = [...ruleSet.rules].reverse();
+
+    reversedRules.forEach((rule, reversedIndex) => {
       const item = document.createElement("div");
       item.className = "rule-item";
 
@@ -2266,8 +2216,6 @@ class ProducerPopup {
   showRulesMainView() {
     if (this.rulesMainView) this.rulesMainView.style.display = "block";
     if (this.rulesEditView) this.rulesEditView.style.display = "none";
-    if (this.rulesManagementView)
-      this.rulesManagementView.style.display = "none";
     if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
     this.currentEditingRuleSetId = null;
     this.isCreatingNewRuleSet = false;
@@ -2280,8 +2228,6 @@ class ProducerPopup {
 
     if (this.rulesMainView) this.rulesMainView.style.display = "none";
     if (this.rulesEditView) this.rulesEditView.style.display = "block";
-    if (this.rulesManagementView)
-      this.rulesManagementView.style.display = "none";
     if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
 
     // Show/hide name section and appropriate buttons based on whether we're creating or editing
@@ -2320,20 +2266,6 @@ class ProducerPopup {
     this.updateUI();
     this.loadModeSettings(); // Load mode settings when showing edit view
     this.renderRulesPreview(); // Render rules preview
-  }
-
-  showRulesManagementPage() {
-    if (this.rulesEditView) this.rulesEditView.style.display = "none";
-    if (this.rulesManagementView)
-      this.rulesManagementView.style.display = "block";
-    this.renderRulesManagementList();
-  }
-
-  showModeEditFromRulesManagement() {
-    if (this.rulesManagementView)
-      this.rulesManagementView.style.display = "none";
-    if (this.rulesEditView) this.rulesEditView.style.display = "block";
-    this.renderRulesPreview();
   }
 
   showModeSettingsView() {
@@ -2580,113 +2512,6 @@ class ProducerPopup {
     }
   }
 
-  renderRulesManagementList() {
-    if (!this.rulesManagementList) return;
-
-    let ruleSet;
-    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
-      ruleSet = this.tempRuleSet;
-    } else {
-      ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
-      );
-    }
-
-    // Update the count
-    if (this.rulesManagementCount) {
-      this.rulesManagementCount.textContent = ruleSet?.rules?.length || 0;
-    }
-
-    // Show/hide Clear All button based on rules count
-    const hasRules = ruleSet && ruleSet.rules && ruleSet.rules.length > 0;
-    if (this.clearRulesFromManagementBtn) {
-      this.clearRulesFromManagementBtn.style.display = hasRules
-        ? "inline-flex"
-        : "none";
-    }
-    if (this.exportRulesFromManagementBtn) {
-      this.exportRulesFromManagementBtn.style.display = hasRules
-        ? "inline-flex"
-        : "none";
-    }
-
-    if (!ruleSet || !ruleSet.rules || ruleSet.rules.length === 0) {
-      this.rulesManagementList.innerHTML = `
-        <div class="empty-state">
-          No blocking rules configured yet.<br />
-          Go back and add some rules to get started!
-        </div>
-      `;
-      return;
-    }
-
-    this.rulesManagementList.innerHTML = "";
-
-    // Reverse the rules array to show latest first (without mutating original)
-    const reversedRules = [...ruleSet.rules].reverse();
-
-    reversedRules.forEach((rule, reversedIndex) => {
-      // Calculate the actual index in the original array
-      const index = ruleSet.rules.length - 1 - reversedIndex;
-
-      const ruleText =
-        rule.type === "allowParam"
-          ? `?${rule.paramKey}=${rule.paramValue || "any"}`
-          : rule.url;
-
-      const item = document.createElement("div");
-      item.className = "rule-item";
-
-      const info = document.createElement("div");
-      info.className = "rule-info";
-
-      const url = document.createElement("div");
-      url.className = "rule-url";
-      url.textContent = ruleText;
-
-      const type = document.createElement("div");
-      type.className = "rule-type";
-      type.textContent = this.formatRuleType(rule);
-
-      info.appendChild(url);
-      info.appendChild(type);
-
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "btn btn-xsmall btn-squared btn-danger";
-      removeBtn.textContent = "✕";
-      removeBtn.title = "Delete Rule";
-      removeBtn.addEventListener("click", () => {
-        this.deleteRuleFromManagement(index);
-      });
-
-      item.appendChild(info);
-      item.appendChild(removeBtn);
-      this.rulesManagementList.appendChild(item);
-    });
-  }
-
-  deleteRuleFromManagement(index) {
-    let ruleSet;
-    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
-      ruleSet = this.tempRuleSet;
-    } else {
-      ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
-      );
-    }
-
-    if (!ruleSet || !ruleSet.rules) return;
-
-    ruleSet.rules.splice(index, 1);
-    this.saveState();
-    this.renderRulesManagementList();
-    this.renderRulesPreview();
-    this.showNotification("Rule deleted");
-
-    // Broadcast rules update to background
-    chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
-  }
-
   clearRulesFromCurrentMode() {
     let ruleSet;
     if (this.isCreatingNewRuleSet && this.tempRuleSet) {
@@ -2711,7 +2536,7 @@ class ProducerPopup {
 
     ruleSet.rules = [];
     this.saveState();
-    this.renderRulesManagementList();
+    this.renderRulesList();
     this.renderRulesPreview();
     this.showNotification("All rules cleared");
 

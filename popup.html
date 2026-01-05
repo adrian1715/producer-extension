@@ -414,6 +414,17 @@
         border-radius: 2px;
       }
 
+      /* Scroll snap for rules list */
+      #modeSettingsSection .scroll-container {
+        scroll-snap-type: y mandatory;
+        scroll-padding: 0;
+      }
+
+      #modeSettingsSection .rule-item {
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+      }
+
       .flex-row {
         display: flex;
         gap: 6px;
@@ -1003,11 +1014,12 @@
           </div>
 
           <!-- Mode Settings Section (compact with Configure button) -->
-          <div class="section" id="modeSettingsSection" style="padding: 10px">
-            <div
-              class="section-title"
-              style="margin-bottom: 0; font-size: 13px"
-            >
+          <div
+            class="section"
+            id="modeSettingsSection"
+            style="margin-bottom: 0"
+          >
+            <div class="section-title" style="margin-bottom: 0">
               <div style="display: flex; align-items: center; gap: 8px">
                 <button
                   id="backToRuleSetListBtn2"
@@ -1028,18 +1040,18 @@
             </div>
 
             <!-- Add Rule Section -->
-            <div class="section" id="addRuleSection" style="padding: 10px">
+            <div class="section" id="addRuleSection" style="padding: 12px">
               <div
                 class="section-title"
-                style="margin-bottom: 8px; font-size: 13px"
+                style="margin-bottom: 9px; font-size: 13px"
               >
                 🚫 Add Rule
               </div>
 
-              <div class="input-group" style="margin-bottom: 6px">
+              <div class="input-group" style="margin-bottom: 8px">
                 <select
                   id="ruleType"
-                  style="padding: 6px 10px; font-size: 12px"
+                  style="padding: 7px 12px; font-size: 13px"
                 >
                   <option selected hidden>Select one option</option>
                   <option value="domain">Block Domain</option>
@@ -1054,7 +1066,7 @@
                   type="text"
                   id="urlInput"
                   placeholder="e.g., youtube.com, * (block all)"
-                  style="padding: 6px 10px; font-size: 12px"
+                  style="padding: 7px 12px; font-size: 13px"
                 />
                 <button id="addRule" class="btn btn-small" title="Add Rule">
                   Add
@@ -1070,40 +1082,68 @@
                   type="text"
                   id="paramKeyInput"
                   placeholder="Key (e.g., list)"
-                  style="width: 50%; padding: 6px 10px; font-size: 12px"
+                  style="width: 50%; padding: 7px 12px; font-size: 13px"
                 />
                 <input
                   type="text"
                   id="paramValueInput"
                   placeholder="Value (optional)"
-                  style="width: 50%; padding: 6px 10px; font-size: 12px"
+                  style="width: 50%; padding: 7px 12px; font-size: 13px"
                 />
                 <button id="addParamRule" class="btn btn-small">Add</button>
               </div>
             </div>
 
-            <!-- Rules Preview Section (shows only last added rule) -->
-            <div
-              class="section"
-              id="rulesPreviewSection"
-              style="padding: 10px; margin-bottom: 0"
-            >
+            <!-- Rules list -->
+            <div class="section" style="margin-bottom: 0; padding: 12px">
               <div
                 class="section-title"
-                style="margin-bottom: 8px; font-size: 13px"
+                style="margin-bottom: 9px; font-size: 13px"
               >
-                <span>📋 Rules (<span id="rulesPreviewCount">0</span>)</span>
-                <button
-                  id="viewAllRulesBtn"
-                  class="btn btn-xsmall"
-                  style="padding: 4px 12px; font-size: 11px"
-                >
-                  View All →
-                </button>
+                <span>📋 Rules (<span id="ruleCount">0</span>)</span>
+
+                <div id="rulesOptionBtn">
+                  <button
+                    id="importRulesBtn"
+                    class="btn btn-xsmall btn-squared btn-primary"
+                    title="Import Rules"
+                  >
+                    <input
+                      type="file"
+                      id="importFileInput"
+                      accept=".txt"
+                      style="display: none"
+                    />
+                    <i class="bi bi-download"></i>
+                  </button>
+                  <button
+                    id="exportRulesBtn"
+                    class="btn btn-xsmall btn-squared btn-success"
+                    title="Export Rules"
+                    style="display: none"
+                  >
+                    <i class="bi bi-upload"></i>
+                  </button>
+                  <button
+                    id="clearRulesBtn"
+                    class="btn btn-xsmall btn-squared btn-danger"
+                    title="Clear Rules"
+                    style="display: none"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
               </div>
-              <div id="rulesPreview">
-                <div class="empty-state" style="font-size: 11px; padding: 8px">
-                  No rules configured yet
+
+              <div class="scroll-container" style="max-height: 50px">
+                <div id="rulesList">
+                  <div
+                    class="empty-state"
+                    style="padding: 0 10px 10px; font-size: 11px"
+                  >
+                    No blocking rules configured yet.<br />
+                    Add or import some rules to get started!
+                  </div>
                 </div>
               </div>
             </div>
@@ -1158,64 +1198,6 @@
             <button id="saveRuleSetBtn" class="btn btn-primary" style="flex: 1">
               Save Mode
             </button>
-          </div>
-        </div>
-
-        <!-- Rules Management View (full rules list page) -->
-        <div id="rules-management-view" style="display: none">
-          <div class="section" style="margin: 0">
-            <div class="section-title" style="justify-content: space-between">
-              <div style="display: flex; align-items: center; gap: 8px">
-                <button
-                  id="backToModeEditBtn"
-                  class="btn btn-xsmall btn-squared"
-                  title="Back to Mode Settings"
-                >
-                  <i class="bi bi-arrow-left"></i>
-                </button>
-                <span
-                  >📋 All Rules (<span id="rulesManagementCount">0</span>)</span
-                >
-              </div>
-              <div style="display: flex; gap: 4px">
-                <button
-                  id="importRulesFromManagementBtn"
-                  class="btn btn-xsmall btn-squared btn-primary"
-                  title="Import Rules"
-                >
-                  <i class="bi bi-download"></i>
-                </button>
-                <input
-                  type="file"
-                  id="importFileInputManagement"
-                  accept=".txt"
-                  style="display: none"
-                />
-                <button
-                  id="exportRulesFromManagementBtn"
-                  class="btn btn-xsmall btn-squared btn-success"
-                  title="Export Rules"
-                >
-                  <i class="bi bi-upload"></i>
-                </button>
-                <button
-                  id="clearRulesFromManagementBtn"
-                  class="btn btn-xsmall btn-squared btn-danger"
-                  title="Clear All Rules"
-                >
-                  <i class="bi bi-trash"></i>
-                </button>
-              </div>
-            </div>
-
-            <div class="scroll-container" style="max-height: 247px">
-              <div id="rulesManagementList">
-                <div class="empty-state">
-                  No blocking rules configured yet.<br />
-                  Go back and add some rules to get started!
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
