@@ -548,6 +548,14 @@ class ProducerPopup {
         await this.ensureBackgroundTimerRunning();
         this.requestTimerUpdate();
         this.startTimerUpdates();
+
+        // Reapply grayscale state if focus mode is active
+        const activeMode = this.customModes.find(
+          (mode) => mode.id === this.activeRuleSetId
+        );
+        if (activeMode?.settings?.grayscaleEnabled) {
+          await this.broadcastGrayscaleState(true);
+        }
       }
 
       // Initialize session tracking times if there's a current session
@@ -1055,6 +1063,12 @@ class ProducerPopup {
         }
       });
 
+      // Get the active mode's grayscale setting for content script
+      const activeMode = this.customModes.find(
+        (mode) => mode.id === this.activeRuleSetId
+      );
+      const grayscaleEnabled = activeMode?.settings?.grayscaleEnabled || false;
+
       await chrome.storage.local.set({
         isActive: this.isActive,
         customModes: this.customModes,
@@ -1064,6 +1078,7 @@ class ProducerPopup {
         sessionHistory: this.sessionHistory,
         sessionBlocks: this.sessionBlocks,
         focusedTime: this.focusedTime,
+        grayscaleEnabled: grayscaleEnabled, // Save for content script initialization
       });
 
       // Get active rule set's rules
@@ -1229,14 +1244,6 @@ class ProducerPopup {
         }
       }
 
-      // Apply grayscale filter if enabled in active mode
-      const activeMode = this.customModes.find(
-        (mode) => mode.id === this.activeRuleSetId
-      );
-      if (activeMode?.settings?.grayscaleEnabled) {
-        this.broadcastGrayscaleState(true);
-      }
-
       // Start timer updates
       this.startTimerUpdates();
 
@@ -1305,14 +1312,26 @@ class ProducerPopup {
         action: "stopTimer",
       });
 
-      // Remove grayscale filter when focus mode stops
-      this.broadcastGrayscaleState(false);
-
       this.sessionStartTime = null;
       // Don't clear currentSessionId - keep the session active for next time
     }
 
-    this.saveState("toggleProducing");
+    await this.saveState("toggleProducing");
+
+    // Apply or remove grayscale filter based on focus mode state
+    // This happens AFTER saveState so storage is updated first
+    if (this.isActive) {
+      const activeMode = this.customModes.find(
+        (mode) => mode.id === this.activeRuleSetId
+      );
+      if (activeMode?.settings?.grayscaleEnabled) {
+        await this.broadcastGrayscaleState(true);
+      }
+    } else {
+      // Remove grayscale filter when focus mode stops
+      await this.broadcastGrayscaleState(false);
+    }
+
     this.updateUI();
 
     // Show feedback
@@ -2345,7 +2364,7 @@ class ProducerPopup {
     }
   }
 
-  saveModeSettingsFromView() {
+  async saveModeSettingsFromView() {
     // Save mode settings from the view to the mode object
     let ruleSet;
     if (this.isCreatingNewRuleSet && this.tempRuleSet) {
@@ -2398,7 +2417,7 @@ class ProducerPopup {
       this.activeRuleSetId === this.currentEditingRuleSetId &&
       this.isActive
     ) {
-      this.broadcastGrayscaleState();
+      await this.broadcastGrayscaleState();
     }
   }
 
@@ -2444,7 +2463,7 @@ class ProducerPopup {
     }
   }
 
-  saveModeSettings() {
+  async saveModeSettings() {
     // Save mode settings from UI to the mode object
     let ruleSet;
     if (this.isCreatingNewRuleSet && this.tempRuleSet) {
@@ -2479,7 +2498,7 @@ class ProducerPopup {
       this.activeRuleSetId === this.currentEditingRuleSetId &&
       this.isActive
     ) {
-      this.broadcastGrayscaleState();
+      await this.broadcastGrayscaleState();
     }
   }
 
@@ -3160,27 +3179,53 @@ class ProducerPopup {
     this.showNotification("Reset to default settings");
   }
 
-  broadcastGrayscaleState(enabled = null) {
+  async broadcastGrayscaleState(enabled = null) {
+    // Get active mode for determining grayscale state and logging
+    const activeMode = this.customModes.find(
+      (mode) => mode.id === this.activeRuleSetId
+    );
+
     // If enabled is not provided, get it from the active mode's settings
     if (enabled === null) {
-      const activeMode = this.customModes.find(
-        (mode) => mode.id === this.activeRuleSetId
-      );
-      enabled = activeMode?.settings?.grayscaleEnabled || false;
+      // Grayscale should only be enabled if BOTH focus mode is active AND the mode has grayscale enabled
+      if (this.isActive) {
+        enabled = activeMode?.settings?.grayscaleEnabled || false;
+      } else {
+        // Focus mode is off, so grayscale should always be off
+        enabled = false;
+      }
     }
 
-    console.log("[Producer Popup] Broadcasting grayscale state:", enabled);
+    console.log(
+      "[Producer Popup] Broadcasting grayscale state:",
+      enabled,
+      "isActive:",
+      this.isActive,
+      "activeRuleSetId:",
+      this.activeRuleSetId
+    );
 
-    // Send message to all tabs to toggle grayscale filter
-    chrome.tabs.query({}, (tabs) => {
+    // FIRST: Update storage to trigger storage change listeners in ALL tabs
+    // This is the PRIMARY method for instant updates
+    await chrome.storage.local.set({
+      grayscaleEnabled: enabled,
+      isActive: this.isActive,
+    });
+    console.log("[Producer Popup] Storage updated with grayscale:", enabled);
+
+    // SECOND: Send direct messages to all tabs as backup (in case storage listener hasn't fired yet)
+    try {
+      const tabs = await chrome.tabs.query({});
       console.log("[Producer Popup] Found tabs:", tabs.length);
 
-      tabs.forEach((tab) => {
+      // Send messages to all tabs in parallel
+      const messagePromises = tabs.map(async (tab) => {
         if (
           tab.id &&
           tab.url &&
           !tab.url.startsWith("chrome://") &&
-          !tab.url.startsWith("chrome-extension://")
+          !tab.url.startsWith("chrome-extension://") &&
+          !tab.url.startsWith("about:")
         ) {
           console.log(
             "[Producer Popup] Sending grayscale message to tab:",
@@ -3188,27 +3233,43 @@ class ProducerPopup {
             tab.url
           );
 
-          chrome.tabs
-            .sendMessage(tab.id, {
-              action: "toggleGrayscale",
-              enabled: enabled,
-            })
-            .then(() => {
+          // Try multiple times to ensure delivery
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              await chrome.tabs.sendMessage(tab.id, {
+                action: "toggleGrayscale",
+                enabled: enabled,
+              });
               console.log(
                 "[Producer Popup] Message sent successfully to tab:",
                 tab.id
               );
-            })
-            .catch((error) => {
-              console.log(
-                "[Producer Popup] Failed to send message to tab:",
-                tab.id,
-                error.message
-              );
-            });
+              break; // Success, exit retry loop
+            } catch (error) {
+              if (attempt === 0) {
+                // Wait a bit and retry once
+                await new Promise((resolve) => setTimeout(resolve, 50));
+              } else {
+                console.log(
+                  "[Producer Popup] Failed to send message to tab:",
+                  tab.id,
+                  error.message
+                );
+              }
+            }
+          }
         }
       });
-    });
+
+      // Wait for all messages to be sent
+      await Promise.all(messagePromises);
+      console.log("[Producer Popup] All grayscale messages sent");
+    } catch (error) {
+      console.error(
+        "[Producer Popup] Error broadcasting grayscale state:",
+        error
+      );
+    }
   }
 
   // Navigation methods for block page settings
@@ -3243,8 +3304,6 @@ class ProducerPopup {
 
   // Session management methods
   async activateSession(sessionId) {
-    if (this.isActive) await this.toggleProducing();
-
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
@@ -3253,6 +3312,9 @@ class ProducerPopup {
       this.showNotification(`"${session.name}" is already active`, "error");
       return;
     }
+
+    // Remember if focus mode was active before switching
+    const wasFocusModeActive = this.isActive;
 
     // Save current session state before switching (if there is one)
     if (this.currentSessionId) {
@@ -3313,8 +3375,15 @@ class ProducerPopup {
     // Start session stats tracking
     this.startSessionStatsTracking();
 
-    // Save state and wait for it to complete
-    await this.saveState();
+    // Get rules before and after the mode change to determine which tabs need reloading
+    const beforeRules = this.getRulesFromData(
+      this.customModes,
+      wasFocusModeActive ? session.ruleSetId : null
+    );
+
+    // Save state with "modeSettings" action to prevent automatic tab reload
+    // We'll handle tab reloading manually after grayscale updates
+    await this.saveState("modeSettings");
 
     // Update UI to reflect changes
     this.updateUI();
@@ -3326,6 +3395,33 @@ class ProducerPopup {
     if (this.sessionsList && this.sessionsList.parentElement) {
       // The parent element is the scroll container
       this.sessionsList.parentElement.scrollTop = 0;
+    }
+
+    // Get the new mode's rules
+    const activeRules = this.getActiveRules();
+
+    // Update rules with background script for the new mode
+    chrome.runtime.sendMessage({
+      action: "updateRules",
+      isActive: this.isActive,
+      rules: activeRules,
+    });
+
+    // ALWAYS broadcast grayscale when switching modes, regardless of focus state
+    // This ensures tabs reflect the new mode's grayscale setting immediately
+    // The broadcastGrayscaleState() method will determine the correct state based on this.isActive
+    await this.broadcastGrayscaleState();
+
+    // Now reload only the tabs that changed from blocked to unblocked or vice versa
+    // This happens AFTER grayscale update so unaffected tabs don't reload
+    if (this.isActive) {
+      chrome.runtime.sendMessage({
+        action: "reloadAffectedTabs",
+        rulesBefore: beforeRules,
+        rulesAfter: activeRules,
+        isActiveBefore: wasFocusModeActive,
+        isActiveAfter: this.isActive,
+      });
     }
 
     // Show notification

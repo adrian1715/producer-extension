@@ -5,9 +5,9 @@ class ProducerContentScript {
     this.checkTimeout = null;
     this.pollInterval = null;
     this.observer = null;
-    this.blockPageTheme = 'blue'; // Default theme
-    this.blockPageTitle = '🎯 Stay Focused!';
-    this.blockPageMessage = 'This site is blocked during your focus session.';
+    this.blockPageTheme = "blue"; // Default theme
+    this.blockPageTitle = "🎯 Stay Focused!";
+    this.blockPageMessage = "This site is blocked during your focus session.";
     this.init();
     this.interceptNavigationAttempts();
     this.observeUrlChanges();
@@ -17,35 +17,91 @@ class ProducerContentScript {
   setupThemeListener() {
     // Listen for theme updates from background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      console.log('[Producer] Received message:', message);
+      console.log("[Producer] Received message:", message);
 
       if (message.action === "applyBlockPageTheme") {
-        this.blockPageTheme = message.theme || 'blue';
-        this.blockPageTitle = message.blockPageTitle || '🎯 Stay Focused!';
-        this.blockPageMessage = message.blockPageMessage || 'This site is blocked during your focus session.';
+        this.blockPageTheme = message.theme || "blue";
+        this.blockPageTitle = message.blockPageTitle || "🎯 Stay Focused!";
+        this.blockPageMessage =
+          message.blockPageMessage ||
+          "This site is blocked during your focus session.";
+        sendResponse({ success: true });
       } else if (message.action === "toggleGrayscale") {
-        console.log('[Producer] Received toggleGrayscale message, enabled:', message.enabled);
+        console.log(
+          "[Producer] Received toggleGrayscale message, enabled:",
+          message.enabled
+        );
         this.toggleGrayscaleFilter(message.enabled);
+        sendResponse({ success: true });
       }
+      return true; // Keep the message channel open for async response
     });
 
     // Load current theme and grayscale setting from storage on initialization
-    chrome.storage.local.get(['theme', 'blockPageTitle', 'blockPageMessage', 'grayscaleEnabled', 'isActive'], (data) => {
-      console.log('[Producer] Initial storage data:', data);
+    chrome.storage.local.get(
+      [
+        "theme",
+        "blockPageTitle",
+        "blockPageMessage",
+        "grayscaleEnabled",
+        "isActive",
+      ],
+      (data) => {
+        console.log("[Producer] Initial storage data:", data);
 
-      if (data.theme) {
-        this.blockPageTheme = data.theme;
+        if (data.theme) {
+          this.blockPageTheme = data.theme;
+        }
+        if (data.blockPageTitle) {
+          this.blockPageTitle = data.blockPageTitle;
+        }
+        if (data.blockPageMessage) {
+          this.blockPageMessage = data.blockPageMessage;
+        }
+        // Apply grayscale if it's enabled AND focus mode is active
+        if (data.grayscaleEnabled && data.isActive) {
+          console.log(
+            "[Producer] Applying grayscale on init - grayscaleEnabled:",
+            data.grayscaleEnabled,
+            "isActive:",
+            data.isActive
+          );
+          this.toggleGrayscaleFilter(true);
+        }
       }
-      if (data.blockPageTitle) {
-        this.blockPageTitle = data.blockPageTitle;
-      }
-      if (data.blockPageMessage) {
-        this.blockPageMessage = data.blockPageMessage;
-      }
-      // Apply grayscale if it's enabled AND focus mode is active
-      if (data.grayscaleEnabled && data.isActive) {
-        console.log('[Producer] Applying grayscale on init - grayscaleEnabled:', data.grayscaleEnabled, 'isActive:', data.isActive);
-        this.toggleGrayscaleFilter(true);
+    );
+
+    // Listen for storage changes to react to grayscale setting changes
+    // This is the PRIMARY method for instant updates across all tabs
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === "local") {
+        // Check if grayscale or isActive changed
+        if (
+          changes.grayscaleEnabled ||
+          changes.isActive ||
+          changes.activeRuleSetId
+        ) {
+          // Always re-read fresh values from storage when any relevant key changes
+          chrome.storage.local.get(["grayscaleEnabled", "isActive"], (data) => {
+            const shouldEnable = !!(data.grayscaleEnabled && data.isActive);
+            console.log(
+              "[Producer] Storage changed - updating grayscale:",
+              shouldEnable,
+              "grayscaleEnabled:",
+              data.grayscaleEnabled,
+              "isActive:",
+              data.isActive
+            );
+
+            // Force update the grayscale filter
+            this.toggleGrayscaleFilter(shouldEnable);
+
+            // Force a reflow to ensure the change is applied immediately
+            if (document.documentElement) {
+              void document.documentElement.offsetHeight;
+            }
+          });
+        }
       }
     });
   }
@@ -56,9 +112,9 @@ class ProducerContentScript {
       return;
     }
 
-    console.log('[Producer] Toggling grayscale filter:', enabled);
+    console.log("[Producer] Toggling grayscale filter:", enabled);
 
-    const styleId = 'producer-grayscale-filter';
+    const styleId = "producer-grayscale-filter";
     let style = document.getElementById(styleId);
 
     if (enabled) {
@@ -74,7 +130,7 @@ class ProducerContentScript {
           return;
         }
 
-        const newStyle = document.createElement('style');
+        const newStyle = document.createElement("style");
         newStyle.id = styleId;
         newStyle.textContent = `
           html {
@@ -87,7 +143,7 @@ class ProducerContentScript {
         const target = document.head || document.documentElement;
         target.appendChild(newStyle);
 
-        console.log('[Producer] Grayscale filter applied');
+        console.log("[Producer] Grayscale filter applied");
 
         // Force reflow to ensure filter is applied
         if (document.documentElement) {
@@ -99,7 +155,7 @@ class ProducerContentScript {
     } else {
       if (style) {
         style.remove();
-        console.log('[Producer] Grayscale filter removed');
+        console.log("[Producer] Grayscale filter removed");
       }
     }
   }
@@ -355,47 +411,47 @@ class ProducerContentScript {
     // Define theme styles
     const themeStyles = {
       blackwhite: {
-        background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-        containerBg: 'rgba(255, 255, 255, 0.05)',
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        textColor: '#ffffff',
-        accentColor: '#ffffff'
+        background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)",
+        containerBg: "rgba(255, 255, 255, 0.05)",
+        borderColor: "rgba(255, 255, 255, 0.15)",
+        textColor: "#ffffff",
+        accentColor: "#ffffff",
       },
       blue: {
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        containerBg: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        textColor: '#ffffff',
-        accentColor: '#2ecc71'
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        containerBg: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(255, 255, 255, 0.3)",
+        textColor: "#ffffff",
+        accentColor: "#2ecc71",
       },
       red: {
-        background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
-        containerBg: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        textColor: '#ffffff',
-        accentColor: '#2ecc71'
+        background: "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
+        containerBg: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(255, 255, 255, 0.3)",
+        textColor: "#ffffff",
+        accentColor: "#2ecc71",
       },
       orange: {
-        background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
-        containerBg: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        textColor: '#ffffff',
-        accentColor: '#2ecc71'
+        background: "linear-gradient(135deg, #f39c12 0%, #e67e22 100%)",
+        containerBg: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(255, 255, 255, 0.3)",
+        textColor: "#ffffff",
+        accentColor: "#2ecc71",
       },
       purple: {
-        background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)',
-        containerBg: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        textColor: '#ffffff',
-        accentColor: '#2ecc71'
+        background: "linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)",
+        containerBg: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(255, 255, 255, 0.3)",
+        textColor: "#ffffff",
+        accentColor: "#2ecc71",
       },
       teal: {
-        background: 'linear-gradient(135deg, #1abc9c 0%, #16a085 100%)',
-        containerBg: 'rgba(255, 255, 255, 0.1)',
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        textColor: '#ffffff',
-        accentColor: '#3498db'
-      }
+        background: "linear-gradient(135deg, #1abc9c 0%, #16a085 100%)",
+        containerBg: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(255, 255, 255, 0.3)",
+        textColor: "#ffffff",
+        accentColor: "#3498db",
+      },
     };
 
     // Get current theme or default to blue
@@ -406,7 +462,10 @@ class ProducerContentScript {
     let displayUrl = urlToReport;
     if (urlToReport.length > maxUrlLength) {
       const keepLength = Math.floor((maxUrlLength - 3) / 2); // Reserve 3 chars for "..."
-      displayUrl = urlToReport.substring(0, keepLength) + "..." + urlToReport.substring(urlToReport.length - keepLength);
+      displayUrl =
+        urlToReport.substring(0, keepLength) +
+        "..." +
+        urlToReport.substring(urlToReport.length - keepLength);
     }
 
     // Replace page content with block message
