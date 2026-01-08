@@ -9,7 +9,6 @@ class ProducerBackground {
     this.timerInterval = null;
     this.heartbeatInterval = null; // Heartbeat for detecting browser closure
     this.temporaryAllowedUrls = new Set(); // For Allow Once button - temporary bypass
-    this.browserJustStarted = false; // Flag to detect actual browser restart vs other init triggers
 
     this.init();
   }
@@ -35,8 +34,11 @@ class ProducerBackground {
     // Set up listeners
     this.setupListeners();
 
-    // DO NOT check for browser closure on init - only check on actual browser startup
-    // This prevents false positives when popup reopens or service worker wakes up
+    // Check for browser closure on init
+    await this.checkForBrowserClosure();
+
+    // Reload state after potential session deactivation
+    await this.loadState();
 
     // Restore timer if was active - improved logic
     if (this.isActive) {
@@ -150,30 +152,20 @@ class ProducerBackground {
       return true; // Keep message channel open for async responses
     });
 
-    // Check for browser closure ONLY on actual browser startup
+    // Check for browser closure on startup
     chrome.runtime.onStartup.addListener(async () => {
-      this.browserJustStarted = true;
       await this.checkForBrowserClosure();
-      this.browserJustStarted = false;
-    });
-
-    // Set flag on extension install/update to distinguish from browser restart
-    chrome.runtime.onInstalled.addListener(async (details) => {
-      if (details.reason === 'install' || details.reason === 'update') {
-        // Mark that this was an extension install/update, not a browser restart
-        await chrome.storage.local.set({
-          extensionJustInstalled: true,
-          lastActiveTimestamp: Date.now()
-        });
-      }
     });
 
     // Detect when all browser windows are closed
     chrome.windows.onRemoved.addListener(async (windowId) => {
       const windows = await chrome.windows.getAll();
       if (windows.length === 0) {
-        // All windows closed - update timestamp for closure detection
+        // All windows closed - save timestamp and STOP heartbeat to freeze the timestamp
         await chrome.storage.local.set({ lastActiveTimestamp: Date.now() });
+
+        // Stop heartbeat so timestamp doesn't get updated anymore
+        this.stopHeartbeat();
       }
     });
 
@@ -223,38 +215,16 @@ class ProducerBackground {
         "sessions",
         "currentSessionId",
         "isActive",
-        "extensionJustInstalled",
       ]);
-
-      // If extension was just installed/updated, don't treat as browser restart
-      if (data.extensionJustInstalled) {
-        await chrome.storage.local.remove(["extensionJustInstalled"]);
-        console.log("Extension was just installed/updated, skipping closure check");
-        return;
-      }
-
-      // CRITICAL: Only deactivate if we're certain this is a browser restart
-      // chrome.runtime.onStartup ONLY fires on browser restart, not on:
-      // - Extension reload
-      // - Popup open/close
-      // - Service worker wake
-      if (!this.browserJustStarted) {
-        // This should never happen if called only from onStartup, but safeguard
-        console.log("checkForBrowserClosure called but not from browser startup");
-        return;
-      }
 
       const lastActiveTimestamp = data.lastActiveTimestamp;
       const currentTime = Date.now();
 
-      // Check if there was a long gap (>5 minutes = likely shutdown/restart)
-      const timeSinceLastActive = currentTime - lastActiveTimestamp;
-      const FIVE_MINUTES = 5 * 60 * 1000;
-
-      if (lastActiveTimestamp && timeSinceLastActive > FIVE_MINUTES) {
+      // If there's a timestamp and the difference is > 35 seconds, browser was likely closed
+      if (lastActiveTimestamp && currentTime - lastActiveTimestamp > 35000) {
         console.log(
-          "Browser was restarted after shutdown, deactivating session...",
-          Math.floor(timeSinceLastActive / 1000),
+          "Browser was closed, deactivating session...",
+          Math.floor((currentTime - lastActiveTimestamp) / 1000),
           "seconds elapsed"
         );
 
@@ -281,9 +251,7 @@ class ProducerBackground {
             // Update last active timestamp
             session.lastActive = lastActiveTimestamp;
 
-            console.log(
-              `Session "${session.name}" deactivated due to browser restart`
-            );
+            console.log(`Session "${session.name}" deactivated due to browser closure`);
           }
 
           // Save updated sessions and clear current session
@@ -303,16 +271,7 @@ class ProducerBackground {
           await this.stopTimer();
           this.stopHeartbeat();
         }
-      } else {
-        console.log(
-          "Browser restart detected but session is recent, keeping active",
-          "seconds elapsed:",
-          Math.floor(timeSinceLastActive / 1000)
-        );
       }
-
-      // Update timestamp to mark successful restart check
-      await chrome.storage.local.set({ lastActiveTimestamp: Date.now() });
     } catch (error) {
       console.error("Error checking for browser closure:", error);
     }
