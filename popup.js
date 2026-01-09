@@ -51,6 +51,7 @@ class ProducerPopup {
     this.importRulesBtn = document.getElementById("importRulesBtn");
     this.importFileInput = document.getElementById("importFileInput");
     this.clearRulesBtn = document.getElementById("clearRulesBtn");
+    this.rulesSectionTitle = document.getElementById("rulesSectionTitle");
     this.urlInputContainer = document.getElementById("urlInputContainer");
     this.paramKeyInput = document.getElementById("paramKeyInput");
     this.paramValueInput = document.getElementById("paramValueInput");
@@ -62,6 +63,20 @@ class ProducerPopup {
     this.ruleSetsList = document.getElementById("ruleSetsList");
     this.rulesMainView = document.getElementById("rules-main-view");
     this.rulesEditView = document.getElementById("rules-edit-view");
+    this.allRulesView = document.getElementById("all-rules-view");
+    this.allRulesViewScrollContainer = document.getElementById(
+      "allRulesViewScrollContainer"
+    );
+    this.allRulesList = document.getElementById("allRulesList");
+    this.backFromAllRulesBtn = document.getElementById("backFromAllRulesBtn");
+    this.addRuleAllViewBtn = document.getElementById("addRuleAllViewBtn");
+    this.importRulesAllViewBtn = document.getElementById(
+      "importRulesAllViewBtn"
+    );
+    this.exportRulesAllViewBtn = document.getElementById(
+      "exportRulesAllViewBtn"
+    );
+    this.clearRulesAllViewBtn = document.getElementById("clearRulesAllViewBtn");
     this.backToRuleSetListBtn = document.getElementById("backToRuleSetListBtn");
     this.backToRuleSetListBtn2 = document.getElementById(
       "backToRuleSetListBtn2"
@@ -287,6 +302,44 @@ class ProducerPopup {
       this.backToRuleSetListBtn2.addEventListener("click", () =>
         this.showRulesMainView()
       );
+    }
+
+    // Click on "Rules" section title to show All Rules view
+    if (this.rulesSectionTitle) {
+      this.rulesSectionTitle.addEventListener("click", () =>
+        this.showAllRulesView()
+      );
+    }
+
+    // Back button from All Rules view
+    if (this.backFromAllRulesBtn) {
+      this.backFromAllRulesBtn.addEventListener("click", () => {
+        // Always go back to the edit view of the current mode
+        this.showRulesEditView();
+      });
+    }
+
+    // All Rules view buttons
+    if (this.addRuleAllViewBtn) {
+      this.addRuleAllViewBtn.addEventListener("click", () => {
+        // Go back to edit mode page so user can add rules
+        this.showRulesEditView();
+      });
+    }
+    if (this.importRulesAllViewBtn) {
+      this.importRulesAllViewBtn.addEventListener("click", () => {
+        this.importFileInput.click();
+      });
+    }
+    if (this.exportRulesAllViewBtn) {
+      this.exportRulesAllViewBtn.addEventListener("click", () => {
+        this.exportRules();
+      });
+    }
+    if (this.clearRulesAllViewBtn) {
+      this.clearRulesAllViewBtn.addEventListener("click", () => {
+        this.clearRules();
+      });
     }
 
     // Mode settings events
@@ -1613,6 +1666,275 @@ class ProducerPopup {
     this.showNotification("Rule removed");
   }
 
+  editRuleUrlInline(rule, urlElement) {
+    if (!this.currentEditingRuleSetId) return;
+
+    // Don't allow editing allowParam rules (they have paramKey/paramValue)
+    if (rule.type === "allowParam") {
+      this.showNotification(
+        "Parameter rules cannot be edited. Please delete and re-add.",
+        "error"
+      );
+      return;
+    }
+
+    // Create input element
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = rule.url;
+    input.style.width = "100%";
+    input.style.fontSize = "inherit";
+    input.style.fontWeight = "inherit";
+    input.style.padding = "4px 8px";
+    input.style.background = "rgba(255, 255, 255, 0.1)";
+    input.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+    input.style.borderRadius = "6px";
+    input.style.color = "white";
+
+    const saveEdit = () => {
+      const newUrl = input.value.trim();
+      if (!newUrl) {
+        this.showNotification("URL cannot be empty", "error");
+        cancelEdit();
+        return;
+      }
+
+      const cleanedUrl = this.cleanUrl(newUrl);
+
+      // Validate URL
+      if (!this.isValidUrl(cleanedUrl)) {
+        this.showNotification("Invalid URL format", "error");
+        cancelEdit();
+        return;
+      }
+
+      // Check if URL is different
+      if (cleanedUrl !== rule.url) {
+        // Find the rule set
+        let ruleSet;
+        if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+          ruleSet = this.tempRuleSet;
+        } else {
+          ruleSet = this.customModes.find(
+            (rs) => rs.id === this.currentEditingRuleSetId
+          );
+        }
+
+        if (ruleSet) {
+          // Find and update the rule
+          const ruleToEdit = ruleSet.rules.find((r) => r.id === rule.id);
+          if (ruleToEdit) {
+            ruleToEdit.url = cleanedUrl;
+            rule.url = cleanedUrl; // Update the rule reference too
+
+            // Only save state if not creating (temp changes don't get saved until confirmation)
+            if (!this.isCreatingNewRuleSet) {
+              this.saveState();
+            }
+            this.updateUI();
+            this.renderRulesPreview();
+            this.showNotification("Rule updated!");
+          }
+        }
+      }
+
+      // Restore original element with updated URL
+      urlElement.textContent = this.formatUrl(rule.url);
+      urlElement.title = rule.url;
+      urlElement.style.display = "";
+      input.remove();
+    };
+
+    const cancelEdit = () => {
+      urlElement.textContent = this.formatUrl(rule.url);
+      urlElement.style.display = "";
+      input.remove();
+    };
+
+    input.addEventListener("blur", saveEdit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        input.blur();
+      } else if (e.key === "Escape") {
+        cancelEdit();
+      }
+    });
+
+    urlElement.style.display = "none";
+    urlElement.parentNode.insertBefore(input, urlElement);
+    input.focus();
+    input.select();
+  }
+
+  editParamRuleInline(rule, urlElement) {
+    if (!this.currentEditingRuleSetId) return;
+
+    // Create container for both inputs
+    const container = document.createElement("div");
+    container.style.display = "flex";
+    container.style.gap = "4px";
+    container.style.alignItems = "center";
+    container.style.width = "100%";
+
+    // Create question mark span
+    const questionMark = document.createElement("span");
+    questionMark.textContent = "?";
+    questionMark.style.color = "white";
+    questionMark.style.fontSize = "inherit";
+    questionMark.style.fontWeight = "inherit";
+
+    // Create key input
+    const keyInput = document.createElement("input");
+    keyInput.type = "text";
+    keyInput.value = rule.paramKey || "";
+    keyInput.placeholder = "key";
+    keyInput.style.flex = "1";
+    keyInput.style.fontSize = "inherit";
+    keyInput.style.fontWeight = "inherit";
+    keyInput.style.padding = "4px 8px";
+    keyInput.style.background = "rgba(255, 255, 255, 0.1)";
+    keyInput.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+    keyInput.style.borderRadius = "6px";
+    keyInput.style.color = "white";
+    keyInput.style.minWidth = "50px";
+
+    // Create equals sign span
+    const equalsSign = document.createElement("span");
+    equalsSign.textContent = "=";
+    equalsSign.style.color = "white";
+    equalsSign.style.fontSize = "inherit";
+    equalsSign.style.fontWeight = "inherit";
+
+    // Create value input
+    const valueInput = document.createElement("input");
+    valueInput.type = "text";
+    valueInput.value = rule.paramValue || "";
+    valueInput.placeholder = "value";
+    valueInput.style.flex = "1";
+    valueInput.style.fontSize = "inherit";
+    valueInput.style.fontWeight = "inherit";
+    valueInput.style.padding = "4px 8px";
+    valueInput.style.background = "rgba(255, 255, 255, 0.1)";
+    valueInput.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+    valueInput.style.borderRadius = "6px";
+    valueInput.style.color = "white";
+    valueInput.style.minWidth = "50px";
+
+    const saveEdit = () => {
+      const newKey = keyInput.value.trim();
+      const newValue = valueInput.value.trim();
+
+      if (!newKey) {
+        this.showNotification("Parameter key cannot be empty", "error");
+        cancelEdit();
+        return;
+      }
+
+      // Check if values changed
+      if (newKey !== rule.paramKey || newValue !== rule.paramValue) {
+        // Find the rule set
+        let ruleSet;
+        if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+          ruleSet = this.tempRuleSet;
+        } else {
+          ruleSet = this.customModes.find(
+            (rs) => rs.id === this.currentEditingRuleSetId
+          );
+        }
+
+        if (ruleSet) {
+          // Find and update the rule
+          const ruleToEdit = ruleSet.rules.find((r) => r.id === rule.id);
+          if (ruleToEdit) {
+            ruleToEdit.paramKey = newKey;
+            ruleToEdit.paramValue = newValue;
+            rule.paramKey = newKey; // Update the rule reference too
+            rule.paramValue = newValue;
+
+            // Only save state if not creating (temp changes don't get saved until confirmation)
+            if (!this.isCreatingNewRuleSet) {
+              this.saveState();
+            }
+            this.updateUI();
+            this.renderRulesPreview();
+            this.showNotification("Parameter rule updated!");
+          }
+        }
+      }
+
+      // Restore original element with updated values
+      const paramText = `?${rule.paramKey}=${rule.paramValue || "any"}`;
+      urlElement.textContent = paramText;
+      urlElement.title = paramText;
+      urlElement.style.display = "";
+      container.remove();
+    };
+
+    const cancelEdit = () => {
+      const paramText = `?${rule.paramKey}=${rule.paramValue || "any"}`;
+      urlElement.textContent = paramText;
+      urlElement.style.display = "";
+      container.remove();
+    };
+
+    // Add event listeners to both inputs
+    const handleKeydown = (e) => {
+      if (e.key === "Enter") {
+        saveEdit();
+      } else if (e.key === "Escape") {
+        cancelEdit();
+      } else if (e.key === "Tab") {
+        // Allow tab to switch between inputs
+        e.preventDefault();
+        if (e.target === keyInput) {
+          valueInput.focus();
+          valueInput.select();
+        } else {
+          keyInput.focus();
+          keyInput.select();
+        }
+      }
+    };
+
+    keyInput.addEventListener("blur", (e) => {
+      // Only save if blur is not moving to the other input
+      setTimeout(() => {
+        if (
+          document.activeElement !== keyInput &&
+          document.activeElement !== valueInput
+        ) {
+          saveEdit();
+        }
+      }, 100);
+    });
+
+    valueInput.addEventListener("blur", (e) => {
+      // Only save if blur is not moving to the other input
+      setTimeout(() => {
+        if (
+          document.activeElement !== keyInput &&
+          document.activeElement !== valueInput
+        ) {
+          saveEdit();
+        }
+      }, 100);
+    });
+
+    keyInput.addEventListener("keydown", handleKeydown);
+    valueInput.addEventListener("keydown", handleKeydown);
+
+    // Assemble container
+    container.appendChild(questionMark);
+    container.appendChild(keyInput);
+    container.appendChild(equalsSign);
+    container.appendChild(valueInput);
+
+    urlElement.style.display = "none";
+    urlElement.parentNode.insertBefore(container, urlElement);
+    keyInput.focus();
+    keyInput.select();
+  }
+
   renderRulesList() {
     this.rulesList.innerHTML = "";
 
@@ -1663,8 +1985,8 @@ class ProducerPopup {
     if (ruleSet.rules.length === 0) {
       this.rulesList.innerHTML = `
         <div class="empty-state" style="padding: 0 10px 10px; font-size: 11px;">
-          No blocking rules configured yet.<br>
-          Add or import some rules to get started!
+          No rules configured yet.<br>
+          Add or import rules to get started!
         </div>
       `;
       return;
@@ -1682,10 +2004,36 @@ class ProducerPopup {
 
       const url = document.createElement("div");
       url.className = "rule-url";
+
+      // Set title attribute for hover tooltip and make editable
       if (rule.type !== "allowParam") {
+        if (rule.url === "*") {
+          url.title = "(*) All Websites";
+          item.title = "(*) All Websites";
+        } else {
+          url.title = rule.url;
+          item.title = rule.url;
+        }
         url.textContent = this.formatUrl(rule.url);
+        url.style.cursor = "pointer";
+
+        // Add double-click to edit URL inline
+        url.addEventListener("dblclick", (e) => {
+          e.stopPropagation();
+          this.editRuleUrlInline(rule, url);
+        });
       } else {
-        url.textContent = `?${rule.paramKey}=${rule.paramValue || "any"}`;
+        const paramText = `?${rule.paramKey}=${rule.paramValue || "any"}`;
+        url.textContent = paramText;
+        url.title = paramText;
+        item.title = paramText;
+        url.style.cursor = "pointer";
+
+        // Add double-click to edit parameter rule inline
+        url.addEventListener("dblclick", (e) => {
+          e.stopPropagation();
+          this.editParamRuleInline(rule, url);
+        });
       }
 
       const type = document.createElement("div");
@@ -1699,6 +2047,7 @@ class ProducerPopup {
       removeBtn.className = "btn btn-xsmall btn-squared btn-danger";
       removeBtn.textContent = "✕";
       removeBtn.title = "Delete Rule";
+      removeBtn.style.marginLeft = "4px";
       removeBtn.addEventListener("click", () => {
         this.removeRule(rule.id);
       });
@@ -1713,8 +2062,11 @@ class ProducerPopup {
   }
 
   cleanUrl(url) {
-    // Remove protocol if present
-    return url.replace(/^https?:\/\//, "").replace(/^www\./, "");
+    // Remove protocol if present, remove www prefix, and remove trailing slash
+    return url
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .replace(/\/+$/, "");
   }
 
   isValidUrl(url) {
@@ -1862,6 +2214,11 @@ class ProducerPopup {
       }
       this.updateUI();
 
+      // If All Rules view is visible, re-render it
+      if (this.allRulesView && this.allRulesView.style.display !== "none") {
+        this.renderAllRulesList();
+      }
+
       this.showNotification("Rules imported successfully", "success");
     } catch (err) {
       console.error("Failed to import rules:", err);
@@ -1944,6 +2301,12 @@ class ProducerPopup {
       this.saveState();
     }
     this.updateUI();
+
+    // If All Rules view is visible, re-render it
+    if (this.allRulesView && this.allRulesView.style.display !== "none") {
+      this.renderAllRulesList();
+    }
+
     this.showNotification("All rules cleared");
   }
 
@@ -2259,10 +2622,198 @@ class ProducerPopup {
   showRulesMainView() {
     if (this.rulesMainView) this.rulesMainView.style.display = "block";
     if (this.rulesEditView) this.rulesEditView.style.display = "none";
+    if (this.allRulesView) this.allRulesView.style.display = "none";
     if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
     this.currentEditingRuleSetId = null;
     this.isCreatingNewRuleSet = false;
     this.tempRuleSet = null;
+  }
+
+  showAllRulesView() {
+    if (!this.currentEditingRuleSetId) {
+      this.showNotification("No mode selected", "error");
+      return;
+    }
+
+    if (this.rulesMainView) this.rulesMainView.style.display = "none";
+    if (this.rulesEditView) this.rulesEditView.style.display = "none";
+    if (this.allRulesView) this.allRulesView.style.display = "block";
+    if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
+
+    this.renderAllRulesList();
+  }
+
+  renderAllRulesList() {
+    if (!this.allRulesList) return;
+
+    this.allRulesList.innerHTML = "";
+
+    if (!this.currentEditingRuleSetId) {
+      this.allRulesList.innerHTML = `
+        <div class="empty-state">
+          No mode selected.<br>
+          Select a mode to view its rules.
+        </div>
+      `;
+      // Center the empty state
+      if (this.allRulesViewScrollContainer) {
+        this.allRulesViewScrollContainer.style.display = "flex";
+        this.allRulesViewScrollContainer.style.justifyContent = "center";
+        this.allRulesViewScrollContainer.style.alignItems = "center";
+      }
+      // Hide all buttons except import when no mode selected
+      if (this.addRuleAllViewBtn) this.addRuleAllViewBtn.style.display = "none";
+      if (this.exportRulesAllViewBtn)
+        this.exportRulesAllViewBtn.style.display = "none";
+      if (this.clearRulesAllViewBtn)
+        this.clearRulesAllViewBtn.style.display = "none";
+      if (this.importRulesAllViewBtn)
+        this.importRulesAllViewBtn.style.flex = "";
+      return;
+    }
+
+    // Get rule set from temp if creating, otherwise from custom modes
+    let ruleSet;
+    if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+      ruleSet = this.tempRuleSet;
+    } else {
+      ruleSet = this.customModes.find(
+        (rs) => rs.id === this.currentEditingRuleSetId
+      );
+    }
+
+    if (!ruleSet) {
+      this.allRulesList.innerHTML = `
+        <div class="empty-state">
+          Mode not found.
+        </div>
+      `;
+      // Center the empty state
+      if (this.allRulesViewScrollContainer) {
+        this.allRulesViewScrollContainer.style.display = "flex";
+        this.allRulesViewScrollContainer.style.justifyContent = "center";
+        this.allRulesViewScrollContainer.style.alignItems = "center";
+      }
+      // Hide all buttons except import when mode not found
+      if (this.addRuleAllViewBtn) this.addRuleAllViewBtn.style.display = "none";
+      if (this.exportRulesAllViewBtn)
+        this.exportRulesAllViewBtn.style.display = "none";
+      if (this.clearRulesAllViewBtn)
+        this.clearRulesAllViewBtn.style.display = "none";
+      if (this.importRulesAllViewBtn)
+        this.importRulesAllViewBtn.style.flex = "";
+      return;
+    }
+
+    if (ruleSet.rules.length === 0) {
+      this.allRulesList.innerHTML = `
+        <div class="empty-state">
+          No rules configured yet.<br>
+          Add or import rules to get started!
+        </div>
+      `;
+      // Center the empty state
+      if (this.allRulesViewScrollContainer) {
+        this.allRulesViewScrollContainer.style.display = "flex";
+        this.allRulesViewScrollContainer.style.justifyContent = "center";
+        this.allRulesViewScrollContainer.style.alignItems = "center";
+      }
+      // Show Add Rule + Import buttons (50% each) when no rules
+      if (this.addRuleAllViewBtn) {
+        this.addRuleAllViewBtn.style.display = "inline-flex";
+        this.addRuleAllViewBtn.style.flex = "1";
+      }
+      if (this.importRulesAllViewBtn) {
+        this.importRulesAllViewBtn.style.flex = "1";
+      }
+      if (this.exportRulesAllViewBtn)
+        this.exportRulesAllViewBtn.style.display = "none";
+      if (this.clearRulesAllViewBtn)
+        this.clearRulesAllViewBtn.style.display = "none";
+      return;
+    }
+
+    // Remove centering for rules list (normal vertical scrolling)
+    if (this.allRulesViewScrollContainer) {
+      this.allRulesViewScrollContainer.style.display = "block";
+      this.allRulesViewScrollContainer.style.justifyContent = "";
+      this.allRulesViewScrollContainer.style.alignItems = "";
+    }
+
+    // Show Import + Export + Delete All buttons (33.3% each) when rules exist
+    if (this.addRuleAllViewBtn) this.addRuleAllViewBtn.style.display = "none";
+    if (this.importRulesAllViewBtn) this.importRulesAllViewBtn.style.flex = "";
+    if (this.exportRulesAllViewBtn)
+      this.exportRulesAllViewBtn.style.display = "inline-flex";
+    if (this.clearRulesAllViewBtn)
+      this.clearRulesAllViewBtn.style.display = "inline-flex";
+
+    // Reverse the rules array to show latest first (without mutating original)
+    const reversedRules = [...ruleSet.rules].reverse();
+
+    reversedRules.forEach((rule, reversedIndex) => {
+      const item = document.createElement("div");
+      item.className = "rule-item";
+
+      const info = document.createElement("div");
+      info.className = "rule-info";
+
+      const url = document.createElement("div");
+      url.className = "rule-url";
+
+      // Set title attribute for hover tooltip and make editable
+      if (rule.type !== "allowParam") {
+        if (rule.url === "*") {
+          url.title = "(*) All Websites";
+          item.title = "(*) All Websites";
+        } else {
+          url.title = rule.url;
+          item.title = rule.url;
+        }
+        url.textContent = this.formatUrl(rule.url);
+        url.style.cursor = "pointer";
+
+        // Add double-click to edit URL inline
+        url.addEventListener("dblclick", (e) => {
+          e.stopPropagation();
+          this.editRuleUrlInline(rule, url);
+        });
+      } else {
+        const paramText = `?${rule.paramKey}=${rule.paramValue || "any"}`;
+        url.textContent = paramText;
+        url.title = paramText;
+        item.title = paramText;
+        url.style.cursor = "pointer";
+
+        // Add double-click to edit parameter rule inline
+        url.addEventListener("dblclick", (e) => {
+          e.stopPropagation();
+          this.editParamRuleInline(rule, url);
+        });
+      }
+
+      const type = document.createElement("div");
+      type.className = "rule-type";
+      type.textContent = this.formatRuleType(rule);
+
+      info.appendChild(url);
+      info.appendChild(type);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "btn btn-xsmall btn-squared btn-danger";
+      removeBtn.textContent = "✕";
+      removeBtn.title = "Delete Rule";
+      removeBtn.style.marginLeft = "4px";
+      removeBtn.addEventListener("click", () => {
+        this.removeRule(rule.id);
+        // Re-render the all rules list after removal
+        this.renderAllRulesList();
+      });
+
+      item.appendChild(info);
+      item.appendChild(removeBtn);
+      this.allRulesList.appendChild(item);
+    });
   }
 
   showRulesEditView() {
@@ -2271,6 +2822,7 @@ class ProducerPopup {
 
     if (this.rulesMainView) this.rulesMainView.style.display = "none";
     if (this.rulesEditView) this.rulesEditView.style.display = "block";
+    if (this.allRulesView) this.allRulesView.style.display = "none";
     if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
 
     // Show/hide name section and appropriate buttons based on whether we're creating or editing
@@ -2314,6 +2866,7 @@ class ProducerPopup {
   showModeSettingsView() {
     // Show the mode settings configuration view
     if (this.rulesEditView) this.rulesEditView.style.display = "none";
+    if (this.allRulesView) this.allRulesView.style.display = "none";
     if (this.modeSettingsView) this.modeSettingsView.style.display = "block";
     this.loadModeSettingsToView();
   }
@@ -2321,6 +2874,7 @@ class ProducerPopup {
   showModeEditFromSettings() {
     // Go back to mode edit view from settings
     if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
+    if (this.allRulesView) this.allRulesView.style.display = "none";
     if (this.rulesEditView) this.rulesEditView.style.display = "block";
   }
 
@@ -3345,7 +3899,7 @@ class ProducerPopup {
     // BUG FIX: Ensure this session has the most recent lastActive timestamp
     // to guarantee it moves to the top of the session list
     const maxLastActive = Math.max(
-      ...this.sessions.map(s => s.lastActive || 0),
+      ...this.sessions.map((s) => s.lastActive || 0),
       Date.now() - 1
     );
     session.lastActive = maxLastActive + 1;
