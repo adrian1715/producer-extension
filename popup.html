@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -17,8 +17,8 @@
       }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
-          sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         /* padding: 12px 0 0 0; */
@@ -463,6 +463,10 @@
         flex-shrink: 0;
       }
 
+      #tab-stats .section {
+        padding: 12px;
+      }
+
       .tab-btn {
         flex: 1;
         background: transparent;
@@ -638,6 +642,12 @@
         font-size: 12px;
         opacity: 0.9;
         margin: 0;
+      }
+
+      .all-view-btn {
+        height: 33px;
+        width: 33.3%;
+        font-size: 13px !important;
       }
 
       /* Theme-specific body backgrounds */
@@ -985,6 +995,72 @@
           </button>
         </div>
 
+        <!-- All Rules View -->
+        <div id="all-rules-view" style="display: none">
+          <div class="section" style="margin-top: 0; margin-bottom: 0">
+            <div class="section-title">
+              <div style="display: flex; gap: 8px; align-items: center">
+                <button
+                  id="backFromAllRulesBtn"
+                  class="btn btn-xsmall btn-squared"
+                >
+                  <i class="bi bi-arrow-left"></i>
+                </button>
+                <span>📋 All Rules</span>
+              </div>
+            </div>
+            <div
+              id="allRulesViewScrollContainer"
+              class="scroll-container"
+              style="height: 204px"
+            >
+              <div id="allRulesList">
+                <div class="empty-state">
+                  No rules configured yet.<br />
+                  Select a mode to view its rules.
+                </div>
+              </div>
+            </div>
+            <div
+              id="allViewBtns"
+              style="display: flex; gap: 8px; margin-top: 10px"
+            >
+              <button
+                id="addRuleAllViewBtn"
+                class="btn btn-small all-view-btn"
+                title="Add Rule"
+                style="display: none"
+              >
+                <i class="bi bi-plus-circle" style="margin-right: 8px"></i> Add
+                Rule
+              </button>
+              <button
+                id="importRulesAllViewBtn"
+                class="btn btn-small btn-primary all-view-btn"
+                title="Import Rules"
+              >
+                <i class="bi bi-download" style="margin-right: 8px"></i> Import
+              </button>
+              <button
+                id="exportRulesAllViewBtn"
+                class="btn btn-small btn-success all-view-btn"
+                title="Export Rules"
+                style="display: none"
+              >
+                <i class="bi bi-upload" style="margin-right: 8px"></i> Export
+              </button>
+              <button
+                id="clearRulesAllViewBtn"
+                class="btn btn-small btn-danger all-view-btn"
+                title="Clear Rules"
+                style="display: none"
+              >
+                <i class="bi bi-trash" style="margin-right: 8px"></i> Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Edit view: Edit or create a mode -->
         <div id="rules-edit-view" style="display: none">
           <!-- Mode name input (only shown when creating new) -->
@@ -1100,7 +1176,13 @@
                 class="section-title"
                 style="margin-bottom: 9px; font-size: 13px"
               >
-                <span>📋 Rules (<span id="ruleCount">0</span>)</span>
+                <span
+                  id="rulesSectionTitle"
+                  style="cursor: pointer"
+                  title="View All Rules"
+                >
+                  📋 Rules (<span id="ruleCount">0</span>)</span
+                >
 
                 <div id="rulesOptionBtn">
                   <button
@@ -1285,7 +1367,7 @@
                     <span
                       style="
                         position: absolute;
-                        content: '';
+                        content: &quot;&quot;;
                         height: 14px;
                         width: 14px;
                         left: 4px;
@@ -1366,7 +1448,7 @@
                     <span
                       style="
                         position: absolute;
-                        content: '';
+                        content: &quot;&quot;;
                         height: 14px;
                         width: 14px;
                         left: 4px;

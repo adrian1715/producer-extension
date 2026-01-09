@@ -767,12 +767,11 @@ class ProducerBackground {
   cleanUrl(url) {
     try {
       const urlObj = new URL(url);
-      return (urlObj.hostname + urlObj.pathname + urlObj.search).replace(
-        /^www\./,
-        ""
-      );
+      return (urlObj.hostname + urlObj.pathname + urlObj.search)
+        .replace(/^www\./, "")
+        .replace(/\/+$/, "");
     } catch {
-      return url.replace(/^https?:\/\//, "").replace(/^www\./, "");
+      return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
     }
   }
 
