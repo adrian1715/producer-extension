@@ -6,7 +6,7 @@ class ProducerContentScript {
     this.pollInterval = null;
     this.observer = null;
     this.blockPageTheme = "blue"; // Default theme
-    this.blockPageTitle = "🎯 Stay Focused!";
+    this.blockPageTitle = "Stay Focused!";
     this.blockPageMessage = "This site is blocked during your focus session.";
     this.init();
     this.interceptNavigationAttempts();
@@ -29,7 +29,7 @@ class ProducerContentScript {
       } else if (message.action === "toggleGrayscale") {
         console.log(
           "[Producer] Received toggleGrayscale message, enabled:",
-          message.enabled
+          message.enabled,
         );
         this.toggleGrayscaleFilter(message.enabled);
         sendResponse({ success: true });
@@ -64,11 +64,11 @@ class ProducerContentScript {
             "[Producer] Applying grayscale on init - grayscaleEnabled:",
             data.grayscaleEnabled,
             "isActive:",
-            data.isActive
+            data.isActive,
           );
           this.toggleGrayscaleFilter(true);
         }
-      }
+      },
     );
 
     // Listen for storage changes to react to grayscale setting changes
@@ -90,7 +90,7 @@ class ProducerContentScript {
               "grayscaleEnabled:",
               data.grayscaleEnabled,
               "isActive:",
-              data.isActive
+              data.isActive,
             );
 
             // Force update the grayscale filter
@@ -213,7 +213,10 @@ class ProducerContentScript {
     document.addEventListener(
       "click",
       async (e) => {
-        const link = e.target.closest("a[href]");
+        const target =
+          e.target instanceof Element ? e.target : e.target.parentElement;
+        if (!target) return;
+        const link = target.closest("a[href]");
         if (link) {
           const href = link.getAttribute("href");
           let targetUrl;
@@ -257,7 +260,7 @@ class ProducerContentScript {
           }
         }
       },
-      true
+      true,
     );
 
     // Intercept form submissions
@@ -286,7 +289,7 @@ class ProducerContentScript {
           }
         }
       },
-      true
+      true,
     );
 
     // Override history methods with better error handling
@@ -298,7 +301,7 @@ class ProducerContentScript {
         if (url) {
           const fullUrl = new URL(url, window.location.href).href;
           // Use debounced check to prevent race conditions
-          setTimeout(() => this.debouncedCheck(fullUrl), 0);
+          setTimeout(() => self.debouncedCheck(fullUrl), 0);
         }
         originalPushState.apply(this, arguments);
         window.dispatchEvent(new Event("producer-urlchange"));
@@ -312,7 +315,7 @@ class ProducerContentScript {
       try {
         if (url) {
           const fullUrl = new URL(url, window.location.href).href;
-          setTimeout(() => this.debouncedCheck(fullUrl), 0);
+          setTimeout(() => self.debouncedCheck(fullUrl), 0);
         }
         originalReplaceState.apply(this, arguments);
         window.dispatchEvent(new Event("producer-urlchange"));
@@ -502,7 +505,7 @@ class ProducerContentScript {
                     .block-container {
                         width: 600px;
                         max-height: 100vh;
-                        padding: 40px;
+                        padding: 20px 30px;
                         background: ${currentTheme.containerBg};
                         border-radius: 20px;
                         backdrop-filter: blur(10px);
@@ -564,7 +567,7 @@ class ProducerContentScript {
                         display: flex;
                         gap: 12px;
                         justify-content: center;
-                        margin-top: 30px;
+                        margin-top: 20px;
                         flex-wrap: wrap;
                     }
                     
@@ -719,9 +722,10 @@ class ProducerContentScript {
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = (seconds % 60) + 1;
+        if (hours >= 24) return `${hours}h ${minutes}m`;
         if (hours > 0) return `${hours}h ${minutes}m`;
-        else if (minutes > 0) return `${minutes}m ${secs}s`;
-        else return `${secs}s`;
+        if (minutes > 0) return `${minutes}m ${secs}s`;
+        return `${secs}s`;
       }
 
       // Timer - show focused time instead of local time
@@ -734,7 +738,7 @@ class ProducerContentScript {
           if (response) {
             const focusedTimeFormatted = formatTime(response.focusedTime);
             const totalSessionTimeFormatted = formatTime(
-              response.totalSessionTime
+              response.totalSessionTime,
             );
 
             const el = document.getElementById("sessionTime");
