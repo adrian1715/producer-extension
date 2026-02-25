@@ -24,10 +24,12 @@ class ProducerPopup {
     this.sessionCommitInterval = null; // Timer for periodic commits
     this.sessionFocusStartTime = null; // When focus mode started for current session segment
     this.sessionPauseStartTime = null; // When session was paused (focus mode stopped)
+    this.isLoaded = false;
+    this.loadStatePromise = null;
 
     this.initializeElements();
     this.bindEvents();
-    this.loadState();
+    this.loadStatePromise = this.loadState();
   }
 
   initializeElements() {
@@ -653,9 +655,18 @@ class ProducerPopup {
       }
 
       this.updateUI();
+      this.isLoaded = true;
     } catch (error) {
       console.error("Failed to load state:", error);
     }
+  }
+
+  async ensureLoaded() {
+    if (this.isLoaded) return;
+    if (this.loadStatePromise) {
+      await this.loadStatePromise;
+    }
+    this.isLoaded = true;
   }
 
   async ensureBackgroundTimerRunning() {
@@ -1167,6 +1178,7 @@ class ProducerPopup {
   }
 
   async createNewSession() {
+    await this.ensureLoaded();
     // Create a new session without starting focus mode
     const now = Date.now();
     const sessionId = "session-" + now;
@@ -1220,6 +1232,7 @@ class ProducerPopup {
   }
 
   async toggleProducing() {
+    await this.ensureLoaded();
     const wasActive = this.isActive;
     this.isActive = !this.isActive;
 

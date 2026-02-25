@@ -30,15 +30,13 @@ class ProducerBackground {
   async init() {
     // Load saved state
     await this.loadState();
+    await this.sanityCheckActiveRules();
+
+    // Check for browser closure before starting any timers/heartbeat
+    await this.checkForBrowserClosure();
 
     // Set up listeners
     this.setupListeners();
-
-    // Check for browser closure on init
-    await this.checkForBrowserClosure();
-
-    // Reload state after potential session deactivation
-    await this.loadState();
 
     // Restore timer if was active - improved logic
     if (this.isActive) {
@@ -52,11 +50,39 @@ class ProducerBackground {
     }
   }
 
+  async sanityCheckActiveRules() {
+    if (!this.isActive || this.rules.length > 0) return;
+
+    try {
+      const data = await chrome.storage.local.get([
+        "customModes",
+        "customRules",
+        "activeRuleSetId",
+      ]);
+
+      const activeRuleSetId = data.activeRuleSetId;
+      if (!activeRuleSetId) return;
+
+      const ruleSets = data.customModes || data.customRules || [];
+      const activeRuleSet = ruleSets.find((rs) => rs.id === activeRuleSetId);
+      if (activeRuleSet && Array.isArray(activeRuleSet.rules)) {
+        this.rules = activeRuleSet.rules;
+      } else {
+        console.warn(
+          "Active ruleset missing or empty while focus mode is active.",
+        );
+      }
+    } catch (error) {
+      console.error("Failed sanity check for active rules:", error);
+    }
+  }
+
   async loadState() {
     try {
       const data = await chrome.storage.local.get([
         "rules", // Old format for backward compatibility
         "customRules",
+        "customModes",
         "activeRuleSetId",
         "isActive",
         "sessionBlocks",
@@ -65,9 +91,14 @@ class ProducerBackground {
       ]);
 
       // Load rules from active rule set if using new structure
-      if (data.customRules && data.activeRuleSetId) {
+      if (data.customModes && data.activeRuleSetId) {
+        const activeRuleSet = data.customModes.find(
+          (rs) => rs.id === data.activeRuleSetId,
+        );
+        this.rules = activeRuleSet ? activeRuleSet.rules : [];
+      } else if (data.customRules && data.activeRuleSetId) {
         const activeRuleSet = data.customRules.find(
-          (rs) => rs.id === data.activeRuleSetId
+          (rs) => rs.id === data.activeRuleSetId,
         );
         this.rules = activeRuleSet ? activeRuleSet.rules : [];
       } else if (data.rules) {
@@ -132,12 +163,12 @@ class ProducerBackground {
             const wasBlocked = this.shouldBlockUrlWith(
               rulesBefore,
               isActiveBefore,
-              tab.url
+              tab.url,
             );
             const isBlocked = this.shouldBlockUrlWith(
               rulesAfter,
               isActiveAfter,
-              tab.url
+              tab.url,
             );
 
             // Reload only if the status changes
@@ -152,21 +183,9 @@ class ProducerBackground {
       return true; // Keep message channel open for async responses
     });
 
-    // Check for browser closure on startup
-    chrome.runtime.onStartup.addListener(async () => {
-      await this.checkForBrowserClosure();
-    });
-
     // Detect when all browser windows are closed
     chrome.windows.onRemoved.addListener(async (windowId) => {
-      const windows = await chrome.windows.getAll();
-      if (windows.length === 0) {
-        // All windows closed - save timestamp and STOP heartbeat to freeze the timestamp
-        await chrome.storage.local.set({ lastActiveTimestamp: Date.now() });
-
-        // Stop heartbeat so timestamp doesn't get updated anymore
-        this.stopHeartbeat();
-      }
+      await this.recordWindowClosedTimestampIfNeeded();
     });
 
     // Handle service worker lifecycle in manifest v3
@@ -180,7 +199,28 @@ class ProducerBackground {
         this.focusedTime = totalFocused;
         this.saveTimerState();
       }
+
+      // If the browser is closing, record the close timestamp
+      this.recordWindowClosedTimestampIfNeeded().catch(() => {});
     });
+  }
+
+  async recordWindowClosedTimestampIfNeeded() {
+    try {
+      const windows = await chrome.windows.getAll();
+      if (windows.length === 0) {
+        // All windows closed - save timestamp and STOP heartbeat to freeze the timestamp
+        await chrome.storage.local.set({
+          lastActiveTimestamp: Date.now(),
+          lastWindowClosedAt: Date.now(),
+        });
+
+        // Stop heartbeat so timestamp doesn't get updated anymore
+        this.stopHeartbeat();
+      }
+    } catch (error) {
+      console.error("Failed to record window close timestamp:", error);
+    }
   }
 
   // Start heartbeat to track browser activity
@@ -212,49 +252,116 @@ class ProducerBackground {
     try {
       const data = await chrome.storage.local.get([
         "lastActiveTimestamp",
+        "lastWindowClosedAt",
         "sessions",
         "currentSessionId",
         "isActive",
       ]);
 
       const lastActiveTimestamp = data.lastActiveTimestamp;
+      const lastWindowClosedAt = data.lastWindowClosedAt;
       const currentTime = Date.now();
+      const windows = await chrome.windows.getAll();
+      const hasOpenWindows = windows.length > 0;
 
       // If there's a timestamp and the difference is > 35 seconds, browser was likely closed
-      if (lastActiveTimestamp && currentTime - lastActiveTimestamp > 35000) {
+      if (lastWindowClosedAt && hasOpenWindows) {
+        const elapsedSinceClose = currentTime - lastWindowClosedAt;
+        if (elapsedSinceClose > 35000) {
+          console.log(
+            "Browser was closed, deactivating session...",
+            Math.floor(elapsedSinceClose / 1000),
+            "seconds elapsed",
+          );
+
+          // Load current state
+          const sessions = data.sessions || [];
+          const currentSessionId = data.currentSessionId;
+
+          // Deactivate the active session if one exists
+          if (currentSessionId) {
+            const session = sessions.find((s) => s.id === currentSessionId);
+            if (session) {
+              // Mark session as inactive
+              session.isActive = false;
+
+              // Set end time if not already set
+              if (!session.endTime) {
+                session.endTime = lastWindowClosedAt; // Use last known active time
+              }
+
+              // Clear session tracking times
+              session.sessionFocusStartTime = null;
+              session.sessionPauseStartTime = null;
+
+              // Update last active timestamp
+              session.lastActive = lastWindowClosedAt;
+
+              console.log(
+                `Session "${session.name}" deactivated due to browser closure`,
+              );
+            }
+
+            // Save updated sessions and clear current session
+            await chrome.storage.local.set({
+              sessions: sessions,
+              currentSessionId: null,
+              isActive: false,
+              sessionBlocks: 0,
+            });
+
+            // Update internal state
+            this.isActive = false;
+            this.sessionBlocks = 0;
+            this.sessionStartTime = null;
+
+            // Stop any running timers
+          }
+
+          // Always clear global active/timer state, even if session id is missing
+          await chrome.storage.local.set({
+            sessionStartTime: null,
+            isActive: false,
+            currentSessionId: null,
+            sessionBlocks: 0,
+          });
+          this.isActive = false;
+          this.sessionBlocks = 0;
+          this.sessionStartTime = null;
+          await this.stopTimer();
+          this.stopHeartbeat();
+        }
+        // Consume close marker so worker restarts in same browser run don't re-apply it
+        await chrome.storage.local.set({ lastWindowClosedAt: null });
+      } else if (
+        !lastWindowClosedAt &&
+        lastActiveTimestamp &&
+        currentTime - lastActiveTimestamp > 35000
+      ) {
+        // Fallback for older data that doesn't track lastWindowClosedAt
         console.log(
-          "Browser was closed, deactivating session...",
+          "Browser likely closed (fallback), deactivating session...",
           Math.floor((currentTime - lastActiveTimestamp) / 1000),
-          "seconds elapsed"
+          "seconds elapsed",
         );
 
-        // Load current state
         const sessions = data.sessions || [];
         const currentSessionId = data.currentSessionId;
-
-        // Deactivate the active session if one exists
         if (currentSessionId) {
           const session = sessions.find((s) => s.id === currentSessionId);
           if (session) {
-            // Mark session as inactive
             session.isActive = false;
-
-            // Set end time if not already set
             if (!session.endTime) {
-              session.endTime = lastActiveTimestamp; // Use last known active time
+              session.endTime = lastActiveTimestamp;
             }
-
-            // Clear session tracking times
             session.sessionFocusStartTime = null;
             session.sessionPauseStartTime = null;
-
-            // Update last active timestamp
             session.lastActive = lastActiveTimestamp;
-
-            console.log(`Session "${session.name}" deactivated due to browser closure`);
+            console.log(
+              `Session "${session.name}" deactivated due to browser closure`,
+            );
           }
 
-          // Save updated sessions and clear current session
           await chrome.storage.local.set({
             sessions: sessions,
             currentSessionId: null,
@@ -262,15 +369,20 @@ class ProducerBackground {
             sessionBlocks: 0,
           });
 
-          // Update internal state
-          this.isActive = false;
-          this.sessionBlocks = 0;
-          this.sessionStartTime = null;
-
-          // Stop any running timers
-          await this.stopTimer();
-          this.stopHeartbeat();
         }
+
+        // Always clear global active/timer state, even if session id is missing
+        await chrome.storage.local.set({
+          sessionStartTime: null,
+          isActive: false,
+          currentSessionId: null,
+          sessionBlocks: 0,
+        });
+        this.isActive = false;
+        this.sessionBlocks = 0;
+        this.sessionStartTime = null;
+        await this.stopTimer();
+        this.stopHeartbeat();
       }
     } catch (error) {
       console.error("Error checking for browser closure:", error);
@@ -292,16 +404,23 @@ class ProducerBackground {
 
         // Notify all tabs about the theme change
         chrome.tabs.query({}, (tabs) => {
-          tabs.forEach(tab => {
-            if (tab.id && tab.url && !tab.url.startsWith("chrome://") && !tab.url.startsWith("chrome-extension://")) {
-              chrome.tabs.sendMessage(tab.id, {
-                action: "applyBlockPageTheme",
-                theme: message.theme,
-                blockPageTitle: message.blockPageTitle,
-                blockPageMessage: message.blockPageMessage
-              }).catch(() => {
-                // Tab may not have content script loaded, ignore error
-              });
+          tabs.forEach((tab) => {
+            if (
+              tab.id &&
+              tab.url &&
+              !tab.url.startsWith("chrome://") &&
+              !tab.url.startsWith("chrome-extension://")
+            ) {
+              chrome.tabs
+                .sendMessage(tab.id, {
+                  action: "applyBlockPageTheme",
+                  theme: message.theme,
+                  blockPageTitle: message.blockPageTitle,
+                  blockPageMessage: message.blockPageMessage,
+                })
+                .catch(() => {
+                  // Tab may not have content script loaded, ignore error
+                });
             }
           });
         });
@@ -332,9 +451,14 @@ class ProducerBackground {
         // Calculate current session's focused time and total session time
         let currentSessionFocusedTime = 0;
         let totalSessionTime = 0;
-        const data = await chrome.storage.local.get(["currentSessionId", "sessions"]);
+        const data = await chrome.storage.local.get([
+          "currentSessionId",
+          "sessions",
+        ]);
         if (data.currentSessionId && data.sessions) {
-          const currentSession = data.sessions.find((s) => s.id === data.currentSessionId);
+          const currentSession = data.sessions.find(
+            (s) => s.id === data.currentSessionId,
+          );
           if (currentSession) {
             const sessionFocusedTime = currentSession.focusedTime || 0;
             const sessionBreakTime = currentSession.breakTime || 0;
@@ -344,14 +468,23 @@ class ProducerBackground {
             let currentBreakElapsed = 0;
             if (this.isActive && currentSession.sessionFocusStartTime) {
               // Currently in focus mode - add elapsed focus time
-              currentFocusElapsed = Math.floor((now - currentSession.sessionFocusStartTime) / 1000);
+              currentFocusElapsed = Math.floor(
+                (now - currentSession.sessionFocusStartTime) / 1000,
+              );
             } else if (!this.isActive && currentSession.sessionPauseStartTime) {
               // Currently paused - add elapsed break time
-              currentBreakElapsed = Math.floor((now - currentSession.sessionPauseStartTime) / 1000);
+              currentBreakElapsed = Math.floor(
+                (now - currentSession.sessionPauseStartTime) / 1000,
+              );
             }
 
-            currentSessionFocusedTime = sessionFocusedTime + currentFocusElapsed;
-            totalSessionTime = sessionFocusedTime + sessionBreakTime + currentFocusElapsed + currentBreakElapsed;
+            currentSessionFocusedTime =
+              sessionFocusedTime + currentFocusElapsed;
+            totalSessionTime =
+              sessionFocusedTime +
+              sessionBreakTime +
+              currentFocusElapsed +
+              currentBreakElapsed;
           }
         }
 
@@ -452,7 +585,10 @@ class ProducerBackground {
         }
 
         try {
-          const data = await chrome.storage.local.get(["customModes", "activeRuleSetId"]);
+          const data = await chrome.storage.local.get([
+            "customModes",
+            "activeRuleSetId",
+          ]);
           const customModes = data.customModes || [];
           const activeRuleSetId = data.activeRuleSetId;
 
@@ -472,11 +608,11 @@ class ProducerBackground {
           try {
             const urlObj = new URL(message.url);
             // For file URLs, use the full pathname; for http/https, use hostname + pathname
-            if (urlObj.protocol === 'file:') {
+            if (urlObj.protocol === "file:") {
               urlToAllow = urlObj.pathname;
             } else {
               // Remove www. from hostname to ensure proper matching
-              const hostname = urlObj.hostname.replace(/^www\./, '');
+              const hostname = urlObj.hostname.replace(/^www\./, "");
               urlToAllow = hostname + urlObj.pathname;
             }
           } catch (e) {
@@ -485,7 +621,7 @@ class ProducerBackground {
 
           // Check if rule already exists
           const ruleExists = activeMode.rules.some(
-            (rule) => rule.type === "allow" && rule.url === urlToAllow
+            (rule) => rule.type === "allow" && rule.url === urlToAllow,
           );
 
           if (ruleExists) {
@@ -651,7 +787,7 @@ class ProducerBackground {
 
     // Check if URL would be blocked by domain/url rules
     const blockRules = this.rules.filter(
-      (rule) => rule.type === "domain" || rule.type === "url"
+      (rule) => rule.type === "domain" || rule.type === "url",
     );
 
     let wouldBeBlocked = false;
@@ -665,7 +801,7 @@ class ProducerBackground {
     // If URL would be blocked, check for allowParam exceptions
     if (wouldBeBlocked) {
       const allowParamRules = this.rules.filter(
-        (rule) => rule.type === "allowParam"
+        (rule) => rule.type === "allowParam",
       );
       for (const rule of allowParamRules) {
         if (this.matchesParamRule(url, rule)) {
@@ -704,7 +840,7 @@ class ProducerBackground {
         // Block entire domain and all subdomains
         const hostname = new URL("https://" + url).hostname.replace(
           /^www\./,
-          ""
+          "",
         );
         return hostname === ruleUrl || hostname.endsWith("." + ruleUrl);
 
@@ -771,14 +907,17 @@ class ProducerBackground {
         .replace(/^www\./, "")
         .replace(/\/+$/, "");
     } catch {
-      return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
+      return url
+        .replace(/^https?:\/\//, "")
+        .replace(/^www\./, "")
+        .replace(/\/+$/, "");
     }
   }
 
   async fetchMotivationalQuote() {
     try {
       const response = await fetch(
-        "https://api.forismatic.com/api/1.0/?method=getQuote&format=json&lang=en"
+        "https://api.forismatic.com/api/1.0/?method=getQuote&format=json&lang=en",
       );
 
       if (!response.ok) {
