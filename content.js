@@ -5,6 +5,9 @@ class ProducerContentScript {
     this.checkTimeout = null;
     this.pollInterval = null;
     this.observer = null;
+    this.blockPageSetupTimeout = null;
+    this.blockStatsInterval = null;
+    this.blockVisibilityHandler = null;
     this.blockPageTheme = "blue"; // Default theme
     this.blockPageTitle = "Stay Focused!";
     this.blockPageMessage = "This site is blocked during your focus session.";
@@ -383,13 +386,14 @@ class ProducerContentScript {
   }
 
   async blockPage(blockedUrl = null) {
-    const phrase = await this.getMotivationalQuote();
+    this.isBlocked = true;
 
     // Use provided URL or fall back to current location
     const urlToReport = blockedUrl || window.location.href;
 
-    // Report the block to background script and get block number
+    // Report the block to background script and get block number + redirect URL.
     let blockNumber = 0;
+    let blockedPageUrl = null;
     try {
       const response = await chrome.runtime.sendMessage({
         action: "reportBlock",
@@ -398,365 +402,32 @@ class ProducerContentScript {
       if (response && response.blockNumber) {
         blockNumber = response.blockNumber;
       }
+      if (response && response.blockedPageUrl) {
+        blockedPageUrl = response.blockedPageUrl;
+      }
     } catch (err) {
       console.error("Could not report block:", err);
     }
 
-    // Cleanup intervals and timeouts
     this.cleanup();
 
-    // Prevent the page from loading further
-    if (typeof window.stop === "function") window.stop();
-
-    // Avoid injecting multiple overlays
-    if (document.getElementById("producer-block-overlay")) return;
-
-    // Define theme styles
-    const themeStyles = {
-      blackwhite: {
-        background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)",
-        containerBg: "rgba(255, 255, 255, 0.05)",
-        borderColor: "rgba(255, 255, 255, 0.15)",
-        textColor: "#ffffff",
-        accentColor: "#ffffff",
-      },
-      blue: {
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        containerBg: "rgba(255, 255, 255, 0.1)",
-        borderColor: "rgba(255, 255, 255, 0.3)",
-        textColor: "#ffffff",
-        accentColor: "#2ecc71",
-      },
-      red: {
-        background: "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
-        containerBg: "rgba(255, 255, 255, 0.1)",
-        borderColor: "rgba(255, 255, 255, 0.3)",
-        textColor: "#ffffff",
-        accentColor: "#2ecc71",
-      },
-      orange: {
-        background: "linear-gradient(135deg, #f39c12 0%, #e67e22 100%)",
-        containerBg: "rgba(255, 255, 255, 0.1)",
-        borderColor: "rgba(255, 255, 255, 0.3)",
-        textColor: "#ffffff",
-        accentColor: "#2ecc71",
-      },
-      purple: {
-        background: "linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)",
-        containerBg: "rgba(255, 255, 255, 0.1)",
-        borderColor: "rgba(255, 255, 255, 0.3)",
-        textColor: "#ffffff",
-        accentColor: "#2ecc71",
-      },
-      teal: {
-        background: "linear-gradient(135deg, #1abc9c 0%, #16a085 100%)",
-        containerBg: "rgba(255, 255, 255, 0.1)",
-        borderColor: "rgba(255, 255, 255, 0.3)",
-        textColor: "#ffffff",
-        accentColor: "#3498db",
-      },
-    };
-
-    // Get current theme or default to blue
-    const currentTheme = themeStyles[this.blockPageTheme] || themeStyles.blue;
-
-    // Truncate URL if too long (keep beginning and end, add ellipsis in middle)
-    const maxUrlLength = 100;
-    let displayUrl = urlToReport;
-    if (urlToReport.length > maxUrlLength) {
-      const keepLength = Math.floor((maxUrlLength - 3) / 2); // Reserve 3 chars for "..."
-      displayUrl =
-        urlToReport.substring(0, keepLength) +
-        "..." +
-        urlToReport.substring(urlToReport.length - keepLength);
+    if (!blockedPageUrl) {
+      try {
+        const url = new URL(chrome.runtime.getURL("blocked.html"));
+        url.searchParams.set("blockedUrl", urlToReport);
+        url.searchParams.set("blockNumber", String(blockNumber));
+        blockedPageUrl = url.toString();
+      } catch (error) {
+        console.error("Could not build blocked page URL:", error);
+        return;
+      }
     }
 
-    // Replace page content with block message
-    document.documentElement.innerHTML = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Producer - Site Blocked</title>
-                <meta charset="utf-8">
-                <style>
-                    * {
-                        margin: 0;
-                        padding: 0;
-                        box-sizing: border-box;
-                    }
-
-                    body {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-                        background: ${currentTheme.background};
-                        color: ${currentTheme.textColor};
-                        height: 100vh;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        text-align: center;
-                        animation: fadeIn 0.5s ease-in;
-                    }
-                    
-                    @keyframes fadeIn {
-                        from { opacity: 0; transform: translateY(20px); }
-                        to { opacity: 1; transform: translateY(0); }
-                    }
-                    
-                    .block-container {
-                        width: 600px;
-                        max-height: 100vh;
-                        padding: 20px 30px;
-                        background: ${currentTheme.containerBg};
-                        border-radius: 20px;
-                        backdrop-filter: blur(10px);
-                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-                        border: 1px solid ${currentTheme.borderColor};
-                    }
-                    
-                    .icon {
-                        font-size: 80px;
-                        margin-bottom: 20px;
-                        animation: pulse 2s infinite;
-                    }
-                    
-                    @keyframes pulse {
-                        0%, 100% { transform: scale(1); }
-                        50% { transform: scale(1.1); }
-                    }
-                    
-                    .title {
-                        font-size: 32px;
-                        font-weight: 700;
-                        margin-bottom: 8px;
-                        background: linear-gradient(45deg, #fff, #f0f0f0);
-                        -webkit-background-clip: text;
-                        -webkit-text-fill-color: transparent;
-                        background-clip: text;
-                    }
-                    
-                    .message {
-                        font-size: 18px;
-                        opacity: 0.9;
-                        margin-bottom: 16px;
-                        line-height: 1.5;
-                    }
-                    
-                    .blocked-url {
-                        font-size: 14px;
-                        opacity: 0.7;
-                        background: rgba(255, 255, 255, 0.1);
-                        padding: 8px 16px;
-                        border-radius: 20px;
-                        display: inline-block;
-                        margin-bottom: 8px;
-                        word-break: break-all;
-                    }
-                    
-                    .motivational {
-                        font-size: 16px;
-                        opacity: 0.8;
-                        font-style: italic;
-                        margin: 20px 0;
-                        padding: 16px;
-                        background: rgba(255, 255, 255, 0.05);
-                        border-radius: 12px;
-                        border-left: 3px solid rgba(255, 255, 255, 0.3);
-                    }
-                    
-                    .actions {
-                        display: flex;
-                        gap: 12px;
-                        justify-content: center;
-                        margin-top: 20px;
-                        flex-wrap: wrap;
-                    }
-                    
-                    .btn {
-                        background: rgba(255, 255, 255, 0.2);
-                        border: 2px solid rgba(255, 255, 255, 0.3);
-                        color: white;
-                        padding: 12px 24px;
-                        border-radius: 25px;
-                        font-size: 16px;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        text-decoration: none;
-                        font-family: inherit;
-                    }
-                    
-                    .btn:hover {
-                        background: rgba(255, 255, 255, 0.3);
-                        transform: translateY(-2px);
-                        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-                    }
-                    
-                    .btn-primary {
-                        background: rgba(46, 204, 113, 0.3);
-                        border-color: #2ecc71;
-                    }
-                    
-                    .btn-primary:hover {
-                        background: rgba(46, 204, 113, 0.5);
-                    }
-
-                    .btn-warning {
-                        background: rgba(231, 76, 60, 0.2);
-                        border-color: rgba(231, 76, 60, 0.5);
-                        font-size: 14px;
-                        padding: 10px 20px;
-                    }
-
-                    .btn-warning:hover {
-                        background: rgba(231, 76, 60, 0.4);
-                    }
-
-                    .block-number {
-                        font-size: 14px;
-                        opacity: 0.7;
-                        margin-bottom: 8px;
-                    }
-
-                    .stats {
-                        margin-top: 20px;
-                        padding: 16px;
-                        background: rgba(255, 255, 255, 0.05);
-                        border-radius: 12px;
-                        font-size: 14px;
-                    }
-                    
-                    .time {
-                        font-size: 18px;
-                        font-weight: 600;
-                        color: ${currentTheme.accentColor};
-                        margin-bottom: 8px;
-                        white-space: pre;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="block-container" id="producer-block-overlay">
-                    <div class="icon">🎯</div>
-                    <div class="title">${this.blockPageTitle}</div>
-                    <div class="message">${this.blockPageMessage}</div>
-                    <div style="margin: 20px 0;">
-                      <div class="block-number">Block #${blockNumber}</div>
-                      <div class="blocked-url" title="${urlToReport}">${displayUrl}</div>
-                      <div class="actions" style="margin-top: 0;">
-                          <button id="allow-once-btn" class="btn btn-warning" title="Allow this site only this time">Allow Once</button>
-                          <button id="add-exception-btn" class="btn btn-warning" title="Add allowed URL in the rules list">Add Exception</button>
-                      </div>
-                    </div>
-                    <div class="motivational">${phrase}</div>
-
-                    <div class="stats">
-                        <div class="time" id="sessionTime">Focus Session Active</div>
-                        <div>Keep going! Every moment of focus counts.</div>
-                    </div>
-
-                    <div class="actions">
-                        <button id="go-back-btn" class="btn">← Go Back</button>
-                        <button id="close-btn" class="btn btn-primary">Close Tab</button>
-                    </div>
-                </div>
-            </body>
-            </html>
-        `;
-
-    // Wait for DOM to be ready and attach event listeners
-    setTimeout(() => {
-      const backBtn = document.getElementById("go-back-btn");
-      const closeBtn = document.getElementById("close-btn");
-      const allowOnceBtn = document.getElementById("allow-once-btn");
-      const addExceptionBtn = document.getElementById("add-exception-btn");
-
-      backBtn.addEventListener("click", () => {
-        history.back();
-        // Reload the page to actually navigate to the previous URL
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      });
-      closeBtn.addEventListener("click", async () => {
-        try {
-          await chrome.runtime.sendMessage({
-            action: "closeTab",
-          });
-        } catch (err) {
-          console.error("Could not close tab:", err);
-        }
-      });
-      allowOnceBtn.addEventListener("click", async () => {
-        try {
-          // Request temporary bypass for this URL
-          await chrome.runtime.sendMessage({
-            action: "allowOnce",
-            url: urlToReport,
-          });
-          // Reload the page
-          window.location.reload();
-        } catch (err) {
-          console.error("Could not allow once:", err);
-        }
-      });
-      addExceptionBtn.addEventListener("click", async () => {
-        try {
-          // Add URL as permanent allow rule to the active rule set
-          const response = await chrome.runtime.sendMessage({
-            action: "addException",
-            url: urlToReport,
-          });
-          if (response && response.success) {
-            // Refresh the page to load the allowed content
-            window.location.reload();
-          } else {
-            console.error("Could not add exception:", response?.error);
-          }
-        } catch (err) {
-          console.error("Could not add exception:", err);
-        }
-      });
-
-      // Format time helper function
-      function formatTime(seconds) {
-        if (!seconds || seconds < 0) return "0m";
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = (seconds % 60) + 1;
-        if (hours >= 24) return `${hours}h ${minutes}m`;
-        if (hours > 0) return `${hours}h ${minutes}m`;
-        if (minutes > 0) return `${minutes}m ${secs}s`;
-        return `${secs}s`;
-      }
-
-      // Timer - show focused time instead of local time
-      async function updateFocusedTime() {
-        try {
-          const response = await chrome.runtime.sendMessage({
-            action: "getTimerState",
-          });
-
-          if (response) {
-            const focusedTimeFormatted = formatTime(response.focusedTime);
-            const totalSessionTimeFormatted = formatTime(
-              response.totalSessionTime,
-            );
-
-            const el = document.getElementById("sessionTime");
-            if (el) {
-              el.textContent = "Focus Session Active\r\n";
-              el.textContent += `Focused Time: ${focusedTimeFormatted} | Session Time: ${totalSessionTimeFormatted}`;
-            }
-          }
-        } catch (error) {
-          console.error("Error getting timer state:", error);
-          const el = document.getElementById("sessionTime");
-          if (el) el.textContent = "Focus Session Active";
-        }
-      }
-
-      updateFocusedTime();
-      setInterval(updateFocusedTime, 1000);
-    }, 100);
+    try {
+      window.location.replace(blockedPageUrl);
+    } catch (error) {
+      console.error("Could not navigate to blocked page:", error);
+    }
   }
 
   observeUrlChanges() {
@@ -816,6 +487,24 @@ class ProducerContentScript {
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
+    }
+
+    if (this.blockPageSetupTimeout) {
+      clearTimeout(this.blockPageSetupTimeout);
+      this.blockPageSetupTimeout = null;
+    }
+
+    if (this.blockStatsInterval) {
+      clearInterval(this.blockStatsInterval);
+      this.blockStatsInterval = null;
+    }
+
+    if (this.blockVisibilityHandler) {
+      document.removeEventListener(
+        "visibilitychange",
+        this.blockVisibilityHandler,
+      );
+      this.blockVisibilityHandler = null;
     }
   }
 

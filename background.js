@@ -9,6 +9,8 @@ class ProducerBackground {
     this.timerInterval = null;
     this.heartbeatInterval = null; // Heartbeat for detecting browser closure
     this.temporaryAllowedUrls = new Set(); // For Allow Once button - temporary bypass
+    this.pendingDiscardTimeouts = new Map(); // Debounce discard attempts per tab
+    this.blockedPageUrlPrefix = chrome.runtime.getURL("blocked.html");
     this.listenersSetup = false;
 
     this.init();
@@ -194,6 +196,8 @@ class ProducerBackground {
 
     // Handle service worker lifecycle in manifest v3
     chrome.runtime.onSuspend?.addListener(() => {
+      this.clearAllPendingDiscardTimeouts();
+
       // Stop heartbeat
       this.stopHeartbeat();
 
@@ -207,6 +211,102 @@ class ProducerBackground {
       // If the browser is closing, record the close timestamp
       this.recordWindowClosedTimestampIfNeeded().catch(() => {});
     });
+
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (!tab) return;
+
+      // Re-check after URL changes and when loading completes.
+      if (
+        changeInfo.url ||
+        changeInfo.status === "loading" ||
+        changeInfo.status === "complete"
+      ) {
+        this.scheduleDiscardBlockedTab(tabId, "tabUpdated");
+      }
+    });
+
+    chrome.tabs.onActivated.addListener((activeInfo) => {
+      // The tab that just lost focus is a good discard candidate.
+      if (activeInfo.previousTabId) {
+        this.scheduleDiscardBlockedTab(activeInfo.previousTabId, "tabBlurred");
+      }
+    });
+
+    chrome.tabs.onRemoved.addListener((tabId) => {
+      this.clearPendingDiscardTimeout(tabId);
+    });
+  }
+
+  clearPendingDiscardTimeout(tabId) {
+    const timeoutId = this.pendingDiscardTimeouts.get(tabId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      this.pendingDiscardTimeouts.delete(tabId);
+    }
+  }
+
+  clearAllPendingDiscardTimeouts() {
+    this.pendingDiscardTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+    this.pendingDiscardTimeouts.clear();
+  }
+
+  shouldSkipDiscard(tab) {
+    if (!tab || !tab.id || !tab.url) return true;
+    const isProducerBlockedPage = this.isProducerBlockedPageUrl(tab.url);
+
+    // Skip internal/restricted pages and tabs that should remain readily available.
+    if (
+      tab.url.startsWith("chrome://") ||
+      (tab.url.startsWith("chrome-extension://") && !isProducerBlockedPage) ||
+      tab.url.startsWith("about:") ||
+      tab.url.startsWith("devtools://") ||
+      tab.url.startsWith("view-source:")
+    ) {
+      return true;
+    }
+
+    if (tab.active || tab.pinned || tab.audible || tab.discarded) {
+      return true;
+    }
+
+    if (tab.autoDiscardable === false) {
+      return true;
+    }
+
+    return false;
+  }
+
+  isProducerBlockedPageUrl(url) {
+    return !!(
+      url &&
+      this.blockedPageUrlPrefix &&
+      url.startsWith(this.blockedPageUrlPrefix)
+    );
+  }
+
+  scheduleDiscardBlockedTab(tabId, reason = "unknown") {
+    this.clearPendingDiscardTimeout(tabId);
+
+    const timeoutId = setTimeout(async () => {
+      this.pendingDiscardTimeouts.delete(tabId);
+
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        if (this.shouldSkipDiscard(tab)) return;
+        if (
+          !this.isProducerBlockedPageUrl(tab.url) &&
+          !this.shouldBlockUrl(tab.url)
+        )
+          return;
+
+        await chrome.tabs.discard(tabId);
+        console.log("Discarded blocked tab to reduce memory:", tabId, reason);
+      } catch (error) {
+        // Tab may no longer exist or be discard-ineligible; ignore.
+      }
+    }, 400);
+
+    this.pendingDiscardTimeouts.set(tabId, timeoutId);
   }
 
   async recordWindowClosedTimestampIfNeeded() {
@@ -414,7 +514,6 @@ class ProducerBackground {
             isActive: false,
             sessionBlocks: 0,
           });
-
         }
 
         // Always clear global active/timer state, even if session id is missing
@@ -598,8 +697,36 @@ class ProducerBackground {
           // Notify popup if it's open
           this.notifyPopup("updateBlockCount", { count: this.sessionBlocks });
         }
+
+        // If the user moves away from this blocked tab, discard it quickly.
+        if (sender.tab && sender.tab.id) {
+          this.scheduleDiscardBlockedTab(sender.tab.id, "reportedBlock");
+        }
+        let blockedPageUrl = null;
+        if (message.url) {
+          try {
+            const blockedUrl = new URL(this.blockedPageUrlPrefix);
+            blockedUrl.searchParams.set("blockedUrl", message.url);
+            blockedUrl.searchParams.set(
+              "blockNumber",
+              String(this.sessionBlocks),
+            );
+            if (sender.tab && sender.tab.favIconUrl) {
+              blockedUrl.searchParams.set(
+                "originalFavIcon",
+                sender.tab.favIconUrl,
+              );
+            }
+            blockedPageUrl = blockedUrl.toString();
+          } catch (error) {
+            // fallback below
+          }
+        }
         // Return the current block number
-        sendResponse({ blockNumber: this.sessionBlocks });
+        sendResponse({
+          blockNumber: this.sessionBlocks,
+          blockedPageUrl,
+        });
         break;
 
       case "allowOnce":
