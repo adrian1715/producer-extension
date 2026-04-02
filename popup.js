@@ -67,21 +67,21 @@ class ProducerPopup {
     this.rulesEditView = document.getElementById("rules-edit-view");
     this.allRulesView = document.getElementById("all-rules-view");
     this.allRulesViewScrollContainer = document.getElementById(
-      "allRulesViewScrollContainer"
+      "allRulesViewScrollContainer",
     );
     this.allRulesList = document.getElementById("allRulesList");
     this.backFromAllRulesBtn = document.getElementById("backFromAllRulesBtn");
     this.addRuleAllViewBtn = document.getElementById("addRuleAllViewBtn");
     this.importRulesAllViewBtn = document.getElementById(
-      "importRulesAllViewBtn"
+      "importRulesAllViewBtn",
     );
     this.exportRulesAllViewBtn = document.getElementById(
-      "exportRulesAllViewBtn"
+      "exportRulesAllViewBtn",
     );
     this.clearRulesAllViewBtn = document.getElementById("clearRulesAllViewBtn");
     this.backToRuleSetListBtn = document.getElementById("backToRuleSetListBtn");
     this.backToRuleSetListBtn2 = document.getElementById(
-      "backToRuleSetListBtn2"
+      "backToRuleSetListBtn2",
     );
     this.ruleSetNameInput = document.getElementById("ruleSetNameInput");
     this.ruleSetNameSection = document.getElementById("ruleSetNameSection");
@@ -98,19 +98,19 @@ class ProducerPopup {
     this.pomodoroBreak = document.getElementById("pomodoroBreak");
     this.modeSettingsSection = document.getElementById("modeSettingsSection");
     this.configureModeSettingsBtn = document.getElementById(
-      "configureModeSettingsBtn"
+      "configureModeSettingsBtn",
     );
 
     // Mode settings view elements
     this.modeSettingsView = document.getElementById("mode-settings-view");
     this.backFromModeSettingsBtn = document.getElementById(
-      "backFromModeSettingsBtn"
+      "backFromModeSettingsBtn",
     );
     this.modeGrayscaleToggleView = document.getElementById(
-      "modeGrayscaleToggleView"
+      "modeGrayscaleToggleView",
     );
     this.modePomodoroToggleView = document.getElementById(
-      "modePomodoroToggleView"
+      "modePomodoroToggleView",
     );
     this.pomodoroWorkView = document.getElementById("pomodoroWorkView");
     this.pomodoroBreakView = document.getElementById("pomodoroBreakView");
@@ -129,11 +129,11 @@ class ProducerPopup {
     this.statsMainView = document.getElementById("stats-main-view");
     this.sessionHistoryView = document.getElementById("session-history-view");
     this.viewSessionHistoryBtn = document.getElementById(
-      "viewSessionHistoryBtn"
+      "viewSessionHistoryBtn",
     );
     this.backToStatsBtn = document.getElementById("backToStatsBtn");
     this.statsTabTotalSessions = document.getElementById(
-      "statsTabTotalSessions"
+      "statsTabTotalSessions",
     );
     this.statsTabAvgSession = document.getElementById("statsTabAvgSession");
 
@@ -146,16 +146,16 @@ class ProducerPopup {
     this.currentSessionInfo = document.getElementById("currentSessionInfo");
     this.currentSessionRules = document.getElementById("currentSessionRules");
     this.currentSessionBlocksCount = document.getElementById(
-      "currentSessionBlocksCount"
+      "currentSessionBlocksCount",
     );
     this.currentSessionFocusTime = document.getElementById(
-      "currentSessionFocusTime"
+      "currentSessionFocusTime",
     );
     this.currentSessionBreakTime = document.getElementById(
-      "currentSessionBreakTime"
+      "currentSessionBreakTime",
     );
     this.currentSessionTotalTime = document.getElementById(
-      "currentSessionTotalTime"
+      "currentSessionTotalTime",
     );
 
     // Tab elements
@@ -169,21 +169,21 @@ class ProducerPopup {
     this.previewTitle = document.getElementById("previewTitle");
     this.previewMessage = document.getElementById("previewMessage");
     this.savePersonalizationBtn = document.getElementById(
-      "savePersonalizationBtn"
+      "savePersonalizationBtn",
     );
     this.resetPersonalizationBtn = document.getElementById(
-      "resetPersonalizationBtn"
+      "resetPersonalizationBtn",
     );
     this.grayscaleToggle = document.getElementById("grayscaleToggle");
 
     // Navigation elements for block page settings
     this.openBlockPageSettingsBtn = document.getElementById(
-      "openBlockPageSettingsBtn"
+      "openBlockPageSettingsBtn",
     );
     this.backToThemeBtn = document.getElementById("backToThemeBtn");
     this.themeMainView = document.getElementById("theme-main-view");
     this.blockPageSettingsView = document.getElementById(
-      "block-page-settings-view"
+      "block-page-settings-view",
     );
   }
 
@@ -198,7 +198,7 @@ class ProducerPopup {
     }
     if (this.importRulesBtn) {
       this.importRulesBtn.addEventListener("click", async () =>
-        this.importFileInput.click()
+        this.importFileInput.click(),
       );
     }
     if (this.importFileInput) {
@@ -253,63 +253,63 @@ class ProducerPopup {
     }
     if (this.blockPageMessage) {
       this.blockPageMessage.addEventListener("input", () =>
-        this.updatePreview()
+        this.updatePreview(),
       );
     }
     if (this.savePersonalizationBtn) {
       this.savePersonalizationBtn.addEventListener("click", () =>
-        this.savePersonalization()
+        this.savePersonalization(),
       );
     }
     if (this.resetPersonalizationBtn) {
       this.resetPersonalizationBtn.addEventListener("click", () =>
-        this.resetPersonalization()
+        this.resetPersonalization(),
       );
     }
 
     // Block page settings navigation
     if (this.openBlockPageSettingsBtn) {
       this.openBlockPageSettingsBtn.addEventListener("click", () =>
-        this.showBlockPageSettings()
+        this.showBlockPageSettings(),
       );
     }
     if (this.backToThemeBtn) {
       this.backToThemeBtn.addEventListener("click", () =>
-        this.showThemeMainView()
+        this.showThemeMainView(),
       );
     }
 
     // Custom rule sets events
     if (this.createRuleSetBtn) {
       this.createRuleSetBtn.addEventListener("click", () =>
-        this.startCreatingRuleSet()
+        this.startCreatingRuleSet(),
       );
     }
     if (this.saveRuleSetBtn) {
       this.saveRuleSetBtn.addEventListener("click", () =>
-        this.saveNewRuleSet()
+        this.saveNewRuleSet(),
       );
     }
     if (this.cancelRuleSetBtn) {
       this.cancelRuleSetBtn.addEventListener("click", () =>
-        this.cancelRuleSetCreation()
+        this.cancelRuleSetCreation(),
       );
     }
     if (this.backToRuleSetListBtn) {
       this.backToRuleSetListBtn.addEventListener("click", () =>
-        this.showRulesMainView()
+        this.showRulesMainView(),
       );
     }
     if (this.backToRuleSetListBtn2) {
       this.backToRuleSetListBtn2.addEventListener("click", () =>
-        this.showRulesMainView()
+        this.showRulesMainView(),
       );
     }
 
     // Click on "Rules" section title to show All Rules view
     if (this.rulesSectionTitle) {
       this.rulesSectionTitle.addEventListener("click", () =>
-        this.showAllRulesView()
+        this.showAllRulesView(),
       );
     }
 
@@ -347,39 +347,39 @@ class ProducerPopup {
     // Mode settings events
     if (this.modeGrayscaleToggle) {
       this.modeGrayscaleToggle.addEventListener("change", () =>
-        this.saveModeSettings()
+        this.saveModeSettings(),
       );
     }
     if (this.modePomodoroToggle) {
       this.modePomodoroToggle.addEventListener("change", () =>
-        this.saveModeSettings()
+        this.saveModeSettings(),
       );
     }
     if (this.pomodoroWork) {
       this.pomodoroWork.addEventListener("change", () =>
-        this.saveModeSettings()
+        this.saveModeSettings(),
       );
     }
     if (this.pomodoroBreak) {
       this.pomodoroBreak.addEventListener("change", () =>
-        this.saveModeSettings()
+        this.saveModeSettings(),
       );
     }
     if (this.configureModeSettingsBtn) {
       this.configureModeSettingsBtn.addEventListener("click", () =>
-        this.showModeSettingsView()
+        this.showModeSettingsView(),
       );
     }
 
     // Mode settings view events
     if (this.backFromModeSettingsBtn) {
       this.backFromModeSettingsBtn.addEventListener("click", () =>
-        this.showModeEditFromSettings()
+        this.showModeEditFromSettings(),
       );
     }
     if (this.modeGrayscaleToggleView) {
       this.modeGrayscaleToggleView.addEventListener("change", () =>
-        this.saveModeSettingsFromView()
+        this.saveModeSettingsFromView(),
       );
     }
     if (this.modePomodoroToggleView) {
@@ -390,38 +390,38 @@ class ProducerPopup {
     }
     if (this.pomodoroWorkView) {
       this.pomodoroWorkView.addEventListener("change", () =>
-        this.saveModeSettingsFromView()
+        this.saveModeSettingsFromView(),
       );
     }
     if (this.pomodoroBreakView) {
       this.pomodoroBreakView.addEventListener("change", () =>
-        this.saveModeSettingsFromView()
+        this.saveModeSettingsFromView(),
       );
     }
 
     // Sessions events
     if (this.clearSessionsBtn) {
       this.clearSessionsBtn.addEventListener("click", () =>
-        this.clearSessions()
+        this.clearSessions(),
       );
     }
 
     // Clear all rule sets event
     if (this.clearAllRuleSetsBtn) {
       this.clearAllRuleSetsBtn.addEventListener("click", () =>
-        this.clearAllRuleSets()
+        this.clearAllRuleSets(),
       );
     }
 
     // Stats tab navigation events
     if (this.viewSessionHistoryBtn) {
       this.viewSessionHistoryBtn.addEventListener("click", () =>
-        this.showSessionHistoryView()
+        this.showSessionHistoryView(),
       );
     }
     if (this.backToStatsBtn) {
       this.backToStatsBtn.addEventListener("click", () =>
-        this.showStatsMainView()
+        this.showStatsMainView(),
       );
     }
 
@@ -566,7 +566,7 @@ class ProducerPopup {
       // Load current session data if available
       if (this.currentSessionId) {
         const currentSession = this.sessions.find(
-          (s) => s.id === this.currentSessionId
+          (s) => s.id === this.currentSessionId,
         );
         if (currentSession) {
           // Use storage sessionBlocks as source of truth (updated by background script)
@@ -606,7 +606,7 @@ class ProducerPopup {
 
         // Reapply grayscale state if focus mode is active
         const activeMode = this.customModes.find(
-          (mode) => mode.id === this.activeRuleSetId
+          (mode) => mode.id === this.activeRuleSetId,
         );
         if (activeMode?.settings?.grayscaleEnabled) {
           await this.broadcastGrayscaleState(true);
@@ -616,7 +616,7 @@ class ProducerPopup {
       // Initialize session tracking times if there's a current session
       if (this.currentSessionId) {
         const currentSession = this.sessions.find(
-          (s) => s.id === this.currentSessionId
+          (s) => s.id === this.currentSessionId,
         );
         if (currentSession) {
           // Initialize session tracking times if they don't exist
@@ -715,7 +715,7 @@ class ProducerPopup {
       // This indicates the background timer might have stopped
       if (this.isActive && Date.now() - this.lastTimerUpdate > 5000) {
         console.warn(
-          "Timer updates stopped, attempting to restart background timer"
+          "Timer updates stopped, attempting to restart background timer",
         );
         this.ensureBackgroundTimerRunning();
       }
@@ -790,14 +790,14 @@ class ProducerPopup {
     if (!this.currentSessionId) return;
 
     const currentSession = this.sessions.find(
-      (s) => s.id === this.currentSessionId
+      (s) => s.id === this.currentSessionId,
     );
     if (!currentSession) return;
 
     // Commit any accumulated focus or break time using session's stored times
     if (currentSession.sessionFocusStartTime) {
       const focusElapsed = Math.floor(
-        (Date.now() - currentSession.sessionFocusStartTime) / 1000
+        (Date.now() - currentSession.sessionFocusStartTime) / 1000,
       );
       currentSession.focusedTime =
         (currentSession.focusedTime || 0) + focusElapsed;
@@ -805,7 +805,7 @@ class ProducerPopup {
       currentSession.sessionFocusStartTime = Date.now();
     } else if (currentSession.sessionPauseStartTime) {
       const breakElapsed = Math.floor(
-        (Date.now() - currentSession.sessionPauseStartTime) / 1000
+        (Date.now() - currentSession.sessionPauseStartTime) / 1000,
       );
       currentSession.breakTime = (currentSession.breakTime || 0) + breakElapsed;
       // Reset the start time to now
@@ -817,13 +817,13 @@ class ProducerPopup {
     if (!this.currentSessionId) return;
 
     const currentSession = this.sessions.find(
-      (s) => s.id === this.currentSessionId
+      (s) => s.id === this.currentSessionId,
     );
     if (!currentSession) return;
 
     // Find the session details element in the session history
     const detailsElement = document.querySelector(
-      `.session-details[data-session-id="${this.currentSessionId}"]`
+      `.session-details[data-session-id="${this.currentSessionId}"]`,
     );
     if (!detailsElement) return;
 
@@ -834,29 +834,25 @@ class ProducerPopup {
 
     if (this.isActive && currentSession.sessionFocusStartTime) {
       const currentFocusElapsed = Math.floor(
-        (now - currentSession.sessionFocusStartTime) / 1000
+        (now - currentSession.sessionFocusStartTime) / 1000,
       );
       totalTime += currentFocusElapsed;
     } else if (!this.isActive && currentSession.sessionPauseStartTime) {
       const currentBreakElapsed = Math.floor(
-        (now - currentSession.sessionPauseStartTime) / 1000
+        (now - currentSession.sessionPauseStartTime) / 1000,
       );
       totalTime += currentBreakElapsed;
     }
 
-    const hours = Math.floor(totalTime / 3600);
-    const minutes = Math.floor((totalTime % 3600) / 60);
-
     const ruleSet = this.customModes.find(
-      (rs) => rs.id === currentSession.ruleSetId
+      (rs) => rs.id === currentSession.ruleSetId,
     );
     const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
-
-    detailsElement.textContent = `${ruleSetName} • ${
-      currentSession.blocksCount || 0
-    } block${
-      (currentSession.blocksCount || 0) !== 1 ? "s" : ""
-    } • ${hours}h${minutes}m`;
+    detailsElement.textContent = this.formatSessionDetailsText(
+      ruleSetName,
+      currentSession.blocksCount || 0,
+      totalTime,
+    );
   }
 
   updateCurrentSessionStats() {
@@ -907,7 +903,7 @@ class ProducerPopup {
       }
 
       const currentSession = this.sessions.find(
-        (s) => s.id === this.currentSessionId
+        (s) => s.id === this.currentSessionId,
       );
       if (!currentSession) {
         return;
@@ -925,7 +921,7 @@ class ProducerPopup {
         // Get original values
         let sessionName = currentSession.name;
         const ruleSet = this.customModes.find(
-          (rs) => rs.id === currentSession.ruleSetId
+          (rs) => rs.id === currentSession.ruleSetId,
         );
         let rulesName = ruleSet ? ruleSet.name : "None";
         const blocksCount = String(currentSession.blocksCount || 0);
@@ -975,7 +971,7 @@ class ProducerPopup {
                 // Not even enough room for "...", just truncate to available space
                 rulesName = rulesName.substring(
                   0,
-                  Math.max(0, availableForRules)
+                  Math.max(0, availableForRules),
                 );
               }
             }
@@ -1004,12 +1000,12 @@ class ProducerPopup {
       if (this.isActive && currentSession.sessionFocusStartTime) {
         // Currently in focus mode - calculate elapsed focus time
         currentFocusElapsed = Math.floor(
-          (now - currentSession.sessionFocusStartTime) / 1000
+          (now - currentSession.sessionFocusStartTime) / 1000,
         );
       } else if (!this.isActive && currentSession.sessionPauseStartTime) {
         // Currently paused - calculate elapsed break time
         currentBreakElapsed = Math.floor(
-          (now - currentSession.sessionPauseStartTime) / 1000
+          (now - currentSession.sessionPauseStartTime) / 1000,
         );
       }
 
@@ -1071,7 +1067,7 @@ class ProducerPopup {
           s.sessionFocusStartTime
         ) {
           const currentFocusElapsed = Math.floor(
-            (Date.now() - s.sessionFocusStartTime) / 1000
+            (Date.now() - s.sessionFocusStartTime) / 1000,
           );
           sessionFocusedTime += currentFocusElapsed;
         }
@@ -1110,7 +1106,7 @@ class ProducerPopup {
       // Update current session data if a session is selected
       if (this.currentSessionId) {
         const currentSession = this.sessions.find(
-          (s) => s.id === this.currentSessionId
+          (s) => s.id === this.currentSessionId,
         );
         if (currentSession) {
           currentSession.blocksCount = this.sessionBlocks;
@@ -1129,7 +1125,7 @@ class ProducerPopup {
 
       // Get the active mode's grayscale setting for content script
       const activeMode = this.customModes.find(
-        (mode) => mode.id === this.activeRuleSetId
+        (mode) => mode.id === this.activeRuleSetId,
       );
       const grayscaleEnabled = activeMode?.settings?.grayscaleEnabled || false;
 
@@ -1162,7 +1158,7 @@ class ProducerPopup {
       ) {
         const beforeRules = this.getRulesFromData(
           before.customModes,
-          before.activeRuleSetId
+          before.activeRuleSetId,
         );
         chrome.runtime.sendMessage({
           action: "reloadAffectedTabs",
@@ -1185,7 +1181,7 @@ class ProducerPopup {
     const sessionDate = new Date(now);
     const defaultName = `Session ${sessionDate.toLocaleDateString()} ${sessionDate.toLocaleTimeString(
       [],
-      { hour: "2-digit", minute: "2-digit" }
+      { hour: "2-digit", minute: "2-digit" },
     )}`;
 
     // Reset session blocks counter for the new session
@@ -1227,7 +1223,7 @@ class ProducerPopup {
 
     // Show feedback
     this.showNotification(
-      "New session created! Click 'Start Producing' to begin."
+      "New session created! Click 'Start Producing' to begin.",
     );
   }
 
@@ -1255,7 +1251,7 @@ class ProducerPopup {
         const sessionDate = new Date(this.sessionStartTime);
         const defaultName = `Session ${sessionDate.toLocaleDateString()} ${sessionDate.toLocaleTimeString(
           [],
-          { hour: "2-digit", minute: "2-digit" }
+          { hour: "2-digit", minute: "2-digit" },
         )}`;
 
         const newSession = {
@@ -1293,7 +1289,7 @@ class ProducerPopup {
         });
 
         const currentSession = this.sessions.find(
-          (s) => s.id === this.currentSessionId
+          (s) => s.id === this.currentSessionId,
         );
         if (currentSession) {
           currentSession.isActive = true;
@@ -1327,23 +1323,9 @@ class ProducerPopup {
       });
 
       // Count currently open blocked tabs and add to counter
-      chrome.runtime.sendMessage(
-        {
-          action: "countCurrentlyBlockedTabs",
-        },
-        (response) => {
-          if (response && response.blockedCount > 0) {
-            // Counter is already updated by background script
-            // Just show notification to user
-            this.showNotification(
-              `${response.blockedCount} blocked tab${
-                response.blockedCount !== 1 ? "s" : ""
-              } detected and counted`,
-              "success"
-            );
-          }
-        }
-      );
+      chrome.runtime.sendMessage({
+        action: "countCurrentlyBlockedTabs",
+      });
     } else {
       // Stopping focus session (pausing)
       this.stopTimerUpdates();
@@ -1356,7 +1338,7 @@ class ProducerPopup {
       // Update current session with final data
       if (this.currentSessionId) {
         const currentSession = this.sessions.find(
-          (s) => s.id === this.currentSessionId
+          (s) => s.id === this.currentSessionId,
         );
         if (currentSession) {
           currentSession.isActive = false;
@@ -1388,7 +1370,7 @@ class ProducerPopup {
     // This happens AFTER saveState so storage is updated first
     if (this.isActive) {
       const activeMode = this.customModes.find(
-        (mode) => mode.id === this.activeRuleSetId
+        (mode) => mode.id === this.activeRuleSetId,
       );
       if (activeMode?.settings?.grayscaleEnabled) {
         await this.broadcastGrayscaleState(true);
@@ -1402,7 +1384,7 @@ class ProducerPopup {
 
     // Show feedback
     this.showNotification(
-      this.isActive ? "Focus mode activated!" : "Focus mode deactivated"
+      this.isActive ? "Focus mode activated!" : "Focus mode deactivated",
     );
   }
 
@@ -1435,7 +1417,7 @@ class ProducerPopup {
     // Update current session's blocksCount from sessionBlocks (source of truth)
     if (this.currentSessionId) {
       const currentSession = this.sessions.find(
-        (s) => s.id === this.currentSessionId
+        (s) => s.id === this.currentSessionId,
       );
       if (currentSession) {
         currentSession.blocksCount = this.sessionBlocks;
@@ -1451,7 +1433,7 @@ class ProducerPopup {
     if (this.totalBlockedCountEl) {
       const totalBlocks = this.sessions.reduce(
         (sum, s) => sum + (s.blocksCount || 0),
-        0
+        0,
       );
       this.totalBlockedCountEl.textContent = totalBlocks;
     }
@@ -1538,7 +1520,7 @@ class ProducerPopup {
         ruleSet = this.tempRuleSet;
       } else {
         ruleSet = this.customModes.find(
-          (rs) => rs.id === this.currentEditingRuleSetId
+          (rs) => rs.id === this.currentEditingRuleSetId,
         );
       }
 
@@ -1546,13 +1528,13 @@ class ProducerPopup {
         // Check if a wildcard rule already exists (in either domain or url type)
         const wildcardExists = ruleSet.rules.some(
           (rule) =>
-            rule.url === "*" && (rule.type === "domain" || rule.type === "url")
+            rule.url === "*" && (rule.type === "domain" || rule.type === "url"),
         );
 
         if (wildcardExists) {
           this.showNotification(
             "'Block All Websites' rule already exists",
-            "error"
+            "error",
           );
           this.urlInput.value = ""; // Clear input
           return;
@@ -1584,7 +1566,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -1597,14 +1579,14 @@ class ProducerPopup {
     if (type !== "allowParam") {
       // For domain/url/allow rules, check if URL already exists in any rule type
       const existingRule = ruleSet.rules.find(
-        (rule) => rule.type !== "allowParam" && rule.url === cleanUrl
+        (rule) => rule.type !== "allowParam" && rule.url === cleanUrl,
       );
 
       if (existingRule) {
         const existingTypeLabel = this.formatRuleType(existingRule);
         this.showNotification(
           `URL already added as "${existingTypeLabel}"`,
-          "error"
+          "error",
         );
         this.urlInput.value = ""; // Clear input
         return;
@@ -1615,7 +1597,7 @@ class ProducerPopup {
         (rule) =>
           rule.type === "allowParam" &&
           rule.paramKey === paramKey &&
-          rule.paramValue === paramValue
+          rule.paramValue === paramValue,
       );
 
       if (exists) {
@@ -1662,7 +1644,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -1686,7 +1668,7 @@ class ProducerPopup {
     if (rule.type === "allowParam") {
       this.showNotification(
         "Parameter rules cannot be edited. Please delete and re-add.",
-        "error"
+        "error",
       );
       return;
     }
@@ -1729,7 +1711,7 @@ class ProducerPopup {
           ruleSet = this.tempRuleSet;
         } else {
           ruleSet = this.customModes.find(
-            (rs) => rs.id === this.currentEditingRuleSetId
+            (rs) => rs.id === this.currentEditingRuleSetId,
           );
         }
 
@@ -1851,7 +1833,7 @@ class ProducerPopup {
           ruleSet = this.tempRuleSet;
         } else {
           ruleSet = this.customModes.find(
-            (rs) => rs.id === this.currentEditingRuleSetId
+            (rs) => rs.id === this.currentEditingRuleSetId,
           );
         }
 
@@ -1967,7 +1949,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -2135,6 +2117,17 @@ class ProducerPopup {
     return text.substring(0, maxLength) + "...";
   }
 
+  formatSessionDetailsText(ruleSetName, blocksCount, totalTime) {
+    const hours = Math.floor(totalTime / 3600);
+    const minutes = Math.floor((totalTime % 3600) / 60);
+    const shortRuleSetName = this.truncateText(ruleSetName || "No Rules", 18);
+    const detailsText = `${shortRuleSetName} \u2022 ${blocksCount} block${
+      blocksCount !== 1 ? "s" : ""
+    } \u2022 ${hours}h${minutes}m`;
+
+    return this.truncateText(detailsText, 48);
+  }
+
   showNotification(message, type = "success") {
     const existingNotification = document.querySelector(".notification");
     if (existingNotification)
@@ -2210,7 +2203,7 @@ class ProducerPopup {
         ruleSet = this.tempRuleSet;
       } else {
         ruleSet = this.customModes.find(
-          (rs) => rs.id === this.currentEditingRuleSetId
+          (rs) => rs.id === this.currentEditingRuleSetId,
         );
       }
 
@@ -2251,7 +2244,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -2262,7 +2255,7 @@ class ProducerPopup {
 
     const lines = ruleSet.rules.map(
       (rule) =>
-        `${rule.type} ${rule.url || rule.paramKey + "=" + rule.paramValue}`
+        `${rule.type} ${rule.url || rule.paramKey + "=" + rule.paramValue}`,
     );
 
     const fileContent =
@@ -2298,7 +2291,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -2345,7 +2338,7 @@ class ProducerPopup {
     }
 
     const confirmClear = confirm(
-      `Clear stats for "${session.name}"?\n\nThis will reset the time and blocks count to zero.`
+      `Clear stats for "${session.name}"?\n\nThis will reset the time and blocks count to zero.`,
     );
     if (!confirmClear) return;
 
@@ -2389,7 +2382,7 @@ class ProducerPopup {
   getActiveRules() {
     if (!this.activeRuleSetId) return [];
     const ruleSet = this.customModes.find(
-      (rs) => rs.id === this.activeRuleSetId
+      (rs) => rs.id === this.activeRuleSetId,
     );
     return ruleSet ? ruleSet.rules : [];
   }
@@ -2484,7 +2477,7 @@ class ProducerPopup {
       // Update current session's rule set if there's an active session
       if (this.currentSessionId) {
         const currentSession = this.sessions.find(
-          (s) => s.id === this.currentSessionId
+          (s) => s.id === this.currentSessionId,
         );
         if (currentSession) {
           currentSession.ruleSetId = this.activeRuleSetId;
@@ -2510,7 +2503,7 @@ class ProducerPopup {
         ? " and activated"
         : "";
     this.showNotification(
-      `Custom mode successfully saved${activationMessage}!`
+      `Custom mode successfully saved${activationMessage}!`,
     );
     this.showRulesMainView();
   }
@@ -2530,7 +2523,7 @@ class ProducerPopup {
     if (!ruleSet) return;
 
     const confirmDelete = confirm(
-      `Delete mode "${ruleSet.name}"?\n\nThis will permanently delete ${ruleSet.rules.length} rules.`
+      `Delete mode "${ruleSet.name}"?\n\nThis will permanently delete ${ruleSet.rules.length} rules.`,
     );
     if (!confirmDelete) return;
 
@@ -2566,7 +2559,7 @@ class ProducerPopup {
     }
 
     const ruleSet = this.customModes.find(
-      (rs) => rs.id === this.currentEditingRuleSetId
+      (rs) => rs.id === this.currentEditingRuleSetId,
     );
     if (!ruleSet) return;
 
@@ -2590,7 +2583,7 @@ class ProducerPopup {
     // Update current session's rule set if there's an active session
     if (this.currentSessionId) {
       const currentSession = this.sessions.find(
-        (s) => s.id === this.currentSessionId
+        (s) => s.id === this.currentSessionId,
       );
       if (currentSession) {
         currentSession.ruleSetId = this.activeRuleSetId;
@@ -2617,7 +2610,7 @@ class ProducerPopup {
     // Update current session's rule set if there's an active session
     if (this.currentSessionId) {
       const currentSession = this.sessions.find(
-        (s) => s.id === this.currentSessionId
+        (s) => s.id === this.currentSessionId,
       );
       if (currentSession) {
         currentSession.ruleSetId = null;
@@ -2691,7 +2684,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -2898,7 +2891,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -2938,7 +2931,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -2955,10 +2948,10 @@ class ProducerPopup {
     ruleSet.settings.pomodoroEnabled =
       this.modePomodoroToggleView?.checked || false;
     ruleSet.settings.pomodoroWork = parseInt(
-      this.pomodoroWorkView?.value || 25
+      this.pomodoroWorkView?.value || 25,
     );
     ruleSet.settings.pomodoroBreak = parseInt(
-      this.pomodoroBreakView?.value || 5
+      this.pomodoroBreakView?.value || 5,
     );
 
     // Also sync to hidden elements for backward compatibility
@@ -2995,7 +2988,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -3037,7 +3030,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -3077,7 +3070,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -3128,7 +3121,7 @@ class ProducerPopup {
       ruleSet = this.tempRuleSet;
     } else {
       ruleSet = this.customModes.find(
-        (rs) => rs.id === this.currentEditingRuleSetId
+        (rs) => rs.id === this.currentEditingRuleSetId,
       );
     }
 
@@ -3140,7 +3133,7 @@ class ProducerPopup {
     const confirmClear = confirm(
       `Clear all ${ruleSet.rules.length} rule${
         ruleSet.rules.length !== 1 ? "s" : ""
-      } from this mode?\n\nThis cannot be undone.`
+      } from this mode?\n\nThis cannot be undone.`,
     );
     if (!confirmClear) return;
 
@@ -3197,7 +3190,7 @@ class ProducerPopup {
 
       const name = document.createElement("div");
       name.className = "rule-set-name";
-      name.textContent = ruleSet.name;
+      name.textContent = this.truncateText(ruleSet.name, 30);
       name.style.cursor = "pointer";
       name.title = "Double-click to edit name";
 
@@ -3222,12 +3215,12 @@ class ProducerPopup {
           } else if (newName !== ruleSet.name) {
             // Check if another mode already has this name
             const nameExists = this.customModes.some(
-              (rs) => rs.id !== ruleSet.id && rs.name === newName
+              (rs) => rs.id !== ruleSet.id && rs.name === newName,
             );
             if (nameExists) {
               this.showNotification(
                 "A mode with this name already exists",
-                "error"
+                "error",
               );
             } else {
               ruleSet.name = newName;
@@ -3236,13 +3229,13 @@ class ProducerPopup {
               this.showNotification("Name updated!");
             }
           }
-          name.textContent = ruleSet.name;
+          name.textContent = this.truncateText(ruleSet.name, 30);
           name.style.display = "";
           input.remove();
         };
 
         const cancelEdit = () => {
-          name.textContent = ruleSet.name;
+          name.textContent = this.truncateText(ruleSet.name, 30);
           name.style.display = "";
           input.remove();
         };
@@ -3340,7 +3333,7 @@ class ProducerPopup {
     if (totalSessions > 0) {
       const totalFocusedTime = this.sessions.reduce(
         (sum, s) => sum + (s.focusedTime || 0),
-        0
+        0,
       );
       const avgTime = totalFocusedTime / totalSessions;
       const hours = Math.floor(avgTime / 3600);
@@ -3377,7 +3370,7 @@ class ProducerPopup {
 
     // Sort sessions by last active (most recent first)
     const sortedSessions = [...this.sessions].sort(
-      (a, b) => b.lastActive - a.lastActive
+      (a, b) => b.lastActive - a.lastActive,
     );
 
     sortedSessions.forEach((session) => {
@@ -3397,6 +3390,7 @@ class ProducerPopup {
 
       const info = document.createElement("div");
       info.style.flex = "1";
+      info.style.minWidth = "0";
 
       const name = document.createElement("div");
       name.className = "session-date";
@@ -3425,12 +3419,12 @@ class ProducerPopup {
           } else if (newName !== session.name) {
             // Check if another session already has this name
             const nameExists = this.sessions.some(
-              (s) => s.id !== session.id && s.name === newName
+              (s) => s.id !== session.id && s.name === newName,
             );
             if (nameExists) {
               this.showNotification(
                 "A session with this name already exists",
-                "error"
+                "error",
               );
             } else {
               session.name = newName;
@@ -3469,7 +3463,7 @@ class ProducerPopup {
       details.className = "session-details";
       details.setAttribute("data-session-id", session.id); // For real-time updates
       const ruleSet = this.customModes.find(
-        (rs) => rs.id === session.ruleSetId
+        (rs) => rs.id === session.ruleSetId,
       );
       const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
 
@@ -3481,24 +3475,22 @@ class ProducerPopup {
         const now = Date.now();
         if (this.isActive && session.sessionFocusStartTime) {
           const currentFocusElapsed = Math.floor(
-            (now - session.sessionFocusStartTime) / 1000
+            (now - session.sessionFocusStartTime) / 1000,
           );
           totalTime += currentFocusElapsed;
         } else if (!this.isActive && session.sessionPauseStartTime) {
           const currentBreakElapsed = Math.floor(
-            (now - session.sessionPauseStartTime) / 1000
+            (now - session.sessionPauseStartTime) / 1000,
           );
           totalTime += currentBreakElapsed;
         }
       }
 
-      const hours = Math.floor(totalTime / 3600);
-      const minutes = Math.floor((totalTime % 3600) / 60);
-      details.textContent = `${ruleSetName} • ${
-        session.blocksCount || 0
-      } block${
-        (session.blocksCount || 0) !== 1 ? "s" : ""
-      } • ${hours}h${minutes}m`;
+      details.textContent = this.formatSessionDetailsText(
+        ruleSetName,
+        session.blocksCount || 0,
+        totalTime,
+      );
 
       info.appendChild(name);
       info.appendChild(details);
@@ -3577,7 +3569,7 @@ class ProducerPopup {
     }
 
     const confirmClear = confirm(
-      "Clear all sessions?\n\nThis will permanently delete all sessions and their data. This cannot be undone."
+      "Clear all sessions?\n\nThis will permanently delete all sessions and their data. This cannot be undone.",
     );
     if (!confirmClear) return;
 
@@ -3603,7 +3595,7 @@ class ProducerPopup {
     const confirmClear = confirm(
       `Clear all custom modes?\n\nThis will permanently delete all ${
         this.customModes.length
-      } mode${this.customModes.length !== 1 ? "s" : ""}. This cannot be undone.`
+      } mode${this.customModes.length !== 1 ? "s" : ""}. This cannot be undone.`,
     );
     if (!confirmClear) return;
 
@@ -3749,7 +3741,7 @@ class ProducerPopup {
   async broadcastGrayscaleState(enabled = null) {
     // Get active mode for determining grayscale state and logging
     const activeMode = this.customModes.find(
-      (mode) => mode.id === this.activeRuleSetId
+      (mode) => mode.id === this.activeRuleSetId,
     );
 
     // If enabled is not provided, get it from the active mode's settings
@@ -3769,7 +3761,7 @@ class ProducerPopup {
       "isActive:",
       this.isActive,
       "activeRuleSetId:",
-      this.activeRuleSetId
+      this.activeRuleSetId,
     );
 
     // FIRST: Update storage to trigger storage change listeners in ALL tabs
@@ -3797,7 +3789,7 @@ class ProducerPopup {
           console.log(
             "[Producer Popup] Sending grayscale message to tab:",
             tab.id,
-            tab.url
+            tab.url,
           );
 
           // Try multiple times to ensure delivery
@@ -3809,7 +3801,7 @@ class ProducerPopup {
               });
               console.log(
                 "[Producer Popup] Message sent successfully to tab:",
-                tab.id
+                tab.id,
               );
               break; // Success, exit retry loop
             } catch (error) {
@@ -3820,7 +3812,7 @@ class ProducerPopup {
                 console.log(
                   "[Producer Popup] Failed to send message to tab:",
                   tab.id,
-                  error.message
+                  error.message,
                 );
               }
             }
@@ -3834,7 +3826,7 @@ class ProducerPopup {
     } catch (error) {
       console.error(
         "[Producer Popup] Error broadcasting grayscale state:",
-        error
+        error,
       );
     }
   }
@@ -3886,7 +3878,7 @@ class ProducerPopup {
     // Save current session state before switching (if there is one)
     if (this.currentSessionId) {
       const currentSession = this.sessions.find(
-        (s) => s.id === this.currentSessionId
+        (s) => s.id === this.currentSessionId,
       );
       if (currentSession) {
         // Commit any accumulated focus or break time
@@ -3913,7 +3905,7 @@ class ProducerPopup {
     // to guarantee it moves to the top of the session list
     const maxLastActive = Math.max(
       ...this.sessions.map((s) => s.lastActive || 0),
-      Date.now() - 1
+      Date.now() - 1,
     );
     session.lastActive = maxLastActive + 1;
     session.isActive = true; // Mark session as active
@@ -3945,7 +3937,7 @@ class ProducerPopup {
     // Get rules before and after the mode change to determine which tabs need reloading
     const beforeRules = this.getRulesFromData(
       this.customModes,
-      wasFocusModeActive ? session.ruleSetId : null
+      wasFocusModeActive ? session.ruleSetId : null,
     );
 
     // Save state with "modeSettings" action to prevent automatic tab reload
@@ -4046,10 +4038,10 @@ class ProducerPopup {
       `Delete session "${
         session.name
       }"?\n\nThis will permanently delete all session data including ${Math.floor(
-        totalTime / 3600
+        totalTime / 3600,
       )}h ${Math.floor((totalTime % 3600) / 60)}m of total time and ${
         session.blocksCount || 0
-      } blocks.`
+      } blocks.`,
     );
     if (!confirmDelete) return;
 
@@ -4085,7 +4077,7 @@ class ProducerPopup {
 
     // Create a simple UI to select mode
     const currentRuleSet = this.customModes.find(
-      (rs) => rs.id === session.ruleSetId
+      (rs) => rs.id === session.ruleSetId,
     );
     const currentRuleSetName = currentRuleSet
       ? currentRuleSet.name
@@ -4111,7 +4103,7 @@ class ProducerPopup {
     }
 
     const newRuleSet = this.customModes.find(
-      (rs) => rs.id === session.ruleSetId
+      (rs) => rs.id === session.ruleSetId,
     );
     const newRuleSetName = newRuleSet ? newRuleSet.name : "No Rules";
 
@@ -4143,7 +4135,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Update current session's blocks count if there's an active session
     if (popup.currentSessionId) {
       const currentSession = popup.sessions.find(
-        (s) => s.id === popup.currentSessionId
+        (s) => s.id === popup.currentSessionId,
       );
       if (currentSession) {
         // Update session data
@@ -4199,7 +4191,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     // Update current session object & UI if active
     if (popup.currentSessionId) {
       const currentSession = popup.sessions.find(
-        (s) => s.id === popup.currentSessionId
+        (s) => s.id === popup.currentSessionId,
       );
       if (currentSession) {
         currentSession.blocksCount = popup.sessionBlocks;
