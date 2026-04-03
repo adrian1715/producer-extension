@@ -776,25 +776,14 @@ class ProducerBackground {
             break;
           }
 
-          // Extract URL for the allow rule
-          let urlToAllow = message.url;
-          try {
-            const urlObj = new URL(message.url);
-            // For file URLs, use the full pathname; for http/https, use hostname + pathname
-            if (urlObj.protocol === "file:") {
-              urlToAllow = urlObj.pathname;
-            } else {
-              // Remove www. from hostname to ensure proper matching
-              const hostname = urlObj.hostname.replace(/^www\./, "");
-              urlToAllow = hostname + urlObj.pathname;
-            }
-          } catch (e) {
-            // Use the URL as-is if parsing fails
-          }
+          // Normalize URL so trailing slashes and file:// paths match consistently.
+          const urlToAllow = this.normalizeRuleUrl(message.url, "allow");
 
           // Check if rule already exists
           const ruleExists = activeMode.rules.some(
-            (rule) => rule.type === "allow" && rule.url === urlToAllow,
+            (rule) =>
+              rule.type === "allow" &&
+              this.normalizeRuleUrl(rule.url, "allow") === urlToAllow,
           );
 
           if (ruleExists) {
@@ -1002,24 +991,37 @@ class ProducerBackground {
   }
 
   matchesRule(url, rule) {
-    const ruleUrl = rule.url.toLowerCase();
-    const checkUrl = url.toLowerCase();
+    const normalizedRuleUrl = this.normalizeRuleUrl(rule.url, rule.type);
+    const normalizedCheckUrl = this.cleanUrl(url);
+    const ruleUrl = normalizedRuleUrl.toLowerCase();
+    const checkUrl = normalizedCheckUrl.toLowerCase();
 
     switch (rule.type) {
       case "domain":
         // Wildcard "*" matches all URLs
         if (ruleUrl === "*") return true;
 
+        // Domain rules do not apply to local file paths.
+        if (checkUrl.startsWith("file://")) return false;
+
         // Block entire domain and all subdomains
-        const hostname = new URL("https://" + url).hostname.replace(
+        const hostname = new URL("https://" + checkUrl).hostname.replace(
           /^www\./,
           "",
         );
-        return hostname === ruleUrl || hostname.endsWith("." + ruleUrl);
+        const ruleHostname = ruleUrl.split(/[/?#]/)[0];
+        return (
+          hostname === ruleHostname || hostname.endsWith("." + ruleHostname)
+        );
 
       case "url":
         // Wildcard "*" matches all URLs
         if (ruleUrl === "*") return true;
+
+        // Exact file URL/path matching for file:// rules.
+        if (ruleUrl.startsWith("file://") || checkUrl.startsWith("file://")) {
+          return checkUrl === ruleUrl;
+        }
 
         // Block only the specific URL - exact match for base domain or exact path match
         try {
@@ -1074,17 +1076,78 @@ class ProducerBackground {
   }
 
   cleanUrl(url) {
+    if (!url) return "";
+
+    const raw = String(url).trim();
+    if (raw === "*") return "*";
+
     try {
-      const urlObj = new URL(url);
-      return (urlObj.hostname + urlObj.pathname + urlObj.search)
-        .replace(/^www\./, "")
-        .replace(/\/+$/, "");
+      const urlObj = new URL(raw);
+
+      if (urlObj.protocol === "file:") {
+        let pathname = urlObj.pathname || "";
+        pathname = pathname.replace(/\\/g, "/");
+        pathname = pathname.replace(/^\/([a-zA-Z]:\/)/, "$1");
+        pathname = pathname.replace(/\/{2,}/g, "/");
+
+        const isDriveRoot = /^[a-zA-Z]:\/$/.test(pathname);
+        if (pathname.length > 1 && !isDriveRoot) {
+          pathname = pathname.replace(/\/+$/, "");
+        }
+
+        if (!pathname.startsWith("/")) {
+          pathname = "/" + pathname;
+        }
+
+        return ("file://" + pathname + (urlObj.search || "")).replace(
+          /\/+\?/,
+          "?",
+        );
+      }
+
+      const hostname = (urlObj.hostname || "").replace(/^www\./, "");
+      let pathname = urlObj.pathname || "";
+      if (pathname !== "/") {
+        pathname = pathname.replace(/\/+$/, "");
+      }
+
+      const fullPath = pathname === "/" ? "" : pathname;
+      return (hostname + fullPath + (urlObj.search || "")).replace(
+        /\/+\?/,
+        "?",
+      );
     } catch {
-      return url
+      return raw
+        .replace(/^file:\/\/\/?/i, "file:///")
         .replace(/^https?:\/\//, "")
         .replace(/^www\./, "")
         .replace(/\/+$/, "");
     }
+  }
+
+  normalizeRuleUrl(url, ruleType) {
+    if (!url) return "";
+
+    const raw = String(url).trim();
+    if (raw === "*") return "*";
+
+    if (ruleType === "domain") {
+      try {
+        const parsed = raw.match(/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//)
+          ? new URL(raw)
+          : new URL("https://" + raw);
+        return (parsed.hostname || "").replace(/^www\./, "").toLowerCase();
+      } catch {
+        return raw
+          .replace(/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//, "")
+          .replace(/^www\./, "")
+          .split(/[/?#]/)[0]
+          .replace(/\/+$/, "")
+          .toLowerCase();
+      }
+    }
+
+    return this.cleanUrl(raw);
   }
 
   async fetchMotivationalQuote() {
