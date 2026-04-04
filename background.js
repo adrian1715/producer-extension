@@ -154,14 +154,16 @@ class ProducerBackground {
       if (message.action === "reloadAffectedTabs") {
         const { rulesBefore, rulesAfter, isActiveBefore, isActiveAfter } =
           message;
+        const isDeactivatingFocusMode = isActiveBefore && !isActiveAfter;
 
         chrome.tabs.query({}, (tabs) => {
           tabs.forEach((tab) => {
+            const isProducerBlockedPage = this.isProducerBlockedPageUrl(tab.url);
             if (
               !tab.id ||
               !tab.url ||
               tab.url.startsWith("chrome://") ||
-              tab.url.startsWith("chrome-extension://")
+              (tab.url.startsWith("chrome-extension://") && !isProducerBlockedPage)
             )
               return;
 
@@ -179,6 +181,20 @@ class ProducerBackground {
 
             // Reload only if the status changes
             if (wasBlocked !== isBlocked) {
+              if (isDeactivatingFocusMode) {
+                // On focus-mode deactivation, only force-refresh tabs that are
+                // actually showing Producer's blocked page.
+                if (!isProducerBlockedPage) return;
+
+                const originalBlockedUrl = this.getBlockedPageOriginalUrl(
+                  tab.url,
+                );
+                if (originalBlockedUrl) {
+                  chrome.tabs.update(tab.id, { url: originalBlockedUrl });
+                  return;
+                }
+              }
+
               chrome.tabs.reload(tab.id);
             }
           });
@@ -282,6 +298,16 @@ class ProducerBackground {
       this.blockedPageUrlPrefix &&
       url.startsWith(this.blockedPageUrlPrefix)
     );
+  }
+
+  getBlockedPageOriginalUrl(blockedPageUrl) {
+    if (!this.isProducerBlockedPageUrl(blockedPageUrl)) return null;
+    try {
+      const parsed = new URL(blockedPageUrl);
+      return parsed.searchParams.get("blockedUrl");
+    } catch (error) {
+      return null;
+    }
   }
 
   scheduleDiscardBlockedTab(tabId, reason = "unknown") {
