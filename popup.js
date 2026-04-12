@@ -161,13 +161,60 @@ class ProducerPopup {
     // Tab elements
     this.tabBtns = document.querySelectorAll(".tab-btn");
     this.tabContents = document.querySelectorAll(".tab-content");
+    this.contentArea = document.querySelector(".content-area");
 
     // Personalization elements
     this.themeOptions = document.querySelectorAll(".theme-option");
     this.blockPageTitle = document.getElementById("blockPageTitle");
     this.blockPageMessage = document.getElementById("blockPageMessage");
+    this.blockPageShowQuotes = document.getElementById("blockPageShowQuotes");
+    this.blockPageImage = document.getElementById("blockPageImage");
+    this.useBackgroundImageUrlBtn = document.getElementById(
+      "useBackgroundImageUrlBtn",
+    );
+    this.importBackgroundImageBtn = document.getElementById(
+      "importBackgroundImageBtn",
+    );
+    this.removeBackgroundImageBtn = document.getElementById(
+      "removeBackgroundImageBtn",
+    );
+    this.blockPageImageUrlRow = document.getElementById("blockPageImageUrlRow");
+    this.confirmBackgroundImageUrlBtn = document.getElementById(
+      "confirmBackgroundImageUrlBtn",
+    );
+    this.blockPageImageFileInput = document.getElementById(
+      "blockPageImageFileInput",
+    );
+    this.blockPageImageStatus = document.getElementById("blockPageImageStatus");
+    this.blockPagePrimaryColor = document.getElementById(
+      "blockPagePrimaryColor",
+    );
+    this.blockPagePrimaryColorDisplay = document.getElementById(
+      "blockPagePrimaryColorDisplay",
+    );
+    this.blockPagePrimaryColorText = document.getElementById(
+      "blockPagePrimaryColorText",
+    );
+    this.blockPageAccentColor = document.getElementById("blockPageAccentColor");
+    this.blockPageAccentColorDisplay = document.getElementById(
+      "blockPageAccentColorDisplay",
+    );
+    this.blockPageAccentColorText = document.getElementById(
+      "blockPageAccentColorText",
+    );
+    this.blockPageShowActionButtons = document.getElementById(
+      "blockPageShowActionButtons",
+    );
     this.previewTitle = document.getElementById("previewTitle");
     this.previewMessage = document.getElementById("previewMessage");
+    this.previewQuote = document.getElementById("previewQuote");
+    this.previewUtilityActions = document.getElementById(
+      "previewUtilityActions",
+    );
+    this.blockPagePreview = document.getElementById("blockPagePreview");
+    this.blockPagePreviewCard = document.getElementById("blockPagePreviewCard");
+    this.previewAccentBtn = document.getElementById("previewAccentBtn");
+    this.blockPageImageInputMode = "hidden";
     this.savePersonalizationBtn = document.getElementById(
       "savePersonalizationBtn",
     );
@@ -256,6 +303,98 @@ class ProducerPopup {
         this.updatePreview(),
       );
     }
+    if (this.blockPageShowQuotes) {
+      this.blockPageShowQuotes.addEventListener("change", () =>
+        this.updatePreview(),
+      );
+    }
+    if (this.useBackgroundImageUrlBtn) {
+      this.useBackgroundImageUrlBtn.addEventListener("click", () =>
+        this.toggleBackgroundImageUrlInput(),
+      );
+    }
+    if (this.importBackgroundImageBtn) {
+      this.importBackgroundImageBtn.addEventListener("click", () =>
+        this.blockPageImageFileInput?.click(),
+      );
+    }
+    if (this.removeBackgroundImageBtn) {
+      this.removeBackgroundImageBtn.addEventListener("click", () =>
+        this.clearBackgroundImage(),
+      );
+    }
+    if (this.blockPageImageFileInput) {
+      this.blockPageImageFileInput.addEventListener("change", (event) =>
+        this.importBackgroundImageFile(event),
+      );
+    }
+    if (this.confirmBackgroundImageUrlBtn) {
+      this.confirmBackgroundImageUrlBtn.addEventListener("click", () =>
+        this.applyBackgroundImageUrl(),
+      );
+    }
+    if (this.blockPageImage) {
+      this.blockPageImage.addEventListener("keypress", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          this.applyBackgroundImageUrl();
+        }
+      });
+    }
+    if (this.blockPagePrimaryColor) {
+      this.blockPagePrimaryColor.addEventListener("input", () => {
+        if (this.blockPagePrimaryColorText) {
+          this.blockPagePrimaryColorText.value =
+            this.blockPagePrimaryColor.value;
+        }
+        if (this.blockPagePrimaryColorDisplay) {
+          this.blockPagePrimaryColorDisplay.textContent =
+            this.blockPagePrimaryColor.value;
+        }
+        this.updatePreview();
+      });
+    }
+    if (this.blockPagePrimaryColorDisplay) {
+      this.blockPagePrimaryColorDisplay.addEventListener("dblclick", () =>
+        this.showColorCodeInput("primary"),
+      );
+    }
+    if (this.blockPagePrimaryColorText) {
+      this.bindColorCodeInput(
+        this.blockPagePrimaryColorText,
+        this.blockPagePrimaryColor,
+        this.blockPagePrimaryColorDisplay,
+      );
+    }
+    if (this.blockPageAccentColor) {
+      this.blockPageAccentColor.addEventListener("input", () => {
+        if (this.blockPageAccentColorText) {
+          this.blockPageAccentColorText.value = this.blockPageAccentColor.value;
+        }
+        if (this.blockPageAccentColorDisplay) {
+          this.blockPageAccentColorDisplay.textContent =
+            this.blockPageAccentColor.value;
+        }
+        this.updatePreview();
+      });
+    }
+    if (this.blockPageAccentColorDisplay) {
+      this.blockPageAccentColorDisplay.addEventListener("dblclick", () =>
+        this.showColorCodeInput("accent"),
+      );
+    }
+    if (this.blockPageAccentColorText) {
+      this.bindColorCodeInput(
+        this.blockPageAccentColorText,
+        this.blockPageAccentColor,
+        this.blockPageAccentColorDisplay,
+      );
+    }
+    if (this.blockPageShowActionButtons) {
+      this.blockPageShowActionButtons.addEventListener("change", () =>
+        this.updatePreview(),
+      );
+    }
     if (this.savePersonalizationBtn) {
       this.savePersonalizationBtn.addEventListener("click", () =>
         this.savePersonalization(),
@@ -266,7 +405,6 @@ class ProducerPopup {
         this.resetPersonalization(),
       );
     }
-
     // Block page settings navigation
     if (this.openBlockPageSettingsBtn) {
       this.openBlockPageSettingsBtn.addEventListener("click", () =>
@@ -473,6 +611,20 @@ class ProducerPopup {
     if (tabName === "stats") {
       this.showStatsMainView();
     }
+
+    this.resetScrollPosition(activeContent);
+  }
+
+  resetScrollPosition(activeContainer = null) {
+    if (this.contentArea) {
+      this.contentArea.scrollTop = 0;
+    }
+    if (activeContainer) {
+      activeContainer.scrollTop = 0;
+      activeContainer.querySelectorAll(".scroll-container").forEach((el) => {
+        el.scrollTop = 0;
+      });
+    }
   }
 
   async loadState() {
@@ -491,6 +643,13 @@ class ProducerPopup {
         "theme",
         "blockPageTitle",
         "blockPageMessage",
+        "blockPageShowQuotes",
+        "blockPageBackgroundImage",
+        "blockPageBackgroundImageName",
+        "blockPagePrimaryColor",
+        "blockPageAccentColor",
+        "blockPageUseThemeColors",
+        "blockPageShowActionButtons",
         "grayscaleEnabled", // Global setting (will be removed)
       ]);
 
@@ -589,10 +748,43 @@ class ProducerPopup {
 
       // Load personalization settings
       this.currentTheme = data.theme || "blue";
-      this.currentBlockPageTitle = data.blockPageTitle || "🎯 Stay Focused!";
+      this.currentBlockPageTitle =
+        data.blockPageTitle || this.getDefaultBlockPageSettings().title;
       this.currentBlockPageMessage =
-        data.blockPageMessage ||
-        "This site is blocked during your focus session.";
+        data.blockPageMessage || this.getDefaultBlockPageSettings().message;
+      this.currentBlockPageShowQuotes =
+        data.blockPageShowQuotes !== undefined
+          ? data.blockPageShowQuotes
+          : this.getDefaultBlockPageSettings().showQuotes;
+      this.currentBlockPageBackgroundImage =
+        data.blockPageBackgroundImage ||
+        this.getDefaultBlockPageSettings().backgroundImage;
+      this.currentBlockPageBackgroundImageName =
+        data.blockPageBackgroundImageName || "";
+      const themeColorDefaults = this.getThemeBlockPageDefaults(
+        this.currentTheme,
+      );
+      const hasSavedPrimaryColor = !!data.blockPagePrimaryColor;
+      const hasSavedAccentColor = !!data.blockPageAccentColor;
+      if (data.blockPageUseThemeColors !== undefined) {
+        this.currentBlockPageUseThemeColors = data.blockPageUseThemeColors;
+      } else if (!hasSavedPrimaryColor || !hasSavedAccentColor) {
+        this.currentBlockPageUseThemeColors = true;
+      } else {
+        this.currentBlockPageUseThemeColors =
+          data.blockPagePrimaryColor === themeColorDefaults.primaryColor &&
+          data.blockPageAccentColor === themeColorDefaults.accentColor;
+      }
+      this.currentBlockPagePrimaryColor = hasSavedPrimaryColor
+        ? data.blockPagePrimaryColor
+        : themeColorDefaults.primaryColor;
+      this.currentBlockPageAccentColor = hasSavedAccentColor
+        ? data.blockPageAccentColor
+        : themeColorDefaults.accentColor;
+      this.currentBlockPageShowActionButtons =
+        data.blockPageShowActionButtons !== undefined
+          ? data.blockPageShowActionButtons
+          : this.getDefaultBlockPageSettings().showActionButtons;
 
       // Apply loaded personalization
       this.applyTheme(this.currentTheme);
@@ -942,7 +1134,7 @@ class ProducerPopup {
         // If total exceeds maxTotalLength characters, apply smart truncation
         if (totalLength > maxTotalLength) {
           // Step 1: Truncate session name to max characters (with ellipsis)
-          const sessionMaxLength = 24; // Max chars for session name
+          const sessionMaxLength = 25; // Max chars for session name
           if (sessionName.length > sessionMaxLength) {
             sessionName = sessionName.substring(0, sessionMaxLength) + ellipsis;
           }
@@ -2633,6 +2825,7 @@ class ProducerPopup {
     this.currentEditingRuleSetId = null;
     this.isCreatingNewRuleSet = false;
     this.tempRuleSet = null;
+    this.resetScrollPosition(document.getElementById("tab-rules"));
   }
 
   showAllRulesView() {
@@ -2647,6 +2840,7 @@ class ProducerPopup {
     if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
 
     this.renderAllRulesList();
+    this.resetScrollPosition(document.getElementById("tab-rules"));
   }
 
   renderAllRulesList() {
@@ -2867,6 +3061,7 @@ class ProducerPopup {
     this.updateUI();
     this.loadModeSettings(); // Load mode settings when showing edit view
     this.renderRulesPreview(); // Render rules preview
+    this.resetScrollPosition(document.getElementById("tab-rules"));
   }
 
   showModeSettingsView() {
@@ -2875,6 +3070,7 @@ class ProducerPopup {
     if (this.allRulesView) this.allRulesView.style.display = "none";
     if (this.modeSettingsView) this.modeSettingsView.style.display = "block";
     this.loadModeSettingsToView();
+    this.resetScrollPosition(document.getElementById("tab-rules"));
   }
 
   showModeEditFromSettings() {
@@ -2882,6 +3078,7 @@ class ProducerPopup {
     if (this.modeSettingsView) this.modeSettingsView.style.display = "none";
     if (this.allRulesView) this.allRulesView.style.display = "none";
     if (this.rulesEditView) this.rulesEditView.style.display = "block";
+    this.resetScrollPosition(document.getElementById("tab-rules"));
   }
 
   loadModeSettingsToView() {
@@ -3607,8 +3804,327 @@ class ProducerPopup {
   }
 
   // Personalization methods
+  getThemeBlockPageDefaults(theme = this.currentTheme || "blue") {
+    const themeDefaults = {
+      blackwhite: { primaryColor: "#1a1a1a", accentColor: "#ffffff" },
+      blue: { primaryColor: "#667eea", accentColor: "#2ecc71" },
+      red: { primaryColor: "#e74c3c", accentColor: "#2ecc71" },
+      orange: { primaryColor: "#f39c12", accentColor: "#2ecc71" },
+      purple: { primaryColor: "#9b59b6", accentColor: "#2ecc71" },
+      teal: { primaryColor: "#1abc9c", accentColor: "#3498db" },
+    };
+
+    return themeDefaults[theme] || themeDefaults.blue;
+  }
+
+  getDefaultBlockPageSettings() {
+    const themeDefaults = this.getThemeBlockPageDefaults();
+    return {
+      title: "Stay Focused",
+      message: "This site is blocked during your focus session",
+      showQuotes: true,
+      backgroundImage: "",
+      backgroundImageName: "",
+      primaryColor: themeDefaults.primaryColor,
+      accentColor: themeDefaults.accentColor,
+      showActionButtons: true,
+    };
+  }
+
+  syncColorInput(textInput, colorInput) {
+    const value = (textInput?.value || "").trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(value) && colorInput) {
+      colorInput.value = value;
+    }
+  }
+
+  showColorCodeInput(type) {
+    const isPrimary = type === "primary";
+    const input = isPrimary
+      ? this.blockPagePrimaryColorText
+      : this.blockPageAccentColorText;
+    const display = isPrimary
+      ? this.blockPagePrimaryColorDisplay
+      : this.blockPageAccentColorDisplay;
+
+    if (!input || !display) return;
+
+    display.style.display = "none";
+    input.style.display = "block";
+    input.focus();
+    input.select();
+  }
+
+  hideColorCodeInput(input, display) {
+    if (!input || !display) return;
+    input.style.display = "none";
+    display.style.display = "block";
+  }
+
+  commitColorCodeInput(input, colorInput, display) {
+    if (!input || !colorInput || !display) return;
+
+    const typedValue = input.value.trim();
+    const isValidColor = /^#[0-9a-fA-F]{6}$/.test(typedValue);
+    const committedValue = isValidColor ? typedValue : colorInput.value;
+
+    input.value = committedValue;
+    colorInput.value = committedValue;
+    display.textContent = committedValue;
+
+    this.hideColorCodeInput(input, display);
+    this.updatePreview();
+
+    if (!isValidColor) {
+      this.showNotification(
+        "Invalid color code. Use a valid hex value.",
+        "error",
+      );
+    }
+  }
+
+  bindColorCodeInput(input, colorInput, display) {
+    if (!input || !colorInput || !display) return;
+
+    input.addEventListener("input", () => {
+      this.syncColorInput(input, colorInput);
+      if (/^#[0-9a-fA-F]{6}$/.test(input.value.trim())) {
+        display.textContent = input.value.trim();
+        this.updatePreview();
+      }
+    });
+
+    input.addEventListener("blur", () => {
+      this.commitColorCodeInput(input, colorInput, display);
+    });
+
+    input.addEventListener("keypress", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.commitColorCodeInput(input, colorInput, display);
+      }
+    });
+  }
+
+  sanitizeHexColor(color, fallback) {
+    return /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : fallback;
+  }
+
+  setBackgroundImageStatus(message) {
+    if (this.blockPageImageStatus) {
+      this.blockPageImageStatus.textContent = message;
+      this.blockPageImageStatus.title = message;
+    }
+  }
+
+  estimateImageStorageBytes(imageDataUrl, imageName) {
+    const payload = JSON.stringify({
+      blockPageBackgroundImage: imageDataUrl || "",
+      blockPageBackgroundImageName: imageName || "",
+    });
+    return new TextEncoder().encode(payload).length;
+  }
+
+  setBackgroundImageInputVisibility(show) {
+    this.blockPageImageInputMode = show ? "url" : "hidden";
+    if (this.blockPageImageUrlRow) {
+      this.blockPageImageUrlRow.style.display = show ? "flex" : "none";
+    }
+    if (show && this.blockPageImage) {
+      this.blockPageImage.focus();
+    }
+  }
+
+  toggleBackgroundImageUrlInput() {
+    const shouldShow = this.blockPageImageInputMode !== "url";
+    this.setBackgroundImageInputVisibility(shouldShow);
+  }
+
+  getBackgroundImageLabel(imageValue, imageName = "") {
+    if (!imageValue) {
+      return "No background image applied.";
+    }
+
+    if (imageValue.startsWith("data:image/")) {
+      return imageName
+        ? `Imported image: ${imageName}`
+        : "Imported image applied.";
+    }
+
+    try {
+      const parsedUrl = new URL(imageValue);
+      const pathname = parsedUrl.pathname.split("/").filter(Boolean);
+      return pathname[pathname.length - 1]
+        ? `Image from URL: ${pathname[pathname.length - 1]}`
+        : `Image from URL: ${parsedUrl.hostname}`;
+    } catch (error) {
+      return "Image from URL applied.";
+    }
+  }
+
+  refreshBackgroundImageControls() {
+    const imageValue = this.blockPageImage?.value?.trim() || "";
+    const hasImage = !!imageValue;
+
+    this.setBackgroundImageStatus(
+      this.getBackgroundImageLabel(
+        imageValue,
+        this.currentBlockPageBackgroundImageName,
+      ),
+    );
+
+    if (this.removeBackgroundImageBtn) {
+      this.removeBackgroundImageBtn.style.display = hasImage
+        ? "inline-flex"
+        : "none";
+    }
+
+    if (!hasImage && this.blockPageImageInputMode !== "url") {
+      this.setBackgroundImageInputVisibility(false);
+    }
+  }
+
+  applyBackgroundImageUrl() {
+    const imageUrl = this.blockPageImage?.value?.trim();
+    if (!imageUrl) {
+      this.setBackgroundImageInputVisibility(true);
+      this.setBackgroundImageStatus("Paste an image URL to apply it.");
+      return;
+    }
+
+    this.currentBlockPageBackgroundImageName = "";
+    this.setBackgroundImageStatus(this.getBackgroundImageLabel(imageUrl));
+    this.setBackgroundImageInputVisibility(false);
+    this.refreshBackgroundImageControls();
+    this.updatePreview();
+  }
+
+  clearBackgroundImage() {
+    if (this.blockPageImage) {
+      this.blockPageImage.value = "";
+    }
+    if (this.blockPageImageFileInput) {
+      this.blockPageImageFileInput.value = "";
+    }
+    this.currentBlockPageBackgroundImageName = "";
+    this.setBackgroundImageInputVisibility(false);
+    this.refreshBackgroundImageControls();
+    this.updatePreview();
+  }
+
+  async importBackgroundImageFile(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+
+    const maxImportBytes = 2 * 1024 * 1024;
+    if (file.size > maxImportBytes) {
+      this.setBackgroundImageStatus(
+        "Image too large. Choose an image under 2 MB.",
+      );
+      this.showNotification("Image too large. Use a file under 2 MB.", "error");
+      if (this.blockPageImageFileInput) {
+        this.blockPageImageFileInput.value = "";
+      }
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+      if (typeof dataUrl === "string" && this.blockPageImage) {
+        const quotaBytes =
+          chrome.storage?.local?.QUOTA_BYTES || 5 * 1024 * 1024;
+        const bytesInUse = await chrome.storage.local.getBytesInUse(null);
+        const previousImageBytes = this.estimateImageStorageBytes(
+          this.blockPageImage.value || "",
+          this.currentBlockPageBackgroundImageName || "",
+        );
+        const newImageBytes = this.estimateImageStorageBytes(
+          dataUrl,
+          file.name,
+        );
+        const projectedBytes = bytesInUse - previousImageBytes + newImageBytes;
+
+        if (projectedBytes > quotaBytes) {
+          this.setBackgroundImageStatus(
+            "Image too large for extension storage. Use a smaller file.",
+          );
+          this.showNotification(
+            "Image exceeds storage limit. Pick a smaller image.",
+            "error",
+          );
+          return;
+        }
+
+        this.blockPageImage.value = dataUrl;
+        this.currentBlockPageBackgroundImageName = file.name;
+        this.setBackgroundImageInputVisibility(false);
+        this.refreshBackgroundImageControls();
+        this.updatePreview();
+      }
+    } catch (error) {
+      console.error("Failed to import background image:", error);
+      this.setBackgroundImageStatus("Failed to import image.");
+    } finally {
+      if (this.blockPageImageFileInput) {
+        this.blockPageImageFileInput.value = "";
+      }
+    }
+  }
+
+  getBlockPageSettingsFromInputs() {
+    const defaults = this.getDefaultBlockPageSettings();
+    return {
+      title: this.blockPageTitle?.value?.trim() || defaults.title,
+      message: this.blockPageMessage?.value?.trim() || defaults.message,
+      showQuotes: this.blockPageShowQuotes?.checked ?? defaults.showQuotes,
+      backgroundImage: this.blockPageImage?.value?.trim() || "",
+      backgroundImageName: this.currentBlockPageBackgroundImageName || "",
+      primaryColor: this.sanitizeHexColor(
+        this.blockPagePrimaryColorText?.value?.trim(),
+        defaults.primaryColor,
+      ),
+      accentColor: this.sanitizeHexColor(
+        this.blockPageAccentColorText?.value?.trim(),
+        defaults.accentColor,
+      ),
+      showActionButtons:
+        this.blockPageShowActionButtons?.checked ?? defaults.showActionButtons,
+    };
+  }
+
+  getPersonalizationPayload(overrides = {}) {
+    return {
+      theme: this.currentTheme,
+      blockPageTitle: this.currentBlockPageTitle,
+      blockPageMessage: this.currentBlockPageMessage,
+      blockPageShowQuotes: this.currentBlockPageShowQuotes,
+      blockPageBackgroundImage: this.currentBlockPageBackgroundImage,
+      blockPageBackgroundImageName: this.currentBlockPageBackgroundImageName,
+      blockPagePrimaryColor: this.currentBlockPagePrimaryColor,
+      blockPageAccentColor: this.currentBlockPageAccentColor,
+      blockPageUseThemeColors: this.currentBlockPageUseThemeColors,
+      blockPageShowActionButtons: this.currentBlockPageShowActionButtons,
+      ...overrides,
+    };
+  }
+
   async selectTheme(theme) {
+    if (this.currentTheme === theme) {
+      return;
+    }
+
+    const nextThemeDefaults = this.getThemeBlockPageDefaults(theme);
     this.currentTheme = theme;
+    if (this.currentBlockPageUseThemeColors !== false) {
+      this.currentBlockPagePrimaryColor = nextThemeDefaults.primaryColor;
+      this.currentBlockPageAccentColor = nextThemeDefaults.accentColor;
+    }
 
     // Update active state on theme options
     this.themeOptions.forEach((option) => {
@@ -3619,26 +4135,28 @@ class ProducerPopup {
       }
     });
 
-    // If theme is already applied, do nothing and display a message
-    if (document.body.classList.contains(`theme-${theme}`)) {
-      this.showNotification(`Theme ${theme} is already applied!`, "error");
-      return;
-    }
-
     // Apply theme immediately
     this.applyTheme(theme);
 
     // Auto-save theme to storage
     try {
-      await chrome.storage.local.set({ theme });
+      const themePayload = { theme };
+      if (this.currentBlockPageUseThemeColors !== false) {
+        themePayload.blockPagePrimaryColor = this.currentBlockPagePrimaryColor;
+        themePayload.blockPageAccentColor = this.currentBlockPageAccentColor;
+      }
+      themePayload.blockPageUseThemeColors =
+        this.currentBlockPageUseThemeColors;
+      await chrome.storage.local.set(themePayload);
+      this.loadPersonalizationUI();
 
       // Send message to background script to update block page theme
-      chrome.runtime.sendMessage({
-        action: "updatePersonalization",
-        theme,
-        blockPageTitle: this.currentBlockPageTitle,
-        blockPageMessage: this.currentBlockPageMessage,
-      });
+      chrome.runtime.sendMessage(
+        this.getPersonalizationPayload({
+          action: "updatePersonalization",
+          theme,
+        }),
+      );
 
       this.showNotification(`Theme changed to ${theme}!`);
     } catch (error) {
@@ -3666,6 +4184,48 @@ class ProducerPopup {
     if (this.blockPageMessage) {
       this.blockPageMessage.value = this.currentBlockPageMessage;
     }
+    if (this.blockPageShowQuotes) {
+      this.blockPageShowQuotes.checked = this.currentBlockPageShowQuotes;
+    }
+    if (this.blockPageImage) {
+      this.blockPageImage.value = this.currentBlockPageBackgroundImage;
+      this.currentBlockPageBackgroundImageName =
+        this.currentBlockPageBackgroundImageName || "";
+      this.setBackgroundImageInputVisibility(false);
+      this.refreshBackgroundImageControls();
+    }
+    if (this.blockPagePrimaryColor) {
+      this.blockPagePrimaryColor.value = this.currentBlockPagePrimaryColor;
+    }
+    if (this.blockPagePrimaryColorText) {
+      this.blockPagePrimaryColorText.value = this.currentBlockPagePrimaryColor;
+    }
+    if (this.blockPagePrimaryColorDisplay) {
+      this.blockPagePrimaryColorDisplay.textContent =
+        this.currentBlockPagePrimaryColor;
+      this.blockPagePrimaryColorDisplay.style.display = "block";
+    }
+    if (this.blockPagePrimaryColorText) {
+      this.blockPagePrimaryColorText.style.display = "none";
+    }
+    if (this.blockPageAccentColor) {
+      this.blockPageAccentColor.value = this.currentBlockPageAccentColor;
+    }
+    if (this.blockPageAccentColorText) {
+      this.blockPageAccentColorText.value = this.currentBlockPageAccentColor;
+    }
+    if (this.blockPageAccentColorDisplay) {
+      this.blockPageAccentColorDisplay.textContent =
+        this.currentBlockPageAccentColor;
+      this.blockPageAccentColorDisplay.style.display = "block";
+    }
+    if (this.blockPageAccentColorText) {
+      this.blockPageAccentColorText.style.display = "none";
+    }
+    if (this.blockPageShowActionButtons) {
+      this.blockPageShowActionButtons.checked =
+        this.currentBlockPageShowActionButtons;
+    }
 
     // Update preview
     this.updatePreview();
@@ -3680,62 +4240,155 @@ class ProducerPopup {
     });
   }
 
+  getPreviewBackground(primaryColor, imageUrl) {
+    const fallback = `linear-gradient(135deg, ${primaryColor} 0%, #764ba2 100%)`;
+    if (!imageUrl) return fallback;
+    return `linear-gradient(140deg, rgba(10, 15, 31, 0.4), rgba(10, 15, 31, 0.6)), url("${imageUrl}"), ${fallback}`;
+  }
+
   updatePreview() {
-    if (this.previewTitle && this.blockPageTitle) {
-      this.previewTitle.textContent =
-        this.blockPageTitle.value || "🎯 Stay Focused!";
+    const defaults = this.getDefaultBlockPageSettings();
+    const settings = this.getBlockPageSettingsFromInputs();
+    if (this.previewTitle) {
+      this.previewTitle.textContent = settings.title || defaults.title;
     }
-    if (this.previewMessage && this.blockPageMessage) {
-      this.previewMessage.textContent =
-        this.blockPageMessage.value ||
-        "This site is blocked during your focus session.";
+    if (this.previewMessage) {
+      this.previewMessage.textContent = settings.message || defaults.message;
+    }
+    if (this.previewQuote) {
+      this.previewQuote.textContent = "Stay focused and keep pushing forward!";
+      this.previewQuote.style.display = settings.showQuotes ? "block" : "none";
+    }
+    if (this.previewUtilityActions) {
+      this.previewUtilityActions.style.display = settings.showActionButtons
+        ? "flex"
+        : "none";
+    }
+    if (this.blockPagePreview) {
+      this.blockPagePreview.style.setProperty(
+        "--preview-background",
+        this.getPreviewBackground(
+          settings.primaryColor || defaults.primaryColor,
+          settings.backgroundImage,
+        ),
+      );
+    }
+    if (this.blockPagePreviewCard) {
+      this.blockPagePreviewCard.style.borderColor = `${settings.accentColor}66`;
+      this.blockPagePreviewCard.style.boxShadow = `0 14px 34px ${settings.primaryColor}33`;
+    }
+    if (this.previewAccentBtn) {
+      this.previewAccentBtn.style.background = `${settings.accentColor}40`;
+      this.previewAccentBtn.style.borderColor = `${settings.accentColor}99`;
+    }
+    if (this.previewQuote) {
+      this.previewQuote.style.borderLeftColor = `${settings.accentColor}aa`;
+    }
+    const previewSessionTime = document.getElementById("previewSessionTime");
+    if (previewSessionTime) {
+      previewSessionTime.style.color = settings.accentColor;
+    }
+
+    // If explicit save button was removed, persist personalization automatically.
+    if (!this.savePersonalizationBtn && this.isLoaded) {
+      this.schedulePersonalizationAutoSave();
     }
   }
 
-  async savePersonalization() {
+  schedulePersonalizationAutoSave() {
+    clearTimeout(this.personalizationAutoSaveTimeout);
+
+    this.personalizationAutoSaveTimeout = setTimeout(async () => {
+      const saved = await this.savePersonalization(true);
+      if (saved) {
+        this.showNotification("Block page changes applied");
+      }
+    }, 250);
+  }
+
+  async savePersonalization(silent = false) {
     try {
-      const blockPageTitle = this.blockPageTitle?.value || "🎯 Stay Focused!";
-      const blockPageMessage =
-        this.blockPageMessage?.value ||
-        "This site is blocked during your focus session.";
+      const settings = this.getBlockPageSettingsFromInputs();
 
       // Save to storage
       await chrome.storage.local.set({
-        blockPageTitle,
-        blockPageMessage,
+        blockPageTitle: settings.title,
+        blockPageMessage: settings.message,
+        blockPageShowQuotes: settings.showQuotes,
+        blockPageBackgroundImage: settings.backgroundImage,
+        blockPageBackgroundImageName: settings.backgroundImageName,
+        blockPagePrimaryColor: settings.primaryColor,
+        blockPageAccentColor: settings.accentColor,
+        blockPageUseThemeColors:
+          settings.primaryColor ===
+            this.getThemeBlockPageDefaults(this.currentTheme).primaryColor &&
+          settings.accentColor ===
+            this.getThemeBlockPageDefaults(this.currentTheme).accentColor,
+        blockPageShowActionButtons: settings.showActionButtons,
       });
 
       // Update current values
-      this.currentBlockPageTitle = blockPageTitle;
-      this.currentBlockPageMessage = blockPageMessage;
+      this.currentBlockPageTitle = settings.title;
+      this.currentBlockPageMessage = settings.message;
+      this.currentBlockPageShowQuotes = settings.showQuotes;
+      this.currentBlockPageBackgroundImage = settings.backgroundImage;
+      this.currentBlockPageBackgroundImageName = settings.backgroundImageName;
+      this.currentBlockPagePrimaryColor = settings.primaryColor;
+      this.currentBlockPageAccentColor = settings.accentColor;
+      this.currentBlockPageUseThemeColors =
+        settings.primaryColor ===
+          this.getThemeBlockPageDefaults(this.currentTheme).primaryColor &&
+        settings.accentColor ===
+          this.getThemeBlockPageDefaults(this.currentTheme).accentColor;
+      this.currentBlockPageShowActionButtons = settings.showActionButtons;
 
       // Send message to background script to update block page
-      chrome.runtime.sendMessage({
-        action: "updatePersonalization",
-        theme: this.currentTheme,
-        blockPageTitle,
-        blockPageMessage,
-      });
+      chrome.runtime.sendMessage(
+        this.getPersonalizationPayload({
+          action: "updatePersonalization",
+        }),
+      );
 
-      this.showNotification("Block page settings saved!");
+      if (!silent) {
+        this.showNotification("Block page settings saved!");
+      }
+      return true;
     } catch (error) {
       console.error("Failed to save block page settings:", error);
       this.showNotification("Failed to save settings", "error");
+      return false;
     }
   }
 
   resetPersonalization() {
-    // Reset to defaults
-    this.currentTheme = "blue";
-    this.currentBlockPageTitle = "🎯 Stay Focused!";
-    this.currentBlockPageMessage =
-      "This site is blocked during your focus session.";
+    const defaults = this.getDefaultBlockPageSettings();
+    const alreadyDefault =
+      this.currentBlockPageTitle === defaults.title &&
+      this.currentBlockPageMessage === defaults.message &&
+      this.currentBlockPageShowQuotes === defaults.showQuotes &&
+      this.currentBlockPageBackgroundImage === defaults.backgroundImage &&
+      this.currentBlockPageBackgroundImageName ===
+        defaults.backgroundImageName &&
+      this.currentBlockPagePrimaryColor === defaults.primaryColor &&
+      this.currentBlockPageAccentColor === defaults.accentColor &&
+      this.currentBlockPageShowActionButtons === defaults.showActionButtons;
 
-    // Update UI
-    this.applyTheme(this.currentTheme);
+    if (alreadyDefault) {
+      this.showNotification("Block page settings already reset", "error");
+      return;
+    }
+
+    this.currentBlockPageTitle = defaults.title;
+    this.currentBlockPageMessage = defaults.message;
+    this.currentBlockPageShowQuotes = defaults.showQuotes;
+    this.currentBlockPageBackgroundImage = defaults.backgroundImage;
+    this.currentBlockPageBackgroundImageName = defaults.backgroundImageName;
+    this.currentBlockPagePrimaryColor = defaults.primaryColor;
+    this.currentBlockPageAccentColor = defaults.accentColor;
+    this.currentBlockPageUseThemeColors = true;
+    this.currentBlockPageShowActionButtons = defaults.showActionButtons;
     this.loadPersonalizationUI();
-
-    this.showNotification("Reset to default settings");
+    this.showNotification("Block page settings reset");
   }
 
   async broadcastGrayscaleState(enabled = null) {
@@ -3837,6 +4490,7 @@ class ProducerPopup {
       this.themeMainView.style.display = "none";
       this.blockPageSettingsView.style.display = "block";
     }
+    this.resetScrollPosition(document.getElementById("tab-personalize"));
   }
 
   showThemeMainView() {
@@ -3844,6 +4498,7 @@ class ProducerPopup {
       this.themeMainView.style.display = "block";
       this.blockPageSettingsView.style.display = "none";
     }
+    this.resetScrollPosition(document.getElementById("tab-personalize"));
   }
 
   // Navigation methods for stats tab
@@ -3852,6 +4507,7 @@ class ProducerPopup {
       this.statsMainView.style.display = "none";
       this.sessionHistoryView.style.display = "block";
     }
+    this.resetScrollPosition(document.getElementById("tab-stats"));
   }
 
   showStatsMainView() {
@@ -3859,6 +4515,7 @@ class ProducerPopup {
       this.statsMainView.style.display = "block";
       this.sessionHistoryView.style.display = "none";
     }
+    this.resetScrollPosition(document.getElementById("tab-stats"));
   }
 
   // Session management methods

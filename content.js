@@ -9,8 +9,13 @@ class ProducerContentScript {
     this.blockStatsInterval = null;
     this.blockVisibilityHandler = null;
     this.blockPageTheme = "blue"; // Default theme
-    this.blockPageTitle = "Stay Focused!";
-    this.blockPageMessage = "This site is blocked during your focus session.";
+    this.blockPageTitle = "Stay Focused";
+    this.blockPageMessage = "This site is blocked during your focus session";
+    this.blockPageShowQuotes = true;
+    this.blockPageBackgroundImage = "";
+    this.blockPagePrimaryColor = "#667eea";
+    this.blockPageAccentColor = "#2ecc71";
+    this.blockPageShowActionButtons = true;
     this.init();
     this.interceptNavigationAttempts();
     this.observeUrlChanges();
@@ -24,10 +29,22 @@ class ProducerContentScript {
 
       if (message.action === "applyBlockPageTheme") {
         this.blockPageTheme = message.theme || "blue";
-        this.blockPageTitle = message.blockPageTitle || "🎯 Stay Focused!";
+        this.blockPageTitle = message.blockPageTitle || "🎯 Stay Focused";
         this.blockPageMessage =
           message.blockPageMessage ||
-          "This site is blocked during your focus session.";
+          "This site is blocked during your focus session";
+        this.blockPageShowQuotes =
+          message.blockPageShowQuotes !== undefined
+            ? message.blockPageShowQuotes
+            : true;
+        this.blockPageBackgroundImage = message.blockPageBackgroundImage || "";
+        this.blockPagePrimaryColor =
+          message.blockPagePrimaryColor || "#667eea";
+        this.blockPageAccentColor = message.blockPageAccentColor || "#2ecc71";
+        this.blockPageShowActionButtons =
+          message.blockPageShowActionButtons !== undefined
+            ? message.blockPageShowActionButtons
+            : true;
         sendResponse({ success: true });
       } else if (message.action === "toggleGrayscale") {
         console.log(
@@ -46,6 +63,11 @@ class ProducerContentScript {
         "theme",
         "blockPageTitle",
         "blockPageMessage",
+        "blockPageShowQuotes",
+        "blockPageBackgroundImage",
+        "blockPagePrimaryColor",
+        "blockPageAccentColor",
+        "blockPageShowActionButtons",
         "grayscaleEnabled",
         "isActive",
       ],
@@ -60,6 +82,21 @@ class ProducerContentScript {
         }
         if (data.blockPageMessage) {
           this.blockPageMessage = data.blockPageMessage;
+        }
+        if (data.blockPageShowQuotes !== undefined) {
+          this.blockPageShowQuotes = data.blockPageShowQuotes;
+        }
+        if (data.blockPageBackgroundImage) {
+          this.blockPageBackgroundImage = data.blockPageBackgroundImage;
+        }
+        if (data.blockPagePrimaryColor) {
+          this.blockPagePrimaryColor = data.blockPagePrimaryColor;
+        }
+        if (data.blockPageAccentColor) {
+          this.blockPageAccentColor = data.blockPageAccentColor;
+        }
+        if (data.blockPageShowActionButtons !== undefined) {
+          this.blockPageShowActionButtons = data.blockPageShowActionButtons;
         }
         // Apply grayscale if it's enabled AND focus mode is active
         if (data.grayscaleEnabled && data.isActive) {

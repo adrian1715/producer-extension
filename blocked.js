@@ -76,21 +76,67 @@ class ProducerBlockedPage {
     return `${secs}s`;
   }
 
+  sanitizeHexColor(color, fallback) {
+    return /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : fallback;
+  }
+
+  hexToRgba(hex, alpha) {
+    const safeHex = this.sanitizeHexColor(hex, "#667eea").replace("#", "");
+    const int = parseInt(safeHex, 16);
+    const r = (int >> 16) & 255;
+    const g = (int >> 8) & 255;
+    const b = int & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  buildBackground(themeBackground, primaryColor, imageUrl) {
+    const overlay = `linear-gradient(140deg, ${this.hexToRgba(primaryColor, 0.5)}, rgba(15, 23, 42, 0.74))`;
+    if (!imageUrl) {
+      return `${overlay}, ${themeBackground}`;
+    }
+    return `${overlay}, url("${imageUrl}"), ${themeBackground}`;
+  }
+
   async applyThemeAndText() {
     const data = await chrome.storage.local.get([
       "theme",
       "blockPageTitle",
       "blockPageMessage",
+      "blockPageShowQuotes",
+      "blockPageBackgroundImage",
+      "blockPagePrimaryColor",
+      "blockPageAccentColor",
+      "blockPageShowActionButtons",
     ]);
 
     const currentTheme = this.themeStyles[data.theme] || this.themeStyles.blue;
-    document.body.style.background = currentTheme.background;
+    const primaryColor = this.sanitizeHexColor(
+      data.blockPagePrimaryColor,
+      "#667eea",
+    );
+    const accentColor = this.sanitizeHexColor(
+      data.blockPageAccentColor,
+      currentTheme.accentColor,
+    );
+    document.body.style.background = this.buildBackground(
+      currentTheme.background,
+      primaryColor,
+      data.blockPageBackgroundImage || "",
+    );
+    document.body.style.backgroundSize = data.blockPageBackgroundImage
+      ? "cover"
+      : "auto";
+    document.body.style.backgroundPosition = "center";
 
     const container = document.querySelector(".block-container");
     if (container) {
-      container.style.background = currentTheme.containerBg;
-      container.style.border = `1px solid ${currentTheme.borderColor}`;
+      container.style.background = this.hexToRgba(primaryColor, 0.2);
+      container.style.border = `1px solid ${this.hexToRgba(accentColor, 0.4)}`;
       container.style.color = currentTheme.textColor;
+      container.style.boxShadow = `0 24px 48px ${this.hexToRgba(
+        primaryColor,
+        0.24,
+      )}`;
     }
 
     const titleEl = document.getElementById("blockTitle");
@@ -98,9 +144,27 @@ class ProducerBlockedPage {
     const blockNumberEl = document.getElementById("blockNumber");
     const blockedUrlEl = document.getElementById("blockedUrl");
     const timeEl = document.getElementById("sessionTime");
+    const quoteEl = document.getElementById("motivationalQuote");
+    const statsEl = document.querySelector(".stats");
+    const iconEl = document.querySelector(".icon");
+    const closeBtn = document.getElementById("close-btn");
+    const allowOnceBtn = document.getElementById("allow-once-btn");
+    const addExceptionBtn = document.getElementById("add-exception-btn");
+    const warningButtons = document.querySelectorAll(".btn-warning");
+    const utilityActions = allowOnceBtn?.parentElement || null;
+    const showActionButtons =
+      data.blockPageShowActionButtons !== undefined
+        ? data.blockPageShowActionButtons
+        : true;
+    const showQuotes =
+      data.blockPageShowQuotes !== undefined ? data.blockPageShowQuotes : true;
 
     if (titleEl) {
       titleEl.textContent = data.blockPageTitle || "Stay Focused";
+      titleEl.style.background = "none";
+      titleEl.style.backgroundClip = "border-box";
+      titleEl.style.webkitTextFillColor = currentTheme.textColor;
+      titleEl.style.color = currentTheme.textColor;
     }
     if (messageEl) {
       messageEl.textContent =
@@ -116,8 +180,38 @@ class ProducerBlockedPage {
       blockedUrlEl.title = this.blockedUrl;
     }
     if (timeEl) {
-      timeEl.style.color = currentTheme.accentColor;
+      timeEl.style.color = accentColor;
     }
+    if (quoteEl) {
+      quoteEl.style.borderLeftColor = this.hexToRgba(accentColor, 0.85);
+      quoteEl.style.background = this.hexToRgba(primaryColor, 0.12);
+      quoteEl.style.display = showQuotes ? "block" : "none";
+    }
+    if (statsEl) {
+      statsEl.style.background = this.hexToRgba(primaryColor, 0.12);
+    }
+    if (iconEl) {
+      iconEl.style.textShadow = `0 0 24px ${this.hexToRgba(accentColor, 0.45)}`;
+    }
+    if (closeBtn) {
+      closeBtn.style.background = this.hexToRgba(accentColor, 0.28);
+      closeBtn.style.borderColor = this.hexToRgba(accentColor, 0.8);
+    }
+    if (utilityActions) {
+      utilityActions.style.display = showActionButtons ? "flex" : "none";
+    }
+    warningButtons.forEach((button) => {
+      const warningBackground =
+        data.theme === "blackwhite"
+          ? "rgba(255, 255, 255, 0.14)"
+          : this.hexToRgba(primaryColor, 0.2);
+      const warningBorder =
+        data.theme === "blackwhite"
+          ? "rgba(255, 255, 255, 0.32)"
+          : this.hexToRgba(primaryColor, 0.46);
+      button.style.background = warningBackground;
+      button.style.borderColor = warningBorder;
+    });
   }
 
   async loadMotivationalQuote() {
@@ -125,6 +219,14 @@ class ProducerBlockedPage {
     if (!quoteEl) return;
 
     const defaultQuote = "Stay focused and keep pushing forward!";
+    const personalization = await chrome.storage.local.get([
+      "blockPageShowQuotes",
+    ]);
+    if (personalization.blockPageShowQuotes === false) {
+      quoteEl.style.display = "none";
+      return;
+    }
+
     try {
       const response = await chrome.runtime.sendMessage({
         action: "getMotivationalQuote",
@@ -284,8 +386,18 @@ class ProducerBlockedPage {
       ) {
         this.checkStillBlocked();
       }
-      if (changes.theme || changes.blockPageTitle || changes.blockPageMessage) {
+      if (
+        changes.theme ||
+        changes.blockPageTitle ||
+        changes.blockPageMessage ||
+        changes.blockPageShowQuotes ||
+        changes.blockPageBackgroundImage ||
+        changes.blockPagePrimaryColor ||
+        changes.blockPageAccentColor ||
+        changes.blockPageShowActionButtons
+      ) {
         this.applyThemeAndText();
+        this.loadMotivationalQuote();
       }
     });
   }

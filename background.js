@@ -572,6 +572,11 @@ class ProducerBackground {
         this.currentTheme = message.theme;
         this.blockPageTitle = message.blockPageTitle;
         this.blockPageMessage = message.blockPageMessage;
+        this.blockPageShowQuotes = message.blockPageShowQuotes;
+        this.blockPageBackgroundImage = message.blockPageBackgroundImage;
+        this.blockPagePrimaryColor = message.blockPagePrimaryColor;
+        this.blockPageAccentColor = message.blockPageAccentColor;
+        this.blockPageShowActionButtons = message.blockPageShowActionButtons;
 
         // Notify all tabs about the theme change
         chrome.tabs.query({}, (tabs) => {
@@ -588,6 +593,11 @@ class ProducerBackground {
                   theme: message.theme,
                   blockPageTitle: message.blockPageTitle,
                   blockPageMessage: message.blockPageMessage,
+                  blockPageShowQuotes: message.blockPageShowQuotes,
+                  blockPageBackgroundImage: message.blockPageBackgroundImage,
+                  blockPagePrimaryColor: message.blockPagePrimaryColor,
+                  blockPageAccentColor: message.blockPageAccentColor,
+                  blockPageShowActionButtons: message.blockPageShowActionButtons,
                 })
                 .catch(() => {
                   // Tab may not have content script loaded, ignore error

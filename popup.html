@@ -4,737 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Producer - Focus Mode</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      html {
-        width: 412px;
-        height: 522px !important;
-      }
-
-      body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        /* padding: 12px 0 0 0; */
-        display: flex;
-        flex-direction: column;
-        height: 522px;
-        overflow: hidden;
-      }
-
-      .header {
-        text-align: center;
-        padding: 12px 16px 0 16px;
-        flex-shrink: 0;
-      }
-
-      .logo-img {
-        height: auto;
-        max-width: 90%;
-        vertical-align: middle;
-      }
-
-      .tagline {
-        font-size: 12px;
-        opacity: 0.8;
-      }
-
-      .main-controls {
-        text-align: center;
-      }
-
-      .status-indicator {
-        width: 75px;
-        height: 75px;
-        border-radius: 50%;
-        margin: 0 auto 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 26px;
-        border: 3px solid rgba(255, 255, 255, 0.3);
-        transition: all 0.3s ease;
-      }
-
-      .status-indicator.active {
-        background: rgba(46, 204, 113, 0.2);
-        border-color: #2ecc71;
-        box-shadow: 0 0 20px rgba(46, 204, 113, 0.3);
-      }
-
-      .status-indicator.inactive {
-        background: rgba(231, 76, 60, 0.2);
-        border-color: #e74c3c;
-      }
-
-      .session-status {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 14px;
-        margin: 12px 0;
-        text-align: center;
-      }
-
-      .session-status-text {
-        color: #e74c3c;
-        font-weight: 500;
-      }
-
-      .session-timer {
-        font-size: 26px;
-        font-weight: 700;
-        font-family: "Courier New", monospace;
-        margin: 8px 0 0 0;
-        letter-spacing: 2px;
-      }
-
-      .session-label {
-        font-size: 12px;
-        opacity: 0.8;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-      }
-
-      .footer {
-        height: 34px !important;
-        margin-top: 16px;
-      }
-
-      .main-footer {
-        display: flex;
-        justify-content: space-between;
-        /* flex-direction: column; */
-        /* gap: 8px; */
-      }
-      .main-footer div {
-        gap: 4px;
-      }
-
-      .settings-footer {
-        display: flex;
-        /* flex-direction: column; */
-        justify-content: space-between;
-        gap: 8px;
-        /* margin: 16px; */
-      }
-
-      .btn {
-        background: rgba(255, 255, 255, 0.2);
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-family: inherit;
-        font-weight: 500;
-        transition: all 0.3s ease;
-      }
-
-      .btn:hover {
-        background: rgba(255, 255, 255, 0.3);
-        transform: translateY(-1px);
-      }
-
-      .btn-primary {
-        background: rgba(52, 152, 219, 0.3);
-        color: white;
-      }
-
-      .btn-primary:hover {
-        background: rgba(52, 152, 219, 0.5);
-        box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
-      }
-
-      .btn-success {
-        background: rgba(46, 204, 113, 0.3);
-        color: white;
-      }
-
-      .btn-success:hover {
-        background: rgba(46, 204, 113, 0.5);
-        box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
-      }
-
-      .btn-danger {
-        background: rgba(231, 76, 60, 0.3);
-        color: white;
-      }
-
-      .btn-danger:hover {
-        background: rgba(231, 76, 60, 0.5);
-        box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
-      }
-
-      .btn-small {
-        padding: 4px 8px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 12px;
-        font-family: inherit;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(5px);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .btn-xsmall {
-        padding: 3px 6px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 12px;
-        font-family: inherit;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(5px);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .btn-small:hover,
-      .btn-xsmall:hover {
-        transform: translateY(-1px);
-      }
-
-      .btn-squared {
-        width: 28px !important;
-        height: 28px !important;
-      }
-
-      i {
-        font-size: 0.9rem;
-      }
-
-      #settings {
-        display: none;
-      }
-
-      #settings .section:first-child {
-        margin-top: 0;
-      }
-
-      .toggle-btn {
-        background: rgba(255, 255, 255, 0.1);
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        color: white;
-        padding: 10px 24px;
-        border-radius: 25px;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(10px);
-      }
-
-      .toggle-btn:hover {
-        background: rgba(255, 255, 255, 0.2);
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-      }
-
-      .toggle-btn.active {
-        background: #e74c3c;
-        border-color: #e74c3c;
-      }
-
-      .toggle-btn.active:hover {
-        background: #c0392b;
-      }
-
-      .section {
-        margin: 12px 0;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 14px;
-        backdrop-filter: blur(10px);
-      }
-
-      .tab-content > .section:first-child,
-      .tab-content > *:first-child > .section:first-child,
-      #rules-edit-view > .section:nth-of-type(1),
-      #rules-edit-view > .section:nth-of-type(2) {
-        margin-top: 0;
-      }
-
-      .tab-content > .section:last-child,
-      .tab-content > *:last-child > .section:last-child,
-      #rules-edit-view > .section:nth-last-of-type(1),
-      #rules-edit-view > .section:nth-last-of-type(2) {
-        margin-bottom: 0;
-      }
-
-      .section-title {
-        justify-content: space-between;
-        display: flex;
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 10px;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .input-group {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 10px;
-      }
-
-      input[type="text"],
-      select {
-        flex: 1;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 8px;
-        font-size: 13px;
-      }
-
-      select option {
-        background: #667eea;
-      }
-
-      body.theme-blue select option {
-        background: #667eea;
-      }
-
-      body.theme-red select option {
-        background: #e74c3c;
-      }
-
-      body.theme-blackwhite select option {
-        background: #1a1a1a;
-      }
-
-      body.theme-orange select option {
-        background: #f39c12;
-      }
-
-      body.theme-purple select option {
-        background: #9b59b6;
-      }
-
-      body.theme-teal select option {
-        background: #1abc9c;
-      }
-
-      input[type="text"]::placeholder {
-        color: rgba(255, 255, 255, 0.6);
-      }
-
-      .rule-item {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        padding: 8px 10px;
-        margin-bottom: 6px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .rule-info {
-        flex: 1;
-        text-align: left;
-        min-width: 0;
-        overflow: hidden;
-      }
-
-      .rule-url {
-        font-size: 12px;
-        font-weight: 500;
-        margin-bottom: 2px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 95%;
-      }
-
-      .rule-type {
-        font-size: 10px;
-        opacity: 0.7;
-        text-transform: uppercase;
-      }
-
-      .stats {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-
-      .stat-card {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        padding: 10px;
-        text-align: center;
-      }
-
-      .stat-number {
-        font-size: 18px;
-        font-weight: 700;
-        margin-bottom: 4px;
-      }
-
-      .stat-label {
-        font-size: 11px;
-        opacity: 0.8;
-      }
-
-      .empty-state {
-        text-align: center;
-        opacity: 0.7;
-        font-size: 12px;
-        padding: 12px;
-      }
-
-      .scroll-container {
-        overflow-y: auto;
-        /* overflow-x: hidden; */
-      }
-
-      .scroll-container::-webkit-scrollbar {
-        width: 4px;
-      }
-
-      .scroll-container::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 2px;
-      }
-
-      .scroll-container::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 2px;
-      }
-
-      /* Scroll snap for rules list */
-      #modeSettingsSection .scroll-container {
-        scroll-snap-type: y mandatory;
-        scroll-padding: 0;
-      }
-
-      #modeSettingsSection .rule-item {
-        scroll-snap-align: start;
-        scroll-snap-stop: always;
-      }
-
-      .flex-row {
-        display: flex;
-        gap: 6px;
-      }
-
-      /* Tab Navigation Styles */
-      .content-area {
-        flex: 1;
-        overflow-y: auto;
-        padding: 12px 16px;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        /* justify-content: safe center; */
-      }
-
-      .tab-content {
-        display: none;
-        text-align: center;
-        animation: fadeIn 0.3s ease;
-        /* padding-top: 8px;
-        padding-bottom: 12px; */
-      }
-
-      .tab-content.active {
-        display: block;
-      }
-
-      .tab-navigation {
-        display: flex;
-        justify-content: space-around;
-        background: rgba(255, 255, 255, 0.1);
-        padding: 12px 16px;
-        gap: 4px;
-        backdrop-filter: blur(10px);
-        flex-shrink: 0;
-      }
-
-      #tab-stats .section {
-        padding: 12px;
-      }
-
-      .tab-btn {
-        flex: 1;
-        background: transparent;
-        border: none;
-        color: rgba(255, 255, 255, 0.6);
-        padding: 8px 4px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 10px;
-        font-family: inherit;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-      }
-
-      .tab-btn i {
-        font-size: 16px;
-      }
-
-      .tab-btn span {
-        font-size: 10px;
-      }
-
-      .tab-btn:hover {
-        background: rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.9);
-      }
-
-      .tab-btn.active {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-
-      /* Mode Item Styles */
-      .rule-set-item {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        padding: 10px;
-        margin-bottom: 8px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: all 0.3s ease;
-      }
-
-      .rule-set-item:last-child {
-        margin-bottom: 0;
-      }
-
-      /* .rule-set-item:hover {
-        background: rgba(255, 255, 255, 0.2);
-        opacity: 0.95;
-        cursor: pointer;
-      } */
-
-      .rule-set-info {
-        flex: 1;
-        text-align: left;
-        min-width: 0;
-        overflow: hidden;
-      }
-
-      .rule-set-name {
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 4px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .rule-set-details {
-        font-size: 11px;
-        opacity: 0.7;
-      }
-
-      /* Session Item Styles */
-      .session-item {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        padding: 10px;
-        margin-bottom: 8px;
-      }
-
-      .session-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 4px;
-      }
-
-      .session-date {
-        font-size: 12px;
-        font-weight: 600;
-      }
-
-      .session-duration {
-        font-size: 12px;
-        font-weight: 500;
-      }
-
-      .session-details {
-        font-size: 11px;
-        opacity: 0.7;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      /* Fade in animation */
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      /* Theme Personalization Styles */
-      .theme-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-      }
-
-      .theme-option {
-        background: rgba(255, 255, 255, 0.1);
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        border-radius: 8px;
-        padding: 8px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 6px;
-        color: white;
-        font-size: 11px;
-        font-weight: 500;
-      }
-
-      .theme-option:hover {
-        background: rgba(255, 255, 255, 0.15);
-        transform: translateY(-2px);
-      }
-
-      .theme-option.active {
-        border-color: white;
-        background: rgba(255, 255, 255, 0.2);
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-      }
-
-      .theme-preview {
-        width: 100%;
-        height: 40px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-      }
-
-      .block-page-preview {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-        padding: 20px;
-        text-align: center;
-        border: 2px dashed rgba(255, 255, 255, 0.3);
-        min-height: 80px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .preview-content h2 {
-        font-size: 16px;
-        margin-bottom: 8px;
-        font-weight: 600;
-      }
-
-      .preview-content p {
-        font-size: 12px;
-        opacity: 0.9;
-        margin: 0;
-      }
-
-      .all-view-btn {
-        height: 33px;
-        width: 33.3%;
-        font-size: 13px !important;
-      }
-
-      /* Theme-specific body backgrounds */
-      body.theme-blue {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      }
-
-      body.theme-red {
-        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-      }
-
-      body.theme-blackwhite {
-        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-      }
-
-      body.theme-orange {
-        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
-      }
-
-      body.theme-purple {
-        background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
-      }
-
-      body.theme-teal {
-        background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
-      }
-
-      /* Toggle Switch Styles */
-      #grayscaleToggle:checked + span,
-      #modeGrayscaleToggle:checked + span,
-      #modePomodoroToggle:checked + span,
-      #modeGrayscaleToggleView:checked + span,
-      #modePomodoroToggleView:checked + span {
-        background-color: rgba(46, 204, 113, 0.5) !important;
-        border-color: #2ecc71 !important;
-      }
-
-      #grayscaleToggle:checked + span + span,
-      #modeGrayscaleToggle:checked + span + span,
-      #modePomodoroToggle:checked + span + span,
-      #modeGrayscaleToggleView:checked + span + span,
-      #modePomodoroToggleView:checked + span + span {
-        transform: translateX(22px);
-      }
-
-      /* Block Page Settings Navigation */
-      #theme-main-view,
-      #block-page-settings-view {
-        animation: fadeIn 0.3s ease;
-      }
-
-      #backToThemeBtn {
-        padding: 6px 10px;
-      }
-
-      /* ACTIVE/INACTIVE BUTTONS */
-      .btn.active {
-        background: rgba(46, 204, 113, 0.3);
-        border-color: rgba(46, 204, 113, 0.5);
-      }
-
-      .btn.active:hover {
-        background: rgba(231, 76, 60, 0.3) !important;
-        border-color: rgba(231, 76, 60, 0.5) !important;
-      }
-
-      .btn.active:hover i::before {
-        content: "\f623" !important; /* bi-x-circle-fill */
-      }
-
-      .btn.inactive {
-        background: rgba(52, 152, 219, 0.3);
-        border-color: rgba(52, 152, 219, 0.5);
-      }
-    </style>
+    <link rel="stylesheet" href="popup.css" />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
@@ -860,7 +130,7 @@
               style="
                 display: none;
                 margin-top: 8px;
-                font-size: 11px;
+                font-size: 10.5px;
                 text-align: center;
                 opacity: 0.8;
               "
@@ -925,7 +195,7 @@
             </div>
           </div>
 
-          <div class="" style="display: flex; gap: 8px">
+          <div>
             <button
               id="viewSessionHistoryBtn"
               class="btn btn-primary"
@@ -1627,13 +897,12 @@
               </button>
             </div>
           </div>
-
           <button
             id="openBlockPageSettingsBtn"
             class="btn btn-primary"
             style="width: 100%"
           >
-            🚫 Personalize Block Page <i class="bi bi-arrow-right"></i>
+            🚫 Open Block Page Studio <i class="bi bi-arrow-right"></i>
           </button>
         </div>
 
@@ -1649,55 +918,164 @@
                 <i class="bi bi-arrow-left"></i>
               </button>
               <span>🚫 Block Page Settings</span>
-            </div>
-
-            <div class="input-group">
-              <input
-                type="text"
-                id="blockPageTitle"
-                placeholder="Block page title"
-                value="🎯 Stay Focused!"
-              />
-            </div>
-
-            <div class="input-group" style="margin-bottom: 0">
-              <input
-                type="text"
-                id="blockPageMessage"
-                placeholder="Block page message"
-                value="This site is blocked during your focus session."
-              />
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">
-              <span>👁️ Preview</span>
               <button
                 id="resetPersonalizationBtn"
                 class="btn btn-xsmall btn-squared btn-danger"
-                title="Reset to Defaults"
+                title="Reset Block Page"
+                style="margin-left: auto"
               >
                 <i class="bi bi-arrow-counterclockwise"></i>
               </button>
             </div>
-            <div class="block-page-preview" id="blockPagePreview">
-              <div class="preview-content">
-                <h2 id="previewTitle">🎯 Stay Focused!</h2>
-                <p id="previewMessage">
-                  This site is blocked during your focus session.
-                </p>
+
+            <div class="field-stack">
+              <label for="blockPageTitle">Main title</label>
+              <input
+                type="text"
+                id="blockPageTitle"
+                placeholder="Block page title"
+                value="🎯 Stay Focused"
+              />
+            </div>
+
+            <div class="field-stack">
+              <label for="blockPageMessage">Supporting message</label>
+              <textarea
+                id="blockPageMessage"
+                placeholder="Explain why the site is blocked"
+              >
+This site is blocked during your focus session</textarea
+              >
+            </div>
+
+            <div class="field-stack" style="margin-bottom: 0">
+              <div class="color-selector-row">
+                <div class="color-selector">
+                  <label class="color-selector-title">Primary overlay</label>
+                  <input
+                    type="color"
+                    id="blockPagePrimaryColor"
+                    class="color-square-input"
+                    value="#667eea"
+                  />
+                  <div
+                    id="blockPagePrimaryColorDisplay"
+                    class="color-code-display"
+                    title="Double-click to edit"
+                  >
+                    #667eea
+                  </div>
+                  <input
+                    type="text"
+                    id="blockPagePrimaryColorText"
+                    class="color-code-input"
+                    placeholder="#667eea"
+                    value="#667eea"
+                    style="display: none"
+                  />
+                </div>
+                <div class="color-selector">
+                  <label class="color-selector-title">Accent color</label>
+                  <input
+                    type="color"
+                    id="blockPageAccentColor"
+                    class="color-square-input"
+                    value="#2ecc71"
+                  />
+                  <div
+                    id="blockPageAccentColorDisplay"
+                    class="color-code-display"
+                    title="Double-click to edit"
+                  >
+                    #2ecc71
+                  </div>
+                  <input
+                    type="text"
+                    id="blockPageAccentColorText"
+                    class="color-code-input"
+                    placeholder="#2ecc71"
+                    value="#2ecc71"
+                    style="display: none"
+                  />
+                </div>
               </div>
             </div>
+
+            <div class="field-stack">
+              <label for="blockPageImage">Background image URL</label>
+              <div class="image-source-actions">
+                <button
+                  type="button"
+                  id="useBackgroundImageUrlBtn"
+                  class="btn btn-primary"
+                >
+                  Use URL
+                </button>
+                <button
+                  type="button"
+                  id="importBackgroundImageBtn"
+                  class="btn btn-primary"
+                >
+                  Import File
+                </button>
+              </div>
+              <div class="conditional-image-controls">
+                <div
+                  class="image-url-row"
+                  id="blockPageImageUrlRow"
+                  style="display: none"
+                >
+                  <input
+                    type="url"
+                    id="blockPageImage"
+                    placeholder="https://images.example.com/focus-wallpaper.jpg"
+                  />
+                  <button
+                    type="button"
+                    id="confirmBackgroundImageUrlBtn"
+                    class="btn btn-success"
+                    title="Confirm image URL"
+                  >
+                    <i class="bi bi-check-lg"></i>
+                  </button>
+                </div>
+                <div class="image-status-row">
+                  <small
+                    id="blockPageImageStatus"
+                    class="image-status-text"
+                    title="No background image applied."
+                  >
+                    No background image applied.
+                  </small>
+                  <button
+                    type="button"
+                    id="removeBackgroundImageBtn"
+                    class="btn btn-danger btn-small btn-squared"
+                    style="display: none"
+                    title="Remove image"
+                  >
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <input
+                type="file"
+                id="blockPageImageFileInput"
+                accept="image/*"
+                style="display: none"
+              />
+            </div>
+
+            <label class="inline-toggle" for="blockPageShowQuotes">
+              <span>Show motivational quotes</span>
+              <input type="checkbox" id="blockPageShowQuotes" checked />
+            </label>
+            <label class="inline-toggle" for="blockPageShowActionButtons">
+              <span>Show Allow Once and Add Exception</span>
+              <input type="checkbox" id="blockPageShowActionButtons" checked />
+            </label>
           </div>
 
-          <button
-            id="savePersonalizationBtn"
-            class="btn btn-success"
-            style="width: 100%"
-          >
-            Save Personalization <i class="bi bi-check-circle"></i>
-          </button>
         </div>
       </div>
 
