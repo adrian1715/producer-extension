@@ -1,6 +1,7 @@
 class ProducerBackground {
   constructor() {
     this.rules = [];
+    this.permanentRules = []; // Always-blocked rules, independent of focus mode
     this.isActive = false;
     this.sessionBlocks = 0;
     this.sessionStartTime = null;
@@ -91,6 +92,7 @@ class ProducerBackground {
         "sessionBlocks",
         "sessionStartTime",
         "focusedTime",
+        "permanentRules",
       ]);
 
       // Load rules from active rule set if using new structure
@@ -115,6 +117,7 @@ class ProducerBackground {
       this.sessionBlocks = data.sessionBlocks || 0;
       this.sessionStartTime = data.sessionStartTime || null;
       this.focusedTime = data.focusedTime || 0;
+      this.permanentRules = data.permanentRules || [];
 
       // Make the session base reflect the persisted focused total
       this.focusedTimeBase = this.focusedTime;
@@ -149,12 +152,27 @@ class ProducerBackground {
     if (this.listenersSetup) return;
     this.listenersSetup = true;
 
+    // Keep permanent rules in sync when storage changes (e.g. written by popup)
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === "local" && changes.permanentRules) {
+        this.permanentRules = changes.permanentRules.newValue || [];
+      }
+    });
+
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.action === "reloadAffectedTabs") {
-        const { rulesBefore, rulesAfter, isActiveBefore, isActiveAfter } =
-          message;
+        const {
+          rulesBefore,
+          rulesAfter,
+          isActiveBefore,
+          isActiveAfter,
+          permanentRulesBefore,
+          permanentRulesAfter,
+        } = message;
         const isDeactivatingFocusMode = isActiveBefore && !isActiveAfter;
+        const permBefore = permanentRulesBefore !== undefined ? permanentRulesBefore : this.permanentRules;
+        const permAfter = permanentRulesAfter !== undefined ? permanentRulesAfter : this.permanentRules;
 
         chrome.tabs.query({}, (tabs) => {
           tabs.forEach((tab) => {
@@ -167,34 +185,34 @@ class ProducerBackground {
             )
               return;
 
-            // Check block status before and after
+            // Check block status before and after (accounting for permanent rules)
             const wasBlocked = this.shouldBlockUrlWith(
               rulesBefore,
               isActiveBefore,
               tab.url,
+              permBefore,
             );
             const isBlocked = this.shouldBlockUrlWith(
               rulesAfter,
               isActiveAfter,
               tab.url,
+              permAfter,
             );
 
             // Reload only if the status changes
             if (wasBlocked !== isBlocked) {
-              if (isDeactivatingFocusMode) {
-                // On focus-mode deactivation, only force-refresh tabs that are
-                // actually showing Producer's blocked page.
-                if (!isProducerBlockedPage) return;
-
-                const originalBlockedUrl = this.getBlockedPageOriginalUrl(
-                  tab.url,
-                );
+              if (!isBlocked && isProducerBlockedPage) {
+                // URL is now unblocked — navigate blocked tabs to their original URL
+                const originalBlockedUrl = this.getBlockedPageOriginalUrl(tab.url);
                 if (originalBlockedUrl) {
                   chrome.tabs.update(tab.id, { url: originalBlockedUrl });
                   return;
                 }
               }
-
+              if (isDeactivatingFocusMode && !isProducerBlockedPage) {
+                // On focus-mode deactivation skip non-blocked pages
+                return;
+              }
               chrome.tabs.reload(tab.id);
             }
           });
@@ -971,9 +989,20 @@ class ProducerBackground {
   }
 
   shouldBlockUrl(url) {
-    if (!this.isActive || !url) return false;
+    if (!url) return false;
 
     const cleanUrl = this.cleanUrl(url);
+
+    // Permanent rules always apply, regardless of whether focus mode is active
+    if (this.permanentRules && this.permanentRules.length > 0) {
+      for (const rule of this.permanentRules) {
+        if (this.matchesRule(cleanUrl, rule)) {
+          return true;
+        }
+      }
+    }
+
+    if (!this.isActive) return false;
 
     // Check regular allow rules first (they take precedence)
     const allowRules = this.rules.filter((rule) => rule.type === "allow");
@@ -1013,16 +1042,19 @@ class ProducerBackground {
   }
 
   // To check if the URL should be refreshed or not
-  shouldBlockUrlWith(rules, isActive, url) {
+  shouldBlockUrlWith(rules, isActive, url, permanentRules = this.permanentRules) {
     const oldRules = this.rules;
     const oldIsActive = this.isActive;
+    const oldPermanentRules = this.permanentRules;
 
     this.rules = rules;
     this.isActive = isActive;
+    this.permanentRules = permanentRules;
     const result = this.shouldBlockUrl(url);
 
     this.rules = oldRules;
     this.isActive = oldIsActive;
+    this.permanentRules = oldPermanentRules;
     return result;
   }
 

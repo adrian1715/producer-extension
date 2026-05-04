@@ -1331,6 +1331,7 @@ class ProducerPopup {
         sessionBlocks: this.sessionBlocks,
         focusedTime: this.focusedTime,
         grayscaleEnabled: grayscaleEnabled, // Save for content script initialization
+        permanentRules: this.getAllPermanentRules(),
       });
 
       // Get active rule set's rules
@@ -2240,6 +2241,22 @@ class ProducerPopup {
       });
 
       item.appendChild(info);
+
+      if (rule.type === "domain" || rule.type === "url") {
+        if (rule.permanent) item.classList.add("rule-permanent");
+        const permanentBtn = document.createElement("button");
+        permanentBtn.className = `btn btn-xsmall btn-squared btn-permanent${rule.permanent ? " active" : ""}`;
+        permanentBtn.textContent = "🔒";
+        permanentBtn.title = rule.permanent
+          ? "Permanent (always active)"
+          : "Make rule permanent (stay active even without focus mode)";
+        permanentBtn.style.marginLeft = "4px";
+        permanentBtn.addEventListener("click", () => {
+          this.toggleRulePermanent(rule.id, this.currentEditingRuleSetId);
+        });
+        item.appendChild(permanentBtn);
+      }
+
       item.appendChild(removeBtn);
       this.rulesList.appendChild(item);
     });
@@ -2583,6 +2600,62 @@ class ProducerPopup {
     if (!activeRuleSetId || !customModes) return [];
     const ruleSet = customModes.find((rs) => rs.id === activeRuleSetId);
     return ruleSet ? ruleSet.rules : [];
+  }
+
+  getAllPermanentRules() {
+    const permanentRules = [];
+    this.customModes.forEach((mode) => {
+      mode.rules.forEach((rule) => {
+        if (rule.permanent && (rule.type === "domain" || rule.type === "url")) {
+          permanentRules.push({ ...rule });
+        }
+      });
+    });
+    return permanentRules;
+  }
+
+  toggleRulePermanent(ruleId, ruleSetId) {
+    const ruleSet = this.customModes.find((rs) => rs.id === ruleSetId);
+    if (!ruleSet) return;
+    const rule = ruleSet.rules.find((r) => r.id === ruleId);
+    if (!rule || (rule.type !== "domain" && rule.type !== "url")) return;
+
+    const permanentRulesBefore = this.getAllPermanentRules();
+    const newPermanent = !rule.permanent;
+
+    // Apply the same permanent flag to every rule across all modes that
+    // shares the same type and URL (so modes stay in sync)
+    this.customModes.forEach((mode) => {
+      mode.rules.forEach((r) => {
+        if (r.type === rule.type && r.url === rule.url) {
+          r.permanent = newPermanent;
+        }
+      });
+    });
+
+    const permanentRulesAfter = this.getAllPermanentRules();
+
+    chrome.storage.local.set({
+      customModes: this.customModes,
+      permanentRules: permanentRulesAfter,
+    });
+
+    const activeRules = this.getActiveRules();
+    chrome.runtime.sendMessage({
+      action: "reloadAffectedTabs",
+      rulesBefore: activeRules,
+      rulesAfter: activeRules,
+      isActiveBefore: this.isActive,
+      isActiveAfter: this.isActive,
+      permanentRulesBefore,
+      permanentRulesAfter,
+    });
+
+    this.renderRulesList();
+    this.renderAllRulesList();
+    this.showNotification(
+      newPermanent ? "Rule is now permanent" : "Rule is no longer permanent",
+    );
   }
 
   // Custom rule set management methods
@@ -3011,6 +3084,22 @@ class ProducerPopup {
       });
 
       item.appendChild(info);
+
+      if (rule.type === "domain" || rule.type === "url") {
+        if (rule.permanent) item.classList.add("rule-permanent");
+        const permanentBtn = document.createElement("button");
+        permanentBtn.className = `btn btn-xsmall btn-squared btn-permanent${rule.permanent ? " active" : ""}`;
+        permanentBtn.textContent = "🔒";
+        permanentBtn.title = rule.permanent
+          ? "Permanent — always blocked (click to disable)"
+          : "Make permanent — stay blocked even without focus mode";
+        permanentBtn.style.marginLeft = "4px";
+        permanentBtn.addEventListener("click", () => {
+          this.toggleRulePermanent(rule.id, this.currentEditingRuleSetId);
+        });
+        item.appendChild(permanentBtn);
+      }
+
       item.appendChild(removeBtn);
       this.allRulesList.appendChild(item);
     });
