@@ -152,10 +152,16 @@ class ProducerBackground {
     if (this.listenersSetup) return;
     this.listenersSetup = true;
 
-    // Keep permanent rules in sync when storage changes (e.g. written by popup)
+    // Keep in-memory state aligned with popup writes when sessions switch/reset.
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === "local" && changes.permanentRules) {
+      if (areaName !== "local") return;
+
+      if (changes.permanentRules) {
         this.permanentRules = changes.permanentRules.newValue || [];
+      }
+
+      if (changes.sessionBlocks) {
+        this.sessionBlocks = changes.sessionBlocks.newValue || 0;
       }
     });
 
@@ -174,6 +180,12 @@ class ProducerBackground {
         const permBefore = permanentRulesBefore !== undefined ? permanentRulesBefore : this.permanentRules;
         const permAfter = permanentRulesAfter !== undefined ? permanentRulesAfter : this.permanentRules;
 
+        // Sync in-memory permanent rules before tabs are reloaded so that
+        // content.js checkBlock calls after navigation see the updated state.
+        if (permanentRulesAfter !== undefined) {
+          this.permanentRules = permanentRulesAfter;
+        }
+
         chrome.tabs.query({}, (tabs) => {
           tabs.forEach((tab) => {
             const isProducerBlockedPage = this.isProducerBlockedPageUrl(tab.url);
@@ -185,21 +197,27 @@ class ProducerBackground {
             )
               return;
 
+            // Blocked tabs show blocked.html — check the original URL, not the
+            // extension URL, so the before/after comparison works correctly.
+            const urlToCheck = isProducerBlockedPage
+              ? (this.getBlockedPageOriginalUrl(tab.url) || tab.url)
+              : tab.url;
+
             // Check block status before and after (accounting for permanent rules)
             const wasBlocked = this.shouldBlockUrlWith(
               rulesBefore,
               isActiveBefore,
-              tab.url,
+              urlToCheck,
               permBefore,
             );
             const isBlocked = this.shouldBlockUrlWith(
               rulesAfter,
               isActiveAfter,
-              tab.url,
+              urlToCheck,
               permAfter,
             );
 
-            // Reload only if the status changes
+            // Reload only if the blocked/unblocked status changes
             if (wasBlocked !== isBlocked) {
               if (!isBlocked && isProducerBlockedPage) {
                 // URL is now unblocked — navigate blocked tabs to their original URL
@@ -214,6 +232,18 @@ class ProducerBackground {
                 return;
               }
               chrome.tabs.reload(tab.id);
+            } else if (wasBlocked && isBlocked && isProducerBlockedPage) {
+              // Site remains blocked but permanent status may have changed —
+              // tell the blocked page to update its UI without a reload.
+              const cleanUrl = this.cleanUrl(urlToCheck);
+              const wasPermanent = permBefore.some((r) => this.matchesRule(cleanUrl, r));
+              const isPermanentNow = permAfter.some((r) => this.matchesRule(cleanUrl, r));
+              if (wasPermanent !== isPermanentNow) {
+                chrome.tabs.sendMessage(tab.id, {
+                  action: "updatePermanentStatus",
+                  isPermanent: isPermanentNow,
+                }).catch(() => {});
+              }
             }
           });
         });
@@ -580,6 +610,10 @@ class ProducerBackground {
 
   async handleMessage(message, sender, sendResponse) {
     switch (message.action) {
+      case "ping":
+        sendResponse({ ok: true });
+        break;
+
       case "updateRules":
         this.rules = message.rules;
         this.isActive = message.isActive;
@@ -734,16 +768,30 @@ class ProducerBackground {
         // Check if URL is temporarily allowed (Allow Once)
         if (this.temporaryAllowedUrls.has(message.url)) {
           this.temporaryAllowedUrls.delete(message.url);
-          sendResponse({ shouldBlock: false });
+          sendResponse({ shouldBlock: false, isPermanent: false });
           break;
         }
 
         const shouldBlock = this.shouldBlockUrl(message.url);
-        sendResponse({ shouldBlock });
+        const cleanedUrl = this.cleanUrl(message.url);
+        const isPermanent = shouldBlock && !!(
+          this.permanentRules &&
+          this.permanentRules.some((r) => this.matchesRule(cleanedUrl, r))
+        );
+        sendResponse({ shouldBlock, isPermanent });
         break;
       }
 
       case "reportBlock":
+        // Refresh from storage first so a newly created/activated session
+        // starts from its own persisted counter, not stale worker memory.
+        try {
+          const data = await chrome.storage.local.get(["sessionBlocks"]);
+          this.sessionBlocks = data.sessionBlocks || 0;
+        } catch (error) {
+          console.warn("Failed to refresh session block counter:", error);
+        }
+
         // Only increment counter if focus mode is active
         if (this.isActive) {
           this.sessionBlocks++;
@@ -759,12 +807,20 @@ class ProducerBackground {
         let blockedPageUrl = null;
         if (message.url) {
           try {
+            const cleanedForCheck = this.cleanUrl(message.url);
+            const isPermanent = !!(
+              this.permanentRules &&
+              this.permanentRules.some((r) =>
+                this.matchesRule(cleanedForCheck, r),
+              )
+            );
             const blockedUrl = new URL(this.blockedPageUrlPrefix);
             blockedUrl.searchParams.set("blockedUrl", message.url);
             blockedUrl.searchParams.set(
               "blockNumber",
-              String(this.sessionBlocks),
+              String(Math.max(1, this.sessionBlocks)),
             );
+            blockedUrl.searchParams.set("isPermanent", isPermanent ? "1" : "0");
             if (sender.tab && sender.tab.favIconUrl) {
               blockedUrl.searchParams.set(
                 "originalFavIcon",
@@ -778,7 +834,7 @@ class ProducerBackground {
         }
         // Return the current block number
         sendResponse({
-          blockNumber: this.sessionBlocks,
+          blockNumber: Math.max(1, this.sessionBlocks),
           blockedPageUrl,
         });
         break;
@@ -865,43 +921,50 @@ class ProducerBackground {
         break;
       }
 
-      case "countCurrentlyBlockedTabs":
-        // Count all currently open tabs that would be blocked
-        chrome.tabs.query({}, async (tabs) => {
-          let blockedCount = 0;
+      case "removePermanentRule": {
+        if (!message.url) {
+          sendResponse({ success: false, error: "No URL provided" });
+          break;
+        }
+        try {
+          const data = await chrome.storage.local.get(["permanentRules", "customModes"]);
+          const permanentRules = data.permanentRules || [];
+          const customModes = data.customModes || [];
+          const cleanUrl = this.cleanUrl(message.url);
 
-          tabs.forEach((tab) => {
-            // Skip chrome:// and extension:// URLs
-            if (
-              !tab.url ||
-              tab.url.startsWith("chrome://") ||
-              tab.url.startsWith("chrome-extension://")
-            ) {
-              return;
-            }
+          const newPermanentRules = permanentRules.filter(
+            (rule) => !this.matchesRule(cleanUrl, rule),
+          );
 
-            // Check if this tab would be blocked
-            if (this.shouldBlockUrl(tab.url)) {
-              blockedCount++;
-            }
+          if (newPermanentRules.length === permanentRules.length) {
+            sendResponse({ success: false, error: "No matching permanent rule found" });
+            break;
+          }
+
+          // Unset the permanent flag on matching rules across all modes so the
+          // popup's rules list reflects the change when next opened.
+          customModes.forEach((mode) => {
+            mode.rules.forEach((rule) => {
+              if (rule.permanent && this.matchesRule(cleanUrl, rule)) {
+                rule.permanent = false;
+              }
+            });
           });
 
-          // Get current session blocks from storage (source of truth)
-          const data = await chrome.storage.local.get(["sessionBlocks"]);
-          const currentSessionBlocks = data.sessionBlocks || 0;
+          this.permanentRules = newPermanentRules;
+          await chrome.storage.local.set({ permanentRules: newPermanentRules, customModes });
+          sendResponse({ success: true });
+        } catch (error) {
+          sendResponse({ success: false, error: error.message });
+        }
+        break;
+      }
 
-          // Add to session blocks counter
-          const newTotal = currentSessionBlocks + blockedCount;
-          this.sessionBlocks = newTotal;
-          chrome.storage.local.set({ sessionBlocks: newTotal });
-
-          // Notify popup with updated count
-          this.notifyPopup("updateBlockCount", { count: newTotal });
-
-          // Send response back
-          sendResponse({ blockedCount, totalCount: newTotal });
-        });
-        return true; // Keep message channel open for async response
+      case "countCurrentlyBlockedTabs":
+        // Legacy message kept for compatibility. Session counters now only track
+        // fresh blocked accesses, never pre-existing blocked tabs.
+        sendResponse({ blockedCount: 0, totalCount: this.sessionBlocks });
+        break;
 
       case "getMotivationalQuote":
         this.fetchMotivationalQuote()

@@ -2,8 +2,12 @@ class ProducerBlockedPage {
   constructor() {
     const params = new URLSearchParams(window.location.search);
     this.blockedUrl = params.get("blockedUrl") || "";
-    this.blockNumber = parseInt(params.get("blockNumber") || "0", 10) || 0;
+    const parsedBlockNumber = parseInt(params.get("blockNumber") || "1", 10);
+    this.blockNumber = Number.isFinite(parsedBlockNumber)
+      ? Math.max(1, parsedBlockNumber)
+      : 1;
     this.originalFavIcon = params.get("originalFavIcon") || "";
+    this.isPermanent = params.get("isPermanent") === "1";
     this.statsInterval = null;
     this.unblockCheckInterval = null;
     this.lastKnownBlockState = true;
@@ -107,6 +111,7 @@ class ProducerBlockedPage {
       "blockPagePrimaryColor",
       "blockPageAccentColor",
       "blockPageShowActionButtons",
+      "isActive",
     ]);
 
     const currentTheme = this.themeStyles[data.theme] || this.themeStyles.blue;
@@ -150,6 +155,7 @@ class ProducerBlockedPage {
     const closeBtn = document.getElementById("close-btn");
     const allowOnceBtn = document.getElementById("allow-once-btn");
     const addExceptionBtn = document.getElementById("add-exception-btn");
+    const undoPermanentRuleBtn = document.getElementById("undo-permanent-rule-btn");
     const warningButtons = document.querySelectorAll(".btn-warning");
     const utilityActions = allowOnceBtn?.parentElement || null;
     const showActionButtons =
@@ -173,7 +179,12 @@ class ProducerBlockedPage {
     }
     if (blockNumberEl) {
       blockNumberEl.textContent = `Block #${this.blockNumber}`;
+      blockNumberEl.style.display = this.isPermanent ? "none" : "";
     }
+    if (addExceptionBtn)
+      addExceptionBtn.style.display = this.isPermanent ? "none" : "";
+    if (undoPermanentRuleBtn)
+      undoPermanentRuleBtn.style.display = this.isPermanent ? "" : "none";
     if (blockedUrlEl) {
       const displayUrl = this.truncateUrl(this.blockedUrl);
       blockedUrlEl.textContent = displayUrl;
@@ -189,6 +200,7 @@ class ProducerBlockedPage {
     }
     if (statsEl) {
       statsEl.style.background = this.hexToRgba(primaryColor, 0.12);
+      statsEl.style.display = this.isPermanent ? "none" : "";
     }
     if (iconEl) {
       iconEl.style.textShadow = `0 0 24px ${this.hexToRgba(accentColor, 0.45)}`;
@@ -353,6 +365,19 @@ class ProducerBlockedPage {
     this.statsInterval = null;
   }
 
+  updateBlockTypeUI() {
+    const show = this.isPermanent ? "none" : "";
+    const hide = this.isPermanent ? "" : "none";
+    const addExceptionBtn = document.getElementById("add-exception-btn");
+    const undoPermanentRuleBtn = document.getElementById("undo-permanent-rule-btn");
+    const blockNumberEl = document.getElementById("blockNumber");
+    const statsEl = document.querySelector(".stats");
+    if (addExceptionBtn) addExceptionBtn.style.display = show;
+    if (undoPermanentRuleBtn) undoPermanentRuleBtn.style.display = hide;
+    if (blockNumberEl) blockNumberEl.style.display = show;
+    if (statsEl) statsEl.style.display = show;
+  }
+
   async checkStillBlocked() {
     if (!this.blockedUrl) return;
     try {
@@ -364,6 +389,12 @@ class ProducerBlockedPage {
       this.lastKnownBlockState = shouldBlock;
       if (!shouldBlock) {
         this.navigateToOriginalUrl();
+      } else if (response?.isPermanent !== undefined) {
+        const wasPermanent = this.isPermanent;
+        this.isPermanent = !!response.isPermanent;
+        if (this.isPermanent !== wasPermanent) {
+          this.updateBlockTypeUI();
+        }
       }
     } catch (error) {
       // If background is temporarily unavailable, keep page and retry.
@@ -375,6 +406,16 @@ class ProducerBlockedPage {
       this.checkStillBlocked();
     }, 2000);
 
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.action === "updatePermanentStatus") {
+        const wasPermanent = this.isPermanent;
+        this.isPermanent = !!message.isPermanent;
+        if (this.isPermanent !== wasPermanent) {
+          this.updateBlockTypeUI();
+        }
+      }
+    });
+
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
       if (
@@ -382,9 +423,19 @@ class ProducerBlockedPage {
         changes.activeRuleSetId ||
         changes.customModes ||
         changes.customRules ||
-        changes.rules
+        changes.rules ||
+        changes.permanentRules
       ) {
         this.checkStillBlocked();
+      }
+      if (changes.isActive) {
+        this.applyThemeAndText();
+        if (changes.isActive.newValue) {
+          this.updateFocusedTime();
+          this.startStatsPolling();
+        } else {
+          this.stopStatsPolling();
+        }
       }
       if (
         changes.theme ||
@@ -407,6 +458,7 @@ class ProducerBlockedPage {
     const closeBtn = document.getElementById("close-btn");
     const allowOnceBtn = document.getElementById("allow-once-btn");
     const addExceptionBtn = document.getElementById("add-exception-btn");
+    const undoPermanentRuleBtn = document.getElementById("undo-permanent-rule-btn");
 
     backBtn?.addEventListener("click", () => {
       history.back();
@@ -450,28 +502,57 @@ class ProducerBlockedPage {
         // ignore
       }
     });
+
+    undoPermanentRuleBtn?.addEventListener("click", async () => {
+      if (!this.blockedUrl) return;
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: "removePermanentRule",
+          url: this.blockedUrl,
+        });
+        if (response && response.success) {
+          // Let checkStillBlocked decide: if still blocked by focus mode, switch
+          // to the focus block UI in place; if fully unblocked, navigate away.
+          await this.checkStillBlocked();
+        }
+      } catch (err) {
+        // ignore
+      }
+    });
   }
 
   setupVisibilityHandler() {
-    document.addEventListener("visibilitychange", () => {
+    document.addEventListener("visibilitychange", async () => {
       if (document.visibilityState === "visible") {
-        this.updateFocusedTime();
+        const { isActive } = await chrome.storage.local.get(["isActive"]);
+        if (isActive) this.updateFocusedTime();
         this.checkStillBlocked();
       }
     });
   }
 
   async init() {
-    this.applyOriginalFavicon();
-    await this.applyThemeAndText();
-    await this.loadMotivationalQuote();
+    // Set up interactions and polling immediately — before any async work —
+    // so buttons respond and the service worker stays alive from the first tick.
     this.setupActions();
     this.setupVisibilityHandler();
     this.startUnblockWatcher();
 
-    await this.updateFocusedTime();
+    // Proactively wake the service worker so the first button click is instant.
+    chrome.runtime.sendMessage({ action: "ping" }).catch(() => {});
+
+    this.applyOriginalFavicon();
+    await this.applyThemeAndText();
+
+    // Load quote in the background — don't block setup on a network request.
+    this.loadMotivationalQuote();
+
+    const { isActive } = await chrome.storage.local.get(["isActive"]);
+    if (isActive) {
+      await this.updateFocusedTime();
+      this.startStatsPolling();
+    }
     await this.checkStillBlocked();
-    this.startStatsPolling();
   }
 }
 

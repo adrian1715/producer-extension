@@ -1515,10 +1515,7 @@ class ProducerPopup {
         focusedTime: sessionFocusedTime,
       });
 
-      // Count currently open blocked tabs and add to counter
-      chrome.runtime.sendMessage({
-        action: "countCurrentlyBlockedTabs",
-      });
+      // Block counter now tracks only fresh blocked accesses.
     } else {
       // Stopping focus session (pausing)
       this.stopTimerUpdates();

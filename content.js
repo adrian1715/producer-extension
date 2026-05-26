@@ -429,14 +429,24 @@ class ProducerContentScript {
     const urlToReport = blockedUrl || window.location.href;
 
     // Report the block to background script and get block number + redirect URL.
-    let blockNumber = 0;
+    let blockNumber = 1;
     let blockedPageUrl = null;
+    const navigationEntry = performance.getEntriesByType("navigation")[0];
+    const isReload =
+      navigationEntry && navigationEntry.type
+        ? navigationEntry.type === "reload"
+        : false;
     try {
       const response = await chrome.runtime.sendMessage({
         action: "reportBlock",
         url: urlToReport,
+        isReload,
       });
-      if (response && response.blockNumber) {
+      if (
+        response &&
+        Number.isFinite(response.blockNumber) &&
+        response.blockNumber >= 1
+      ) {
         blockNumber = response.blockNumber;
       }
       if (response && response.blockedPageUrl) {
