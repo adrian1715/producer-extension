@@ -291,7 +291,7 @@ i {
   display: flex;
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: 9px;
   align-items: center;
   gap: 8px;
 }
@@ -366,11 +366,11 @@ body.theme-teal select option {
 .rule-item {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 8px;
   margin-bottom: 6px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 4px;
 }
 
 .rule-info {
@@ -540,23 +540,17 @@ body.theme-teal select option {
 .rule-set-item {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 10px;
+  padding: 10px 8px 10px 4px;
   margin-bottom: 8px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 4px;
   transition: all 0.3s ease;
 }
 
 .rule-set-item:last-child {
   margin-bottom: 0;
 }
-
-/* .rule-set-item:hover {
-        background: rgba(255, 255, 255, 0.2);
-        opacity: 0.95;
-        cursor: pointer;
-      } */
 
 .rule-set-info {
   flex: 1;
@@ -583,7 +577,7 @@ body.theme-teal select option {
 .session-item {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 10px;
+  padding: 10px 8px 10px 4px;
   margin-bottom: 8px;
 }
 
@@ -1055,26 +1049,32 @@ body.theme-teal select option {
 /* Theme-specific body backgrounds */
 body.theme-blue {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --dropdown-bg: rgba(28, 26, 80, 0.97);
 }
 
 body.theme-red {
   background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  --dropdown-bg: rgba(75, 18, 15, 0.97);
 }
 
 body.theme-blackwhite {
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  --dropdown-bg: rgba(10, 10, 10, 0.97);
 }
 
 body.theme-orange {
   background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  --dropdown-bg: rgba(80, 42, 4, 0.97);
 }
 
 body.theme-purple {
   background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+  --dropdown-bg: rgba(52, 16, 72, 0.97);
 }
 
 body.theme-teal {
   background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+  --dropdown-bg: rgba(6, 62, 52, 0.97);
 }
 
 /* Toggle Switch Styles */
@@ -1103,6 +1103,148 @@ body.theme-teal {
 
 #backToThemeBtn {
   padding: 6px 10px;
+}
+
+/* Drag handle */
+.drag-handle {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  padding: 0 4px 0 2px;
+  opacity: 0.35;
+  flex-shrink: 0;
+  font-size: 15px;
+  transition: opacity 0.2s;
+  user-select: none;
+}
+
+.drag-handle:hover {
+  opacity: 0.75;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+  opacity: 1;
+}
+
+/* Three-dots menu button */
+.item-menu-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 7px 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
+  transition:
+    opacity 0.2s,
+    background 0.2s;
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.item-menu-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Select-mode button uses a circular icon; size it to the icon itself so the
+   hover/click area is exactly the circle, not a larger box around it */
+.mode-select-btn {
+  width: 1em;
+  height: 1em;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.mode-select-btn-selected {
+  color: rgba(46, 204, 113, 0.9);
+  opacity: 1;
+}
+
+.mode-select-btn-selected:hover {
+  background: transparent;
+  color: rgba(110, 231, 160, 1);
+}
+
+/* Dropdown wrapper (relative anchor) */
+.item-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Dropdown panel — position is set via JS (fixed, viewport-aware) */
+.item-dropdown {
+  z-index: 9999;
+  background: var(--dropdown-bg, rgba(25, 25, 55, 0.97));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  backdrop-filter: blur(12px);
+  min-width: 148px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  animation: fadeIn 0.12s ease;
+}
+
+/* Dropdown option row */
+.item-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: inherit;
+  font-weight: 500;
+  text-align: left;
+}
+
+.item-dropdown-option i {
+  font-size: 13px;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.item-dropdown-option:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.item-dropdown-option.danger {
+  color: rgba(231, 76, 60, 0.9);
+}
+
+.item-dropdown-option.danger:hover {
+  background: rgba(231, 76, 60, 0.2);
+}
+
+.item-dropdown-option.warning {
+  color: rgba(241, 196, 15, 0.9);
+}
+
+.item-dropdown-option.warning:hover {
+  background: rgba(241, 196, 15, 0.15);
+}
+
+/* Drag-and-drop visual feedback */
+.rule-set-item.is-dragging,
+.session-item.is-dragging {
+  opacity: 0.35;
+}
+
+.rule-set-item.drag-over,
+.session-item.drag-over {
+  outline: 2px dashed rgba(255, 255, 255, 0.55);
+  outline-offset: -2px;
 }
 
 /* ACTIVE/INACTIVE BUTTONS */

@@ -578,6 +578,16 @@ class ProducerPopup {
         this.createNewSession();
       });
     }
+
+    // Close any open item dropdown when clicking outside the trigger or dropdown
+    document.addEventListener("click", (e) => {
+      if (
+        !e.target.closest(".item-menu-wrap") &&
+        !e.target.closest(".item-dropdown")
+      ) {
+        document.querySelectorAll(".item-dropdown").forEach((d) => d.remove());
+      }
+    });
   }
 
   switchTab(tabName) {
@@ -717,6 +727,15 @@ class ProducerPopup {
       // Load session data
       this.sessions = data.sessions || [];
       this.currentSessionId = data.currentSessionId || null;
+
+      // One-time migration: sort sessions by lastActive descending
+      if (!data.sessionsSortMigrated && this.sessions.length > 1) {
+        this.sessions.sort((a, b) => (b.lastActive || 0) - (a.lastActive || 0));
+        chrome.storage.local.set({
+          sessions: this.sessions,
+          sessionsSortMigrated: true,
+        });
+      }
 
       // Load legacy session data for backward compatibility
       this.sessionHistory = data.sessionHistory || [];
@@ -1401,7 +1420,7 @@ class ProducerPopup {
       sessionPauseStartTime: now, // Start in paused/break state
     };
 
-    this.sessions.push(newSession);
+    this.sessions.unshift(newSession);
     this.currentSessionId = sessionId;
     this.sessionTime = 0;
 
@@ -1463,7 +1482,7 @@ class ProducerPopup {
           sessionPauseStartTime: null,
         };
 
-        this.sessions.push(newSession);
+        this.sessions.unshift(newSession);
         this.currentSessionId = sessionId;
         this.sessionTime = 0;
 
@@ -2177,12 +2196,10 @@ class ProducerPopup {
       return;
     }
 
-    // Reverse the rules array to show latest first (without mutating original)
-    const reversedRules = [...ruleSet.rules].reverse();
-
-    reversedRules.forEach((rule, reversedIndex) => {
+    [...ruleSet.rules].reverse().forEach((rule) => {
       const item = document.createElement("div");
       item.className = "rule-item";
+      if (rule.permanent) item.classList.add("rule-permanent");
 
       const info = document.createElement("div");
       info.className = "rule-info";
@@ -2190,19 +2207,12 @@ class ProducerPopup {
       const url = document.createElement("div");
       url.className = "rule-url";
 
-      // Set title attribute for hover tooltip and make editable
       if (rule.type !== "allowParam") {
-        if (rule.url === "*") {
-          url.title = "(*) All Websites";
-          item.title = "(*) All Websites";
-        } else {
-          url.title = rule.url;
-          item.title = rule.url;
-        }
+        const label = rule.url === "*" ? "(*) All Websites" : rule.url;
+        url.title = label;
+        item.title = label;
         url.textContent = this.formatUrl(rule.url);
         url.style.cursor = "pointer";
-
-        // Add double-click to edit URL inline
         url.addEventListener("dblclick", (e) => {
           e.stopPropagation();
           this.editRuleUrlInline(rule, url);
@@ -2213,8 +2223,6 @@ class ProducerPopup {
         url.title = paramText;
         item.title = paramText;
         url.style.cursor = "pointer";
-
-        // Add double-click to edit parameter rule inline
         url.addEventListener("dblclick", (e) => {
           e.stopPropagation();
           this.editParamRuleInline(rule, url);
@@ -2228,33 +2236,44 @@ class ProducerPopup {
       info.appendChild(url);
       info.appendChild(type);
 
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "btn btn-xsmall btn-squared btn-danger";
-      removeBtn.textContent = "✕";
-      removeBtn.title = "Delete Rule";
-      removeBtn.style.marginLeft = "4px";
-      removeBtn.addEventListener("click", () => {
-        this.removeRule(rule.id);
-      });
-
-      item.appendChild(info);
+      // Inline action buttons (permanent toggle + delete)
+      const actionsWrap = document.createElement("div");
+      actionsWrap.style.display = "flex";
+      actionsWrap.style.alignItems = "center";
+      actionsWrap.style.flexShrink = "0";
 
       if (rule.type === "domain" || rule.type === "url") {
-        if (rule.permanent) item.classList.add("rule-permanent");
-        const permanentBtn = document.createElement("button");
-        permanentBtn.className = `btn btn-xsmall btn-squared btn-permanent${rule.permanent ? " active" : ""}`;
-        permanentBtn.textContent = "🔒";
-        permanentBtn.title = rule.permanent
-          ? "Permanent (always active)"
-          : "Make rule permanent (stay active even without focus mode)";
-        permanentBtn.style.marginLeft = "4px";
-        permanentBtn.addEventListener("click", () => {
+        const permBtn = document.createElement("button");
+        permBtn.className = "item-menu-btn";
+        permBtn.innerHTML = rule.permanent
+          ? '<i class="bi bi-lock-fill"></i>'
+          : '<i class="bi bi-unlock"></i>';
+        permBtn.title = rule.permanent ? "Remove permanent" : "Make permanent";
+        if (rule.permanent) {
+          permBtn.style.color = "rgba(241, 196, 15, 0.9)";
+          permBtn.style.opacity = "1";
+        }
+        permBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
           this.toggleRulePermanent(rule.id, this.currentEditingRuleSetId);
         });
-        item.appendChild(permanentBtn);
+        actionsWrap.appendChild(permBtn);
       }
 
-      item.appendChild(removeBtn);
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "item-menu-btn";
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      deleteBtn.title = "Delete rule";
+      deleteBtn.style.color = "rgba(214, 69, 56, 1)";
+      deleteBtn.style.opacity = "0.85";
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.removeRule(rule.id);
+      });
+      actionsWrap.appendChild(deleteBtn);
+
+      item.appendChild(info);
+      item.appendChild(actionsWrap);
       this.rulesList.appendChild(item);
     });
 
@@ -2762,7 +2781,7 @@ class ProducerPopup {
     // Show success message and return to main view
     const activationMessage =
       this.activeRuleSetId === this.customModes[this.customModes.length - 1].id
-        ? " and activated"
+        ? " and selected"
         : "";
     this.showNotification(
       `Custom mode successfully saved${activationMessage}!`,
@@ -2798,6 +2817,29 @@ class ProducerPopup {
     this.saveState();
     this.updateUI();
     this.showNotification("Mode deleted");
+  }
+
+  duplicateRuleSet(id) {
+    const ruleSet = this.customModes.find((rs) => rs.id === id);
+    if (!ruleSet) return;
+
+    const clone = {
+      ...ruleSet,
+      id: "ruleset-" + Date.now(),
+      name: ruleSet.name + " (Copy)",
+      rules: ruleSet.rules.map((r) => ({
+        ...r,
+        id: Date.now() + Math.random(),
+      })),
+      settings: ruleSet.settings ? { ...ruleSet.settings } : undefined,
+    };
+
+    const originalIndex = this.customModes.findIndex((rs) => rs.id === id);
+    this.customModes.splice(originalIndex + 1, 0, clone);
+    this.activeRuleSetId = clone.id;
+    this.saveState();
+    this.updateUI();
+    this.showNotification(`"${clone.name}" duplicated and activated`);
   }
 
   editRuleSet(id) {
@@ -2854,13 +2896,7 @@ class ProducerPopup {
 
     this.saveState();
     this.updateUI();
-    this.showNotification(`Mode "${ruleSet.name}" activated!`);
-
-    // Scroll to top of modes list to show the newly activated mode
-    // ruleSetsList itself is the scroll-container element
-    if (this.ruleSetsList) {
-      this.ruleSetsList.scrollTop = 0;
-    }
+    this.showNotification(`Mode "${ruleSet.name}" selected!`);
 
     // Reload affected tabs with the new rules
     chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
@@ -2881,7 +2917,7 @@ class ProducerPopup {
 
     this.saveState();
     this.updateUI();
-    this.showNotification("Mode deactivated!");
+    this.showNotification("Mode unselected!");
 
     // Reload affected tabs to remove blocking
     chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
@@ -3018,88 +3054,137 @@ class ProducerPopup {
     if (this.clearRulesAllViewBtn)
       this.clearRulesAllViewBtn.style.display = "inline-flex";
 
-    // Reverse the rules array to show latest first (without mutating original)
-    const reversedRules = [...ruleSet.rules].reverse();
-
-    reversedRules.forEach((rule, reversedIndex) => {
-      const item = document.createElement("div");
-      item.className = "rule-item";
-
-      const info = document.createElement("div");
-      info.className = "rule-info";
-
-      const url = document.createElement("div");
-      url.className = "rule-url";
-
-      // Set title attribute for hover tooltip and make editable
-      if (rule.type !== "allowParam") {
-        if (rule.url === "*") {
-          url.title = "(*) All Websites";
-          item.title = "(*) All Websites";
-        } else {
-          url.title = rule.url;
-          item.title = rule.url;
-        }
-        url.textContent = this.formatUrl(rule.url);
-        url.style.cursor = "pointer";
-
-        // Add double-click to edit URL inline
-        url.addEventListener("dblclick", (e) => {
-          e.stopPropagation();
-          this.editRuleUrlInline(rule, url);
-        });
-      } else {
-        const paramText = `?${rule.paramKey}=${rule.paramValue || "any"}`;
-        url.textContent = paramText;
-        url.title = paramText;
-        item.title = paramText;
-        url.style.cursor = "pointer";
-
-        // Add double-click to edit parameter rule inline
-        url.addEventListener("dblclick", (e) => {
-          e.stopPropagation();
-          this.editParamRuleInline(rule, url);
-        });
-      }
-
-      const type = document.createElement("div");
-      type.className = "rule-type";
-      type.textContent = this.formatRuleType(rule);
-
-      info.appendChild(url);
-      info.appendChild(type);
-
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "btn btn-xsmall btn-squared btn-danger";
-      removeBtn.textContent = "✕";
-      removeBtn.title = "Delete Rule";
-      removeBtn.style.marginLeft = "4px";
-      removeBtn.addEventListener("click", () => {
-        this.removeRule(rule.id);
-        // Re-render the all rules list after removal
-        this.renderAllRulesList();
-      });
-
-      item.appendChild(info);
-
-      if (rule.type === "domain" || rule.type === "url") {
+    [...ruleSet.rules]
+      .slice()
+      .reverse()
+      .forEach((rule, displayIndex) => {
+        const index = ruleSet.rules.length - 1 - displayIndex;
+        const item = document.createElement("div");
+        item.className = "rule-item";
         if (rule.permanent) item.classList.add("rule-permanent");
-        const permanentBtn = document.createElement("button");
-        permanentBtn.className = `btn btn-xsmall btn-squared btn-permanent${rule.permanent ? " active" : ""}`;
-        permanentBtn.textContent = "🔒";
-        permanentBtn.title = rule.permanent
-          ? "Permanent — always blocked (click to disable)"
-          : "Make permanent — stay blocked even without focus mode";
-        permanentBtn.style.marginLeft = "4px";
-        permanentBtn.addEventListener("click", () => {
-          this.toggleRulePermanent(rule.id, this.currentEditingRuleSetId);
-        });
-        item.appendChild(permanentBtn);
-      }
+        item.draggable = true;
+        item.dataset.index = index;
 
-      item.appendChild(removeBtn);
-      this.allRulesList.appendChild(item);
-    });
+        const dragHandle = document.createElement("span");
+        dragHandle.className = "drag-handle";
+        dragHandle.innerHTML = '<i class="bi bi-grip-vertical"></i>';
+        dragHandle.title = "Drag to reorder";
+
+        const info = document.createElement("div");
+        info.className = "rule-info";
+
+        const url = document.createElement("div");
+        url.className = "rule-url";
+
+        if (rule.type !== "allowParam") {
+          const label = rule.url === "*" ? "(*) All Websites" : rule.url;
+          url.title = label;
+          item.title = label;
+          url.textContent = this.formatUrl(rule.url);
+          url.style.cursor = "pointer";
+          url.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            this.editRuleUrlInline(rule, url);
+          });
+        } else {
+          const paramText = `?${rule.paramKey}=${rule.paramValue || "any"}`;
+          url.textContent = paramText;
+          url.title = paramText;
+          item.title = paramText;
+          url.style.cursor = "pointer";
+          url.addEventListener("dblclick", (e) => {
+            e.stopPropagation();
+            this.editParamRuleInline(rule, url);
+          });
+        }
+
+        const type = document.createElement("div");
+        type.className = "rule-type";
+        type.textContent = this.formatRuleType(rule);
+
+        info.appendChild(url);
+        info.appendChild(type);
+
+        // Inline action buttons (permanent toggle + delete)
+        const actionsWrap = document.createElement("div");
+        actionsWrap.style.display = "flex";
+        actionsWrap.style.alignItems = "center";
+        actionsWrap.style.flexShrink = "0";
+
+        if (rule.type === "domain" || rule.type === "url") {
+          const permBtn = document.createElement("button");
+          permBtn.className = "item-menu-btn";
+          permBtn.innerHTML = rule.permanent
+            ? '<i class="bi bi-lock-fill"></i>'
+            : '<i class="bi bi-unlock"></i>';
+          permBtn.title = rule.permanent
+            ? "Remove permanent"
+            : "Make permanent";
+          if (rule.permanent) {
+            permBtn.style.color = "rgba(241, 196, 15, 0.9)";
+            permBtn.style.opacity = "1";
+          }
+          permBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.toggleRulePermanent(rule.id, this.currentEditingRuleSetId);
+          });
+          actionsWrap.appendChild(permBtn);
+        }
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "item-menu-btn";
+        deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+        deleteBtn.title = "Delete rule";
+        deleteBtn.style.color = "rgba(214, 69, 56, 1)";
+        deleteBtn.style.opacity = "0.85";
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.removeRule(rule.id);
+          this.renderAllRulesList();
+        });
+        actionsWrap.appendChild(deleteBtn);
+
+        // Drag-and-drop
+        item.addEventListener("dragstart", (e) => {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", index);
+          setTimeout(() => item.classList.add("is-dragging"), 0);
+        });
+        item.addEventListener("dragend", () => {
+          item.classList.remove("is-dragging");
+          this.allRulesList
+            .querySelectorAll(".drag-over")
+            .forEach((el) => el.classList.remove("drag-over"));
+        });
+        item.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          this.allRulesList
+            .querySelectorAll(".drag-over")
+            .forEach((el) => el.classList.remove("drag-over"));
+          item.classList.add("drag-over");
+        });
+        item.addEventListener("dragleave", (e) => {
+          if (!item.contains(e.relatedTarget))
+            item.classList.remove("drag-over");
+        });
+        item.addEventListener("drop", (e) => {
+          e.preventDefault();
+          item.classList.remove("drag-over");
+          const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+          const toIndex = index;
+          if (fromIndex === toIndex) return;
+          const moved = ruleSet.rules.splice(fromIndex, 1)[0];
+          ruleSet.rules.splice(toIndex, 0, moved);
+          this.saveState();
+          this.renderAllRulesList();
+        });
+
+        item.appendChild(dragHandle);
+        item.appendChild(info);
+        item.appendChild(actionsWrap);
+        this.allRulesList.appendChild(item);
+      });
   }
 
   showRulesEditView() {
@@ -3430,9 +3515,44 @@ class ProducerPopup {
     chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
   }
 
+  _showDropdown(triggerBtn, dropdown) {
+    document.querySelectorAll(".item-dropdown").forEach((d) => d.remove());
+
+    // Append off-screen first so offsetHeight is measurable
+    dropdown.style.position = "fixed";
+    dropdown.style.top = "-9999px";
+    dropdown.style.left = "-9999px";
+    document.body.appendChild(dropdown);
+
+    const dropHeight = dropdown.offsetHeight;
+    const btnRect = triggerBtn.getBoundingClientRect();
+
+    // Use the scroll container's bottom as the threshold, not the full viewport
+    const scrollContainer = triggerBtn.closest(".scroll-container");
+    const containerBottom = scrollContainer
+      ? scrollContainer.getBoundingClientRect().bottom
+      : window.innerHeight;
+
+    const spaceBelow = containerBottom - btnRect.bottom;
+
+    dropdown.style.right = window.innerWidth - btnRect.right + "px";
+    dropdown.style.left = "auto";
+
+    if (spaceBelow >= dropHeight) {
+      // Enough room — open downward
+      dropdown.style.top = btnRect.bottom + 2 + "px";
+      dropdown.style.bottom = "auto";
+    } else {
+      // Not enough room — open upward, bottom edge flush with button top
+      dropdown.style.top = "auto";
+      dropdown.style.bottom = window.innerHeight - btnRect.top + 2 + "px";
+    }
+  }
+
   renderRuleSetsList() {
     if (!this.ruleSetsList) return;
 
+    const scrollTop = this.ruleSetsList.scrollTop;
     this.ruleSetsList.innerHTML = "";
 
     // Show/hide clear all button
@@ -3451,22 +3571,18 @@ class ProducerPopup {
       return;
     }
 
-    // Sort modes by lastActivated (most recent first), with never-activated modes at the end
-    const sortedModes = [...this.customModes].sort((a, b) => {
-      // If both have lastActivated, sort by it
-      if (a.lastActivated && b.lastActivated) {
-        return b.lastActivated - a.lastActivated;
-      }
-      // If only one has lastActivated, put it first
-      if (a.lastActivated) return -1;
-      if (b.lastActivated) return 1;
-      // If neither has lastActivated, maintain original order
-      return 0;
-    });
-
-    sortedModes.forEach((ruleSet) => {
+    this.customModes.forEach((ruleSet, index) => {
       const item = document.createElement("div");
       item.className = "rule-set-item";
+      item.draggable = true;
+      item.dataset.index = index;
+
+      // Check if this rule set is active
+      const isActive = this.activeRuleSetId === ruleSet.id;
+      if (isActive) {
+        item.style.border = "2px solid rgba(46, 204, 113, 0.6)";
+        item.style.background = "rgba(46, 204, 113, 0.1)";
+      }
 
       const info = document.createElement("div");
       info.className = "rule-set-info";
@@ -3547,64 +3663,136 @@ class ProducerPopup {
       info.appendChild(name);
       info.appendChild(details);
 
-      const buttonDiv = document.createElement("div");
-      buttonDiv.style.display = "flex";
-      buttonDiv.style.gap = "4px";
-      buttonDiv.style.marginLeft = "4px";
+      // Drag handle (left)
+      const dragHandle = document.createElement("span");
+      dragHandle.className = "drag-handle";
+      dragHandle.innerHTML = '<i class="bi bi-grip-vertical"></i>';
+      dragHandle.title = "Drag to reorder";
 
-      // Check if this rule set is active
-      const isActive = this.activeRuleSetId === ruleSet.id;
+      // Inline action buttons (select + edit)
+      const actionsWrap = document.createElement("div");
+      actionsWrap.style.display = "flex";
+      actionsWrap.style.alignItems = "center";
+      actionsWrap.style.flexShrink = "0";
+      // actionsWrap.style.gap = "2px";
 
-      // Activate/Deactivate button
-      const toggleBtn = document.createElement("button");
-      toggleBtn.className = isActive
-        ? "btn btn-xsmall btn-squared active"
-        : "btn btn-xsmall btn-squared inactive";
-      toggleBtn.innerHTML = isActive
+      const selectBtn = document.createElement("button");
+      selectBtn.className = isActive
+        ? "item-menu-btn mode-select-btn mode-select-btn-selected"
+        : "item-menu-btn mode-select-btn";
+      selectBtn.innerHTML = isActive
         ? '<i class="bi bi-check-circle-fill"></i>'
-        : '<i class="bi bi-play-circle"></i>';
-      toggleBtn.title = isActive ? "Deactivate Mode" : "Activate Mode";
-
-      toggleBtn.addEventListener("click", (e) => {
+        : '<i class="bi bi-circle"></i>';
+      selectBtn.title = isActive ? "Unselect mode" : "Select mode";
+      selectBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if (isActive) {
-          this.deactivateRuleSet();
-        } else {
-          this.activateRuleSet(ruleSet.id);
-        }
+        if (isActive) this.deactivateRuleSet();
+        else this.activateRuleSet(ruleSet.id);
       });
 
       const editBtn = document.createElement("button");
-      editBtn.className = "btn btn-xsmall btn-squared btn-secondary";
+      editBtn.className = "item-menu-btn";
       editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
-      editBtn.title = "Edit Rules";
+      editBtn.title = "Edit mode";
+      editBtn.style.marginLeft = "4px";
       editBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.editRuleSet(ruleSet.id);
       });
 
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "btn btn-small btn-squared btn-danger";
-      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-      deleteBtn.title = "Delete Rule Set";
-      deleteBtn.addEventListener("click", (e) => {
+      actionsWrap.appendChild(selectBtn);
+      actionsWrap.appendChild(editBtn);
+
+      // Three-dots menu — placed in the same wrap as select/edit so all
+      // three buttons share identical spacing
+      const menuBtn = document.createElement("button");
+      menuBtn.className = "item-menu-btn";
+      menuBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+      menuBtn.title = "More options";
+      menuBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        this.deleteRuleSet(ruleSet.id);
+        const existing = document.querySelector(".item-dropdown");
+        if (existing && existing._trigger === menuBtn) {
+          existing.remove();
+          return;
+        }
+
+        const dropdown = document.createElement("div");
+        dropdown.className = "item-dropdown";
+        dropdown._trigger = menuBtn;
+
+        const duplicateOpt = document.createElement("button");
+        duplicateOpt.className = "item-dropdown-option";
+        duplicateOpt.innerHTML = '<i class="bi bi-copy"></i> Duplicate';
+        duplicateOpt.addEventListener("click", () => {
+          dropdown.remove();
+          this.duplicateRuleSet(ruleSet.id);
+        });
+
+        const deleteOpt = document.createElement("button");
+        deleteOpt.className = "item-dropdown-option danger";
+        deleteOpt.innerHTML = '<i class="bi bi-trash"></i> Delete';
+        deleteOpt.addEventListener("click", () => {
+          dropdown.remove();
+          this.deleteRuleSet(ruleSet.id);
+        });
+
+        dropdown.appendChild(duplicateOpt);
+        dropdown.appendChild(deleteOpt);
+        this._showDropdown(menuBtn, dropdown);
       });
 
+      actionsWrap.appendChild(menuBtn);
+
+      // Drag-and-drop events
+      item.addEventListener("dragstart", (e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", index);
+        setTimeout(() => item.classList.add("is-dragging"), 0);
+      });
+      item.addEventListener("dragend", () => {
+        item.classList.remove("is-dragging");
+        this.ruleSetsList
+          .querySelectorAll(".drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+      });
+      item.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        this.ruleSetsList
+          .querySelectorAll(".drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+        item.classList.add("drag-over");
+      });
+      item.addEventListener("dragleave", (e) => {
+        if (!item.contains(e.relatedTarget)) item.classList.remove("drag-over");
+      });
+      item.addEventListener("drop", (e) => {
+        e.preventDefault();
+        item.classList.remove("drag-over");
+        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+        const toIndex = index;
+        if (fromIndex === toIndex) return;
+        const moved = this.customModes.splice(fromIndex, 1)[0];
+        this.customModes.splice(toIndex, 0, moved);
+        this.saveState();
+        this.renderRuleSetsList();
+      });
+
+      item.appendChild(dragHandle);
       item.appendChild(info);
-      buttonDiv.appendChild(toggleBtn);
-      buttonDiv.appendChild(editBtn);
-      buttonDiv.appendChild(deleteBtn);
-      item.appendChild(buttonDiv);
+      item.appendChild(actionsWrap);
       this.ruleSetsList.appendChild(item);
     });
+    this.ruleSetsList.scrollTop = scrollTop;
   }
 
   // Session history methods
   renderSessionHistory() {
     if (!this.sessionsList) return;
 
+    const scrollContainer = this.sessionsList.parentElement;
+    const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
     this.sessionsList.innerHTML = "";
 
     // Update statistics in main stats view
@@ -3651,18 +3839,16 @@ class ProducerPopup {
       return;
     }
 
-    // Sort sessions by last active (most recent first)
-    const sortedSessions = [...this.sessions].sort(
-      (a, b) => b.lastActive - a.lastActive,
-    );
-
-    sortedSessions.forEach((session) => {
+    this.sessions.forEach((session, index) => {
       const item = document.createElement("div");
       item.className = "session-item";
       item.style.display = "flex";
       item.style.justifyContent = "space-between";
       item.style.alignItems = "center";
       item.style.textAlign = "left";
+      item.style.gap = "4px";
+      item.draggable = true;
+      item.dataset.index = index;
 
       // Highlight if this is the current active session
       const isActive = session.id === this.currentSessionId;
@@ -3677,7 +3863,7 @@ class ProducerPopup {
 
       const name = document.createElement("div");
       name.className = "session-date";
-      name.textContent = this.truncateText(session.name, 35);
+      name.textContent = this.truncateText(session.name, 40);
       name.style.cursor = "pointer";
       name.title = "Double-click to edit name";
       name.style.marginBottom = "4px";
@@ -3716,13 +3902,13 @@ class ProducerPopup {
               this.showNotification("Session name updated!");
             }
           }
-          name.textContent = this.truncateText(session.name, 35);
+          name.textContent = this.truncateText(session.name, 40);
           name.style.display = "";
           input.remove();
         };
 
         const cancelEdit = () => {
-          name.textContent = this.truncateText(session.name, 35);
+          name.textContent = this.truncateText(session.name, 40);
           name.style.display = "";
           input.remove();
         };
@@ -3778,71 +3964,125 @@ class ProducerPopup {
       info.appendChild(name);
       info.appendChild(details);
 
-      // Action buttons
-      const buttonDiv = document.createElement("div");
-      buttonDiv.style.display = "flex";
-      buttonDiv.style.gap = "4px";
-      buttonDiv.style.marginLeft = "4px";
+      // Drag handle (left)
+      const dragHandle = document.createElement("span");
+      dragHandle.className = "drag-handle";
+      dragHandle.innerHTML = '<i class="bi bi-grip-vertical"></i>';
+      dragHandle.title = "Drag to reorder";
 
-      // Activate/Deactivate button
-      const toggleBtn = document.createElement("button");
-      toggleBtn.className = isActive
-        ? "btn btn-xsmall btn-squared active"
-        : "btn btn-xsmall btn-squared inactive";
-      toggleBtn.innerHTML = isActive
-        ? '<i class="bi bi-check-circle-fill"></i>'
-        : '<i class="bi bi-play-circle"></i>';
-      toggleBtn.title = isActive ? "Deactivate Session" : "Activate Session";
+      // Inline action buttons (resume + more options)
+      const actionsWrap = document.createElement("div");
+      actionsWrap.style.display = "flex";
+      actionsWrap.style.alignItems = "center";
+      actionsWrap.style.flexShrink = "0";
 
-      toggleBtn.addEventListener("click", () => {
-        if (isActive) {
-          this.deactivateSession(session.id);
-        } else {
-          this.activateSession(session.id);
-        }
-      });
-
-      buttonDiv.appendChild(toggleBtn);
-
-      // Clear Stats button - only show if session has stats to clear
-      if (
+      const hasStats =
         (session.focusedTime || 0) > 0 ||
         (session.breakTime || 0) > 0 ||
-        (session.blocksCount || 0) > 0
-      ) {
-        const clearStatsBtn = document.createElement("button");
-        clearStatsBtn.className = "btn btn-xsmall btn-squared";
-        clearStatsBtn.innerHTML = '<i class="bi bi-stars"></i>';
-        clearStatsBtn.title = "Clear Stats";
-        clearStatsBtn.addEventListener("click", () => {
-          this.clearInfo(session.id);
-        });
+        (session.blocksCount || 0) > 0;
 
-        // Add hover effect
-        clearStatsBtn.addEventListener("mouseenter", () => {
-          clearStatsBtn.style.boxShadow = "0 2px 8px rgba(241, 196, 15, 0.3)";
-        });
-        clearStatsBtn.addEventListener("mouseleave", () => {
-          clearStatsBtn.style.boxShadow = "none";
-        });
-
-        buttonDiv.appendChild(clearStatsBtn);
-      }
-
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "btn btn-small btn-squared btn-danger";
-      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-      deleteBtn.title = "Delete Session";
-      deleteBtn.addEventListener("click", () => {
-        this.deleteSession(session.id);
+      const resumeBtn = document.createElement("button");
+      resumeBtn.className = isActive
+        ? "item-menu-btn mode-select-btn mode-select-btn-selected"
+        : "item-menu-btn mode-select-btn";
+      resumeBtn.innerHTML = isActive
+        ? '<i class="bi bi-stop-circle-fill"></i>'
+        : '<i class="bi bi-play-circle"></i>';
+      resumeBtn.title = isActive ? "End Session" : "Resume Session";
+      resumeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (isActive) this.deactivateSession(session.id);
+        else this.activateSession(session.id);
       });
 
-      buttonDiv.appendChild(deleteBtn);
+      actionsWrap.appendChild(resumeBtn);
 
+      // Three-dots menu — placed in the same wrap as resume so both
+      // buttons share identical spacing
+      const menuBtn = document.createElement("button");
+      menuBtn.className = "item-menu-btn";
+      menuBtn.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+      menuBtn.title = "More options";
+      menuBtn.style.marginLeft = "4px";
+
+      menuBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const existing = document.querySelector(".item-dropdown");
+        if (existing && existing._trigger === menuBtn) {
+          existing.remove();
+          return;
+        }
+
+        const dropdown = document.createElement("div");
+        dropdown.className = "item-dropdown";
+        dropdown._trigger = menuBtn;
+
+        if (hasStats) {
+          const clearOpt = document.createElement("button");
+          clearOpt.className = "item-dropdown-option warning";
+          clearOpt.innerHTML = '<i class="bi bi-stars"></i> Clear Stats';
+          clearOpt.addEventListener("click", () => {
+            dropdown.remove();
+            this.clearInfo(session.id);
+          });
+          dropdown.appendChild(clearOpt);
+        }
+
+        const deleteOpt = document.createElement("button");
+        deleteOpt.className = "item-dropdown-option danger";
+        deleteOpt.innerHTML = '<i class="bi bi-trash"></i> Delete';
+        deleteOpt.addEventListener("click", () => {
+          dropdown.remove();
+          this.deleteSession(session.id);
+        });
+
+        dropdown.appendChild(deleteOpt);
+        this._showDropdown(menuBtn, dropdown);
+      });
+
+      actionsWrap.appendChild(menuBtn);
+
+      // Drag-and-drop events
+      item.addEventListener("dragstart", (e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", index);
+        setTimeout(() => item.classList.add("is-dragging"), 0);
+      });
+      item.addEventListener("dragend", () => {
+        item.classList.remove("is-dragging");
+        this.sessionsList
+          .querySelectorAll(".drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+      });
+      item.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        this.sessionsList
+          .querySelectorAll(".drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+        item.classList.add("drag-over");
+      });
+      item.addEventListener("dragleave", (e) => {
+        if (!item.contains(e.relatedTarget)) item.classList.remove("drag-over");
+      });
+      item.addEventListener("drop", (e) => {
+        e.preventDefault();
+        item.classList.remove("drag-over");
+        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+        const toIndex = index;
+        if (fromIndex === toIndex) return;
+        const moved = this.sessions.splice(fromIndex, 1)[0];
+        this.sessions.splice(toIndex, 0, moved);
+        this.saveState();
+        this.renderSessionHistory();
+      });
+
+      item.appendChild(dragHandle);
       item.appendChild(info);
-      item.appendChild(buttonDiv);
+      item.appendChild(actionsWrap);
       this.sessionsList.appendChild(item);
     });
+    if (scrollContainer) scrollContainer.scrollTop = scrollTop;
   }
 
   clearSessions() {
@@ -4693,12 +4933,6 @@ class ProducerPopup {
     // Ensure session list is re-rendered to show updated order
     this.renderSessionHistory();
 
-    // Scroll to top of sessions list to show the newly activated session
-    if (this.sessionsList && this.sessionsList.parentElement) {
-      // The parent element is the scroll container
-      this.sessionsList.parentElement.scrollTop = 0;
-    }
-
     // Get the new mode's rules
     const activeRules = this.getActiveRules();
 
@@ -4727,7 +4961,7 @@ class ProducerPopup {
     }
 
     // Show notification
-    this.showNotification(`Session "${session.name}" activated!`);
+    this.showNotification(`Session "${session.name}" resumed!`);
   }
 
   async deactivateSession(sessionId) {
@@ -4768,7 +5002,7 @@ class ProducerPopup {
       await this.saveState();
       this.updateUI();
 
-      this.showNotification(`Session "${session.name}" deactivated!`);
+      this.showNotification(`Session "${session.name}" ended!`);
     }
   }
 
