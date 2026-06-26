@@ -1445,6 +1445,19 @@ class ProducerPopup {
     this.isActive = !this.isActive;
 
     if (this.isActive) {
+      // Check if there's an active mode selected
+      const activeMode = this.activeRuleSetId
+        ? this.customModes.find((m) => m.id === this.activeRuleSetId)
+        : null;
+      if (!activeMode) {
+        this.isActive = false;
+        this.showNotification(
+          "No mode active. Create and activate a mode for Producer to work.",
+          "error",
+        );
+        return;
+      }
+
       // Starting focus mode - ensure there's an active session
       // Only create a new session if there's no active session selected
       if (!this.currentSessionId) {
@@ -1593,7 +1606,7 @@ class ProducerPopup {
 
     // Show feedback
     this.showNotification(
-      this.isActive ? "Focus mode activated!" : "Focus mode deactivated",
+      this.isActive ? "Focus activated!" : "Focus deactivated",
     );
   }
 
@@ -3833,7 +3846,7 @@ class ProducerPopup {
       this.sessionsList.innerHTML = `
         <div class="empty-state">
           No sessions created yet.<br />
-          Start the focus mode to create a new session!
+          Start focus to create a new session!
         </div>
       `;
       return;
