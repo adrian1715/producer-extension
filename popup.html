@@ -393,7 +393,7 @@
                 class="btn btn-xsmall"
                 style="padding: 4px 12px; font-size: 11px"
               >
-                Configure →
+                Features →
               </button>
             </div>
 
@@ -490,23 +490,6 @@
               id="modeGrayscaleToggle"
               style="display: none"
             />
-            <input
-              type="checkbox"
-              id="modePomodoroToggle"
-              style="display: none"
-            />
-            <input
-              type="number"
-              id="pomodoroWork"
-              value="25"
-              style="display: none"
-            />
-            <input
-              type="number"
-              id="pomodoroBreak"
-              value="5"
-              style="display: none"
-            />
           </div>
 
           <!-- Hidden elements for backward compatibility -->
@@ -537,7 +520,7 @@
           </div>
         </div>
 
-        <!-- Mode Settings Configuration View -->
+        <!-- Mode Features View -->
         <div id="mode-settings-view" style="display: none">
           <div class="section" style="margin: 0">
             <div
@@ -551,228 +534,29 @@
               >
                 <i class="bi bi-arrow-left"></i>
               </button>
-              <span>⚙️ Configure Mode Settings</span>
+              <span>✨ Features</span>
             </div>
 
             <div class="scroll-container" style="max-height: 247px">
-              <!-- Grayscale Mode Card -->
-              <div
-                style="
-                  background: rgba(255, 255, 255, 0.1);
-                  border-radius: 8px;
-                  padding: 10px;
-                  margin-bottom: 8px;
-                "
-              >
-                <div
-                  style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                  "
-                >
-                  <div style="flex: 1">
-                    <div
-                      style="
-                        font-size: 14px;
-                        font-weight: 600;
-                        margin-bottom: 4px;
-                      "
-                    >
-                      🎨 Grayscale Mode
-                    </div>
-                    <div
-                      style="font-size: 11px; opacity: 0.85; line-height: 1.4"
-                    >
+              <!-- Grayscale Feature Card -->
+              <div class="feature-card">
+                <div class="feature-header">
+                  <div class="feature-info">
+                    <div class="feature-title">🎨 Grayscale</div>
+                    <div class="feature-desc">
                       Removes all colors from blocked websites, making them less
                       appealing and reducing visual distractions during focus
                       sessions.
                     </div>
                   </div>
-                  <label
-                    style="
-                      position: relative;
-                      display: inline-block;
-                      width: 44px;
-                      height: 22px;
-                      cursor: pointer;
-                      flex-shrink: 0;
-                      margin-left: 10px;
-                    "
-                  >
-                    <input
-                      type="checkbox"
-                      id="modeGrayscaleToggleView"
-                      style="opacity: 0; width: 0; height: 0"
-                    />
-                    <span
-                      style="
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background-color: rgba(255, 255, 255, 0.2);
-                        border-radius: 22px;
-                        transition: 0.3s;
-                        border: 2px solid rgba(255, 255, 255, 0.3);
-                      "
-                    ></span>
-                    <span
-                      style="
-                        position: absolute;
-                        content: &quot;&quot;;
-                        height: 14px;
-                        width: 14px;
-                        left: 4px;
-                        bottom: 4px;
-                        background-color: white;
-                        border-radius: 50%;
-                        transition: 0.3s;
-                      "
-                    ></span>
+                  <label class="feature-toggle">
+                    <input type="checkbox" id="modeGrayscaleToggleView" />
+                    <span class="feature-toggle-track"></span>
+                    <span class="feature-toggle-knob"></span>
                   </label>
                 </div>
               </div>
-
-              <!-- Pomodoro Timer Card -->
-              <div
-                style="
-                  background: rgba(255, 255, 255, 0.1);
-                  border-radius: 8px;
-                  padding: 10px;
-                  margin-bottom: 8px;
-                "
-              >
-                <div
-                  style="
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                    margin-bottom: 8px;
-                  "
-                >
-                  <div style="flex: 1">
-                    <div
-                      style="
-                        font-size: 14px;
-                        font-weight: 600;
-                        margin-bottom: 4px;
-                      "
-                    >
-                      ⏱️ Pomodoro Timer
-                    </div>
-                    <div
-                      style="font-size: 11px; opacity: 0.85; line-height: 1.4"
-                    >
-                      Automatically alternates between focused work sessions and
-                      short breaks. Focus will pause when break time
-                      starts.
-                    </div>
-                  </div>
-                  <label
-                    style="
-                      position: relative;
-                      display: inline-block;
-                      width: 44px;
-                      height: 22px;
-                      cursor: pointer;
-                      flex-shrink: 0;
-                      margin-left: 10px;
-                    "
-                  >
-                    <input
-                      type="checkbox"
-                      id="modePomodoroToggleView"
-                      style="opacity: 0; width: 0; height: 0"
-                    />
-                    <span
-                      style="
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background-color: rgba(255, 255, 255, 0.2);
-                        border-radius: 22px;
-                        transition: 0.3s;
-                        border: 2px solid rgba(255, 255, 255, 0.3);
-                      "
-                    ></span>
-                    <span
-                      style="
-                        position: absolute;
-                        content: &quot;&quot;;
-                        height: 14px;
-                        width: 14px;
-                        left: 4px;
-                        bottom: 4px;
-                        background-color: white;
-                        border-radius: 50%;
-                        transition: 0.3s;
-                      "
-                    ></span>
-                  </label>
-                </div>
-
-                <!-- Pomodoro Options -->
-                <div
-                  id="pomodoroOptionsView"
-                  style="display: none; margin-top: 8px"
-                >
-                  <div
-                    style="
-                      display: flex;
-                      gap: 8px;
-                      align-items: center;
-                      flex-wrap: wrap;
-                      padding-top: 8px;
-                      border-top: 1px solid rgba(255, 255, 255, 0.15);
-                    "
-                  >
-                    <span style="font-size: 11px; opacity: 0.9">Work:</span>
-                    <input
-                      type="number"
-                      id="pomodoroWorkView"
-                      min="1"
-                      max="60"
-                      value="25"
-                      style="
-                        width: 50px;
-                        background: rgba(255, 255, 255, 0.1);
-                        border: 1px solid rgba(255, 255, 255, 0.2);
-                        color: white;
-                        padding: 4px 8px;
-                        border-radius: 6px;
-                        font-size: 12px;
-                      "
-                    />
-                    <span style="font-size: 11px; opacity: 0.9">min</span>
-                    <span
-                      style="font-size: 11px; opacity: 0.7; margin-left: 8px"
-                    >
-                      Break:
-                    </span>
-                    <input
-                      type="number"
-                      id="pomodoroBreakView"
-                      min="1"
-                      max="30"
-                      value="5"
-                      style="
-                        width: 50px;
-                        background: rgba(255, 255, 255, 0.1);
-                        border: 1px solid rgba(255, 255, 255, 0.2);
-                        color: white;
-                        padding: 4px 8px;
-                        border-radius: 6px;
-                        font-size: 12px;
-                      "
-                    />
-                    <span style="font-size: 11px; opacity: 0.9">min</span>
-                  </div>
-                </div>
-              </div>
+              <p style="margin: 20px 0 10px 0">More features coming soon!</p>
             </div>
           </div>
         </div>
@@ -1064,8 +848,8 @@ This site is blocked during your focus session</textarea
           <div style="text-align: left; font-size: 12px; line-height: 1.6">
             <p style="margin-bottom: 8px"><strong>Version:</strong> 1.0.0</p>
             <p style="margin-bottom: 8px">
-              <strong>Description:</strong> A focus extension to help you
-              stay productive by blocking distracting websites.
+              <strong>Description:</strong> A focus extension to help you stay
+              productive by blocking distracting websites.
             </p>
           </div>
         </div>

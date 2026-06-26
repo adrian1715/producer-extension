@@ -1077,21 +1077,96 @@ body.theme-teal {
   --dropdown-bg: rgba(6, 62, 52, 0.97);
 }
 
-/* Toggle Switch Styles */
+/* Toggle Switch Styles — personalization tab & legacy hidden element */
 #grayscaleToggle:checked + span,
-#modeGrayscaleToggle:checked + span,
-#modePomodoroToggle:checked + span,
-#modeGrayscaleToggleView:checked + span,
-#modePomodoroToggleView:checked + span {
+#modeGrayscaleToggle:checked + span {
   background-color: rgba(46, 204, 113, 0.5) !important;
   border-color: #2ecc71 !important;
 }
 
 #grayscaleToggle:checked + span + span,
-#modeGrayscaleToggle:checked + span + span,
-#modePomodoroToggle:checked + span + span,
-#modeGrayscaleToggleView:checked + span + span,
-#modePomodoroToggleView:checked + span + span {
+#modeGrayscaleToggle:checked + span + span {
+  transform: translateX(22px);
+}
+
+/* Feature card layout */
+.feature-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.feature-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.feature-info {
+  flex: 1;
+}
+
+.feature-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.feature-desc {
+  font-size: 11px;
+  opacity: 0.85;
+  line-height: 1.4;
+  margin-left: 8px;
+}
+
+/* Feature toggle switch */
+.feature-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 22px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.feature-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.feature-toggle-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 22px;
+  transition: 0.3s;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.feature-toggle-knob {
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.feature-toggle input:checked + .feature-toggle-track {
+  background-color: rgba(46, 204, 113, 0.5) !important;
+  border-color: #2ecc71 !important;
+}
+
+.feature-toggle input:checked + .feature-toggle-track + .feature-toggle-knob {
   transform: translateX(22px);
 }
 

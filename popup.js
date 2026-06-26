@@ -93,15 +93,12 @@ class ProducerPopup {
 
     // Mode settings elements
     this.modeGrayscaleToggle = document.getElementById("modeGrayscaleToggle");
-    this.modePomodoroToggle = document.getElementById("modePomodoroToggle");
-    this.pomodoroWork = document.getElementById("pomodoroWork");
-    this.pomodoroBreak = document.getElementById("pomodoroBreak");
     this.modeSettingsSection = document.getElementById("modeSettingsSection");
     this.configureModeSettingsBtn = document.getElementById(
       "configureModeSettingsBtn",
     );
 
-    // Mode settings view elements
+    // Mode features view elements
     this.modeSettingsView = document.getElementById("mode-settings-view");
     this.backFromModeSettingsBtn = document.getElementById(
       "backFromModeSettingsBtn",
@@ -109,12 +106,6 @@ class ProducerPopup {
     this.modeGrayscaleToggleView = document.getElementById(
       "modeGrayscaleToggleView",
     );
-    this.modePomodoroToggleView = document.getElementById(
-      "modePomodoroToggleView",
-    );
-    this.pomodoroWorkView = document.getElementById("pomodoroWorkView");
-    this.pomodoroBreakView = document.getElementById("pomodoroBreakView");
-    this.pomodoroOptionsView = document.getElementById("pomodoroOptionsView");
 
     // Rules preview and management elements
     this.rulesPreview = document.getElementById("rulesPreview");
@@ -488,28 +479,13 @@ class ProducerPopup {
         this.saveModeSettings(),
       );
     }
-    if (this.modePomodoroToggle) {
-      this.modePomodoroToggle.addEventListener("change", () =>
-        this.saveModeSettings(),
-      );
-    }
-    if (this.pomodoroWork) {
-      this.pomodoroWork.addEventListener("change", () =>
-        this.saveModeSettings(),
-      );
-    }
-    if (this.pomodoroBreak) {
-      this.pomodoroBreak.addEventListener("change", () =>
-        this.saveModeSettings(),
-      );
-    }
     if (this.configureModeSettingsBtn) {
       this.configureModeSettingsBtn.addEventListener("click", () =>
         this.showModeSettingsView(),
       );
     }
 
-    // Mode settings view events
+    // Mode features view events
     if (this.backFromModeSettingsBtn) {
       this.backFromModeSettingsBtn.addEventListener("click", () =>
         this.showModeEditFromSettings(),
@@ -517,22 +493,6 @@ class ProducerPopup {
     }
     if (this.modeGrayscaleToggleView) {
       this.modeGrayscaleToggleView.addEventListener("change", () =>
-        this.saveModeSettingsFromView(),
-      );
-    }
-    if (this.modePomodoroToggleView) {
-      this.modePomodoroToggleView.addEventListener("change", () => {
-        this.saveModeSettingsFromView();
-        this.updatePomodoroOptionsVisibility();
-      });
-    }
-    if (this.pomodoroWorkView) {
-      this.pomodoroWorkView.addEventListener("change", () =>
-        this.saveModeSettingsFromView(),
-      );
-    }
-    if (this.pomodoroBreakView) {
-      this.pomodoroBreakView.addEventListener("change", () =>
         this.saveModeSettingsFromView(),
       );
     }
@@ -676,9 +636,6 @@ class ProducerPopup {
           rules: data.rules,
           settings: {
             grayscaleEnabled: data.grayscaleEnabled || false,
-            pomodoroEnabled: false,
-            pomodoroWork: 25,
-            pomodoroBreak: 5,
           },
         };
         this.customModes = [defaultMode];
@@ -701,9 +658,6 @@ class ProducerPopup {
           ...ruleSet,
           settings: {
             grayscaleEnabled: data.grayscaleEnabled || false,
-            pomodoroEnabled: false,
-            pomodoroWork: 25,
-            pomodoroBreak: 5,
           },
         }));
         this.activeRuleSetId = data.activeRuleSetId || null;
@@ -2719,9 +2673,6 @@ class ProducerPopup {
       rules: [],
       settings: {
         grayscaleEnabled: false,
-        pomodoroEnabled: false,
-        pomodoroWork: 25,
-        pomodoroBreak: 5,
       },
     };
     this.isCreatingNewRuleSet = true;
@@ -3281,27 +3232,6 @@ class ProducerPopup {
         this.modeGrayscaleToggleView.checked =
           ruleSet.settings.grayscaleEnabled || false;
       }
-      if (this.modePomodoroToggleView) {
-        this.modePomodoroToggleView.checked =
-          ruleSet.settings.pomodoroEnabled || false;
-      }
-      if (this.pomodoroWorkView) {
-        this.pomodoroWorkView.value = ruleSet.settings.pomodoroWork || 25;
-      }
-      if (this.pomodoroBreakView) {
-        this.pomodoroBreakView.value = ruleSet.settings.pomodoroBreak || 5;
-      }
-    }
-    this.updatePomodoroOptionsVisibility();
-  }
-
-  updatePomodoroOptionsVisibility() {
-    // Show/hide pomodoro options based on toggle state
-    if (this.pomodoroOptionsView && this.modePomodoroToggleView) {
-      this.pomodoroOptionsView.style.display = this.modePomodoroToggleView
-        .checked
-        ? "block"
-        : "none";
     }
   }
 
@@ -3326,27 +3256,10 @@ class ProducerPopup {
     // Update settings from view UI
     ruleSet.settings.grayscaleEnabled =
       this.modeGrayscaleToggleView?.checked || false;
-    ruleSet.settings.pomodoroEnabled =
-      this.modePomodoroToggleView?.checked || false;
-    ruleSet.settings.pomodoroWork = parseInt(
-      this.pomodoroWorkView?.value || 25,
-    );
-    ruleSet.settings.pomodoroBreak = parseInt(
-      this.pomodoroBreakView?.value || 5,
-    );
 
-    // Also sync to hidden elements for backward compatibility
+    // Sync to hidden element for backward compatibility
     if (this.modeGrayscaleToggle) {
       this.modeGrayscaleToggle.checked = ruleSet.settings.grayscaleEnabled;
-    }
-    if (this.modePomodoroToggle) {
-      this.modePomodoroToggle.checked = ruleSet.settings.pomodoroEnabled;
-    }
-    if (this.pomodoroWork) {
-      this.pomodoroWork.value = ruleSet.settings.pomodoroWork;
-    }
-    if (this.pomodoroBreak) {
-      this.pomodoroBreak.value = ruleSet.settings.pomodoroBreak;
     }
 
     // Save to storage (with special action to prevent tab reloading)
@@ -3374,32 +3287,15 @@ class ProducerPopup {
     }
 
     if (!ruleSet || !ruleSet.settings) {
-      // If no settings exist yet, initialize with defaults
       if (ruleSet) {
-        ruleSet.settings = {
-          grayscaleEnabled: false,
-          pomodoroEnabled: false,
-          pomodoroWork: 25,
-          pomodoroBreak: 5,
-        };
+        ruleSet.settings = { grayscaleEnabled: false };
       }
     }
 
     if (ruleSet && ruleSet.settings) {
-      // Update UI elements with mode settings
       if (this.modeGrayscaleToggle) {
         this.modeGrayscaleToggle.checked =
           ruleSet.settings.grayscaleEnabled || false;
-      }
-      if (this.modePomodoroToggle) {
-        this.modePomodoroToggle.checked =
-          ruleSet.settings.pomodoroEnabled || false;
-      }
-      if (this.pomodoroWork) {
-        this.pomodoroWork.value = ruleSet.settings.pomodoroWork || 25;
-      }
-      if (this.pomodoroBreak) {
-        this.pomodoroBreak.value = ruleSet.settings.pomodoroBreak || 5;
       }
     }
   }
@@ -3425,10 +3321,6 @@ class ProducerPopup {
     // Update settings from UI
     ruleSet.settings.grayscaleEnabled =
       this.modeGrayscaleToggle?.checked || false;
-    ruleSet.settings.pomodoroEnabled =
-      this.modePomodoroToggle?.checked || false;
-    ruleSet.settings.pomodoroWork = parseInt(this.pomodoroWork?.value || 25);
-    ruleSet.settings.pomodoroBreak = parseInt(this.pomodoroBreak?.value || 5);
 
     // Save to storage (with special action to prevent tab reloading)
     this.saveState("modeSettings");
