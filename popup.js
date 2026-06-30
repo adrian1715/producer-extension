@@ -2361,7 +2361,9 @@ class ProducerPopup {
       const lines = text.split("\n");
 
       // Parse rules from file
+      const validTypes = ["domain", "url", "allow", "allowParam"];
       const importedRules = [];
+      let skippedCount = 0;
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith("#")) continue;
@@ -2370,6 +2372,12 @@ class ProducerPopup {
         const value = valueParts.join(" ").trim();
 
         if (!type || !value) continue;
+
+        // Reject unknown rule types so imports can't inject malformed entries.
+        if (!validTypes.includes(type)) {
+          skippedCount++;
+          continue;
+        }
 
         const baseRule = {
           id: Math.floor(Date.now() * Math.random()),
@@ -2380,10 +2388,28 @@ class ProducerPopup {
         // Properly split query parameter rules
         if (type === "allowParam") {
           const [param, paramValue = ""] = value.split("=");
-          baseRule.paramKey = param.trim();
-          baseRule.paramValue = paramValue.trim();
+          const paramKey = param.trim();
+          // Param keys/values must be plain query-token characters.
+          const paramPattern = /^[a-zA-Z0-9\-._~]+$/;
+          if (!paramKey || !paramPattern.test(paramKey)) {
+            skippedCount++;
+            continue;
+          }
+          const paramValueTrimmed = paramValue.trim();
+          if (paramValueTrimmed && !paramPattern.test(paramValueTrimmed)) {
+            skippedCount++;
+            continue;
+          }
+          baseRule.paramKey = paramKey;
+          baseRule.paramValue = paramValueTrimmed;
         } else {
-          baseRule.url = this.cleanUrl(value);
+          const cleanedUrl = this.cleanUrl(value);
+          // Validate against the same rules the manual Add flow enforces.
+          if (!this.isValidUrl(cleanedUrl)) {
+            skippedCount++;
+            continue;
+          }
+          baseRule.url = cleanedUrl;
         }
 
         importedRules.push(baseRule);
@@ -2404,6 +2430,17 @@ class ProducerPopup {
         return;
       }
 
+      // Don't wipe existing rules if the file had nothing importable.
+      if (importedRules.length === 0) {
+        this.showNotification(
+          skippedCount > 0
+            ? "No valid rules found in file"
+            : "No rules found in file",
+          "error",
+        );
+        return;
+      }
+
       ruleSet.rules = importedRules;
 
       // Only save state if not creating (temp changes don't get saved until confirmation)
@@ -2417,7 +2454,14 @@ class ProducerPopup {
         this.renderAllRulesList();
       }
 
-      this.showNotification("Rules imported successfully", "success");
+      if (skippedCount > 0) {
+        this.showNotification(
+          `Imported ${importedRules.length} rule(s); skipped ${skippedCount} invalid`,
+          "success",
+        );
+      } else {
+        this.showNotification("Rules imported successfully", "success");
+      }
     } catch (err) {
       console.error("Failed to import rules:", err);
       this.showNotification("Failed to import rules", "error");
@@ -3367,25 +3411,38 @@ class ProducerPopup {
         ? `?${lastRule.paramKey}=${lastRule.paramValue || "any"}`
         : lastRule.url;
 
-    this.rulesPreview.innerHTML = `
-      <div class="rule-item">
-        <div class="rule-info">
-          <div class="rule-url">${ruleText}</div>
-          <div class="rule-type">${this.formatRuleType(lastRule)}</div>
-        </div>
-        <button class="btn btn-xsmall btn-squared btn-danger" id="deleteLastRuleBtn">
-          <i class="bi bi-trash"></i>
-        </button>
-      </div>
-    `;
+    // Build via DOM + textContent so rule values (which can come from user input
+    // or imported files) are never interpreted as HTML.
+    this.rulesPreview.innerHTML = "";
 
-    // Add event listener to delete button
-    const deleteBtn = document.getElementById("deleteLastRuleBtn");
-    if (deleteBtn) {
-      deleteBtn.addEventListener("click", () => {
-        this.removeRule(lastRule.id);
-      });
-    }
+    const item = document.createElement("div");
+    item.className = "rule-item";
+
+    const info = document.createElement("div");
+    info.className = "rule-info";
+
+    const urlEl = document.createElement("div");
+    urlEl.className = "rule-url";
+    urlEl.textContent = ruleText;
+
+    const typeEl = document.createElement("div");
+    typeEl.className = "rule-type";
+    typeEl.textContent = this.formatRuleType(lastRule);
+
+    info.appendChild(urlEl);
+    info.appendChild(typeEl);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn btn-xsmall btn-squared btn-danger";
+    deleteBtn.id = "deleteLastRuleBtn";
+    deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+    deleteBtn.addEventListener("click", () => {
+      this.removeRule(lastRule.id);
+    });
+
+    item.appendChild(info);
+    item.appendChild(deleteBtn);
+    this.rulesPreview.appendChild(item);
   }
 
   clearRulesFromCurrentMode() {
@@ -4639,27 +4696,16 @@ class ProducerPopup {
       }
     }
 
-    console.log(
-      "[Producer Popup] Broadcasting grayscale state:",
-      enabled,
-      "isActive:",
-      this.isActive,
-      "activeRuleSetId:",
-      this.activeRuleSetId,
-    );
-
     // FIRST: Update storage to trigger storage change listeners in ALL tabs
     // This is the PRIMARY method for instant updates
     await chrome.storage.local.set({
       grayscaleEnabled: enabled,
       isActive: this.isActive,
     });
-    console.log("[Producer Popup] Storage updated with grayscale:", enabled);
 
     // SECOND: Send direct messages to all tabs as backup (in case storage listener hasn't fired yet)
     try {
       const tabs = await chrome.tabs.query({});
-      console.log("[Producer Popup] Found tabs:", tabs.length);
 
       // Send messages to all tabs in parallel
       const messagePromises = tabs.map(async (tab) => {
@@ -4670,12 +4716,6 @@ class ProducerPopup {
           !tab.url.startsWith("chrome-extension://") &&
           !tab.url.startsWith("about:")
         ) {
-          console.log(
-            "[Producer Popup] Sending grayscale message to tab:",
-            tab.id,
-            tab.url,
-          );
-
           // Try multiple times to ensure delivery
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
@@ -4683,21 +4723,11 @@ class ProducerPopup {
                 action: "toggleGrayscale",
                 enabled: enabled,
               });
-              console.log(
-                "[Producer Popup] Message sent successfully to tab:",
-                tab.id,
-              );
               break; // Success, exit retry loop
             } catch (error) {
               if (attempt === 0) {
                 // Wait a bit and retry once
                 await new Promise((resolve) => setTimeout(resolve, 50));
-              } else {
-                console.log(
-                  "[Producer Popup] Failed to send message to tab:",
-                  tab.id,
-                  error.message,
-                );
               }
             }
           }
@@ -4706,7 +4736,6 @@ class ProducerPopup {
 
       // Wait for all messages to be sent
       await Promise.all(messagePromises);
-      console.log("[Producer Popup] All grayscale messages sent");
     } catch (error) {
       console.error(
         "[Producer Popup] Error broadcasting grayscale state:",

@@ -25,8 +25,6 @@ class ProducerContentScript {
   setupThemeListener() {
     // Listen for theme updates from background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      console.log("[Producer] Received message:", message);
-
       if (message.action === "applyBlockPageTheme") {
         this.blockPageTheme = message.theme || "blue";
         this.blockPageTitle = message.blockPageTitle || "🎯 Stay Focused";
@@ -47,10 +45,6 @@ class ProducerContentScript {
             : true;
         sendResponse({ success: true });
       } else if (message.action === "toggleGrayscale") {
-        console.log(
-          "[Producer] Received toggleGrayscale message, enabled:",
-          message.enabled,
-        );
         this.toggleGrayscaleFilter(message.enabled);
         sendResponse({ success: true });
       }
@@ -72,8 +66,6 @@ class ProducerContentScript {
         "isActive",
       ],
       (data) => {
-        console.log("[Producer] Initial storage data:", data);
-
         if (data.theme) {
           this.blockPageTheme = data.theme;
         }
@@ -100,12 +92,6 @@ class ProducerContentScript {
         }
         // Apply grayscale if it's enabled AND focus mode is active
         if (data.grayscaleEnabled && data.isActive) {
-          console.log(
-            "[Producer] Applying grayscale on init - grayscaleEnabled:",
-            data.grayscaleEnabled,
-            "isActive:",
-            data.isActive,
-          );
           this.toggleGrayscaleFilter(true);
         }
       },
@@ -124,14 +110,6 @@ class ProducerContentScript {
           // Always re-read fresh values from storage when any relevant key changes
           chrome.storage.local.get(["grayscaleEnabled", "isActive"], (data) => {
             const shouldEnable = !!(data.grayscaleEnabled && data.isActive);
-            console.log(
-              "[Producer] Storage changed - updating grayscale:",
-              shouldEnable,
-              "grayscaleEnabled:",
-              data.grayscaleEnabled,
-              "isActive:",
-              data.isActive,
-            );
 
             // Force update the grayscale filter
             this.toggleGrayscaleFilter(shouldEnable);
@@ -151,8 +129,6 @@ class ProducerContentScript {
     if (document.getElementById("producer-block-overlay")) {
       return;
     }
-
-    console.log("[Producer] Toggling grayscale filter:", enabled);
 
     const styleId = "producer-grayscale-filter";
     let style = document.getElementById(styleId);
@@ -183,8 +159,6 @@ class ProducerContentScript {
         const target = document.head || document.documentElement;
         target.appendChild(newStyle);
 
-        console.log("[Producer] Grayscale filter applied");
-
         // Force reflow to ensure filter is applied
         if (document.documentElement) {
           document.documentElement.offsetHeight;
@@ -195,7 +169,6 @@ class ProducerContentScript {
     } else {
       if (style) {
         style.remove();
-        console.log("[Producer] Grayscale filter removed");
       }
     }
   }
