@@ -1,152 +1,283 @@
-# Producer - Focus Mode Extension 🎯
+# Producer — Focus Extension 🎯
 
-A powerful Chrome extension designed to boost productivity by blocking distracting websites and specific URLs during focus sessions.
+A Chrome extension (Manifest V3) that boosts productivity by blocking
+distracting websites and specific URLs during focus sessions. Organize your
+block rules into reusable **modes**, run timed **focus sessions**, keep some
+sites blocked **permanently**, and customize the block page to your taste.
 
-## Features
+---
 
-- **Smart Blocking**: Block entire domains or specific URLs
-- **Granular Control**: Allow specific pages or even certain URL parameters on otherwise blocked domains
-- **Beautiful UI**: Modern, gradient-based popup interface
-- **Focus Sessions**: Toggle focus mode with a single click
-- **Real-time Stats**: Track blocked sites and session statistics
-- **Motivational Blocking**: Encouraging messages when sites are blocked
+## Key Features
+
+- **Modes** — group block/allow rules into named rule sets and switch between
+  them; one mode is active at a time.
+- **Focus sessions** — toggle focus on/off; each session tracks focused time,
+  break time, and how many blocks it triggered.
+- **Flexible rules** — block whole domains, specific URLs, allow exceptions, or
+  allow a blocked page only when a query parameter matches.
+- **Permanent rules** — mark a rule as always-on so it blocks even when focus is
+  off, independent of any session.
+- **Block-all wildcard** — block every site with a single `*` rule and use
+  allow rules to carve out exceptions.
+- **Customizable block page** — themes, custom colors, title, message,
+  optional motivational quotes, a background image, and toggleable action
+  buttons.
+- **Per-mode features** — optional behaviors such as **Grayscale** (drains
+  color from every page while focus is active).
+- **On-the-fly updates** — changing rules instantly reloads or redirects only
+  the affected tabs; blocked tabs return to their original page the moment a
+  rule is removed.
+- **Import / export** — move rule sets between machines with a simple text file.
+- **Stats & history** — session history with editable names, plus averages for
+  focused time and session length.
+- **Privacy-first** — all data is stored locally; nothing about you or the sites
+  you visit is sent anywhere (see [PRIVACY.md](PRIVACY.md)).
+
+---
 
 ## Installation
 
-1. **Download the Extension Files**
+Producer has no build step — it loads directly as an unpacked extension.
 
-   - Save all the provided files in a folder called `producer-extension`
-   - You'll need: `manifest.json`, `popup.html`, `popup.js`, `background.js`, `content.js`, `rules.json`
+1. Open `chrome://extensions/`.
+2. Enable **Developer mode** (toggle in the top right).
+3. Click **Load unpacked** and select the repository root folder.
+4. The Producer icon appears in your toolbar — click it to open the popup.
 
-2. **Load into Chrome**
+---
 
-   - Open Chrome and go to `chrome://extensions/`
-   - Enable "Developer mode" (toggle in top right)
-   - Click "Load unpacked" and select your `producer-extension` folder
-   - The extension should now appear in your extensions bar
+## Core concepts
 
-3. **Create Icon Files (Optional)**
-   - Create an `icons` folder in your extension directory
-   - Add icon files: `icon16.png`, `icon32.png`, `icon48.png`, `icon128.png`
-   - Or remove the icons section from manifest.json if you don't want custom icons
+- **Mode** — a named set of rules (e.g. "Deep Work", "Studying"). You activate
+  one mode at a time; only the active mode's rules are enforced during focus.
+- **Focus** — when focus is on (the **Start Producing** button), the active
+  mode's rules block matching sites. Turning focus off lifts those blocks.
+- **Permanent rule** — blocks its target at all times, whether or not focus is
+  on and regardless of which mode is active.
+- **Session** — created automatically when you start focus; records focused
+  time, break time, and block count, and is kept in your history.
 
-## How to Use
+---
 
-1. Click the **Producer** extension icon in your toolbar
-2. Click **Start Producing** to begin a focus session
-3. Add websites or URLs you want to block
-4. Sites will be blocked until you stop the focus session
+## How to use
 
-## Adding Block Rules
+1. Open the popup and go to the **Modes** tab.
+2. Click **New Mode**, give it a name, and open it to add rules.
+3. Add one or more rules (see [Rule types](#rule-types) below).
+4. **Activate** the mode.
+5. On the **Home** tab, click **Start Producing** to begin a focus session.
 
-### Block Entire Domain
+If you try to start focus with no active mode, Producer will prompt you to
+create and activate one first.
 
-- Select **Block Domain**
-- Enter a domain like `youtube.com` or `reddit.com`
-- This blocks the entire website and all its pages
+---
 
-### Block Specific URLs
+## Rule types
 
-- Select **Block Specific URL**
-- Enter specific paths like `youtube.com/feed/trending`
-- This blocks only that page/section
+When adding a rule, pick a type from the dropdown:
 
-### Allow Specific URLs
+### Block Domain
 
-- Select **Allow Specific URL**
-- Enter URLs you want to allow on otherwise blocked domains
-- Example: Block `youtube.com` but allow `youtube.com/playlist?list=WL`
+Blocks an entire site and all its subdomains.
 
-### **Allow Specific URL Parameters**
+- Example: `youtube.com` blocks `youtube.com`, `www.youtube.com`,
+  `m.youtube.com`, and every page on the domain.
 
-- Fine-tune allowed pages based on their query parameters
-- Example:
+### Block Specific URL
 
-  - Block `youtube.com/watch` (all videos)
-  - **Allow only videos in a specific playlist:**
+Blocks only an exact URL or path, leaving the rest of the domain reachable.
 
-    ```
-    URL: youtube.com/watch
-    allowParams: ?list=PL123456789
-    ```
+- Example: `youtube.com/feed/trending` blocks just that page.
+- A bare domain here (e.g. `youtube.com`) blocks only the site's home page.
 
-  - Now all videos outside that playlist will be blocked, but the playlist is allowed
+### Allow Specific URL
 
-## Usage Examples
+An explicit allowlist that takes precedence over block rules. Use it to permit a
+page on an otherwise-blocked domain.
 
-**Block all YouTube videos except from Watch Later playlist**
+- Example: block `instagram.com` but allow `instagram.com/direct/inbox`.
 
-1. Add rule: **Block Specific URL** → `youtube.com`
-2. Add rule: **Allow Parameter** = key `list` value `WL`
+### Allow Parameter
 
-**Block Instagram but allow direct inbox**
+Allows a blocked URL only when a specific query parameter is present (and,
+optionally, matches a specific value).
 
-1. Add rule: **Block Domain** → `instagram.com`
-2. Add rule: **Allow Specific URL** → `instagram.com/direct/inbox`
+- Example: block `youtube.com/watch` (all videos) but add an Allow Parameter
+  rule with key `list` and value `WL` to permit only your Watch Later playlist.
+- Leave the value empty to allow the parameter with any value.
 
-**Block X (Twitter) general feed but allow your communities**
+### Block All Websites (wildcard)
 
-1. Add rule: **Block Specific URL** → `x.com`
-2. Add rule: **Allow Specific URL** → `x.com/{username}/communities`
+Add a Block Domain or Block Specific URL rule with the value `*` to block
+everything, then use **Allow Specific URL** rules to whitelist the few sites you
+need.
 
-## File Structure
+---
+
+## The block page
+
+When a blocked site is opened, Producer replaces it with a focus page showing the
+blocked URL, a block counter, an optional motivational quote, and your current
+session stats. Its action buttons:
+
+- **Allow Once** — bypass this block a single time without changing any rule.
+- **Add Exception** — add an Allow rule for this URL to the active mode.
+- **Undo Permanent Rule** — shown when the page is blocked by a permanent rule;
+  removes that permanent rule.
+- **Go Back** / **Close Tab** — leave the page.
+
+When a site is blocked permanently with no active focus session, the
+session-stats area is hidden.
+
+---
+
+## Personalization
+
+On the **Personalize** tab you can tailor the block page:
+
+- **Theme** — blue, red, orange, purple, teal, or dark.
+- **Primary & accent colors** — fine-tune the palette.
+- **Title & message** — set your own block-page copy.
+- **Motivational quotes** — show or hide the quote line.
+- **Background image** — add one by file upload (up to 2 MB) or by URL.
+- **Action buttons** — show or hide the Allow Once / Add Exception buttons.
+
+A live preview reflects changes as you make them.
+
+---
+
+## Features (per mode)
+
+Open a mode's **Features** page to enable optional behaviors for that mode:
+
+- **Grayscale** — while focus is active and this mode is on, every page is
+  rendered in grayscale to reduce its pull.
+
+More features are planned.
+
+---
+
+## Import / export
+
+From the rules view you can **Export** the active mode's rules to a text file and
+**Import** them back later or on another machine. The format is one rule per
+line, `type value`:
+
+```
+# comments start with '#'
+domain youtube.com
+url reddit.com/r/popular
+allow youtube.com/playlist?list=WL
+allowParam list=WL
+```
+
+Imported lines are validated — unknown types and malformed URLs/parameters are
+skipped, and the importer reports how many were ignored.
+
+---
+
+## Stats
+
+The **Stats** tab shows your session history (with inline-editable, reorderable
+names) plus overall figures such as total sessions, average focused time, and
+average session length.
+
+---
+
+## Privacy
+
+All rules, sessions, and settings are stored locally via `chrome.storage.local`.
+Producer has no account system, no analytics, and no developer backend. The only
+outbound network request fetches a public motivational quote for the block page
+and contains no personal data. Full details in [PRIVACY.md](PRIVACY.md).
+
+---
+
+## Project structure
 
 ```
 producer-extension/
-├── manifest.json         # Extension configuration
-├── popup.html            # Extension popup interface
-├── popup.js              # Popup functionality
-├── background.js         # Background service worker
-├── content.js            # Content script for blocking
-├── rules.json            # Declarative net request rules
-├── icon.png              # Popup icon image
-└── README.md
+├── manifest.json     # Extension configuration (Manifest V3)
+├── popup.html        # Popup UI markup
+├── popup.css         # Popup styles
+├── popup.js          # Popup logic and all user-initiated state changes
+├── background.js     # Service worker — blocking decisions & session/timer state
+├── content.js        # Content script — enforces blocking on every page
+├── blocked.html      # Standalone block page
+├── blocked.js        # Block page logic
+├── icon.png          # Extension/toolbar icon
+├── producer-logo.png # Logo used in the popup
+├── PRIVACY.md        # Privacy policy
+├── readme.md
+└── reports/          # Dated development reports
 ```
 
-## Technical Details
+## Technical details
 
-- **Manifest Version**: 3 (latest Chrome extension standard)
-- **Permissions**: Storage, activeTab, declarativeNetRequest, tabs
-- **Blocking Method**: Content script injection with beautiful block pages
-- **Storage**: Chrome local storage for persistence
-- **Architecture**: Service worker background script with popup interface
+- **Manifest version:** 3
+- **Permissions:** `storage`, `tabs`
+- **Host access:** `<all_urls>` (the content script must read each page's URL to
+  decide whether to block it; URLs are evaluated locally and never transmitted)
+- **Blocking method:** content-script injection that redirects blocked pages to
+  an in-extension block page
+- **Storage:** `chrome.storage.local` for all persistence
 
-## Features Overview
+### Architecture
 
-- ✅ Block entire domains
-- ✅ Block specific URLs/paths
-- ✅ Whitelist specific URLs on blocked domains
-- ✅ Whitelist based on URL parameters
-- ✅ Real-time session statistics
-- ✅ Beautiful, modern UI
-- ✅ Motivational block pages
-- ✅ Easy toggle on/off
-- ✅ Persistent settings
-- ✅ Session block counting
+Three runtime contexts communicate only via Chrome runtime messages and
+`chrome.storage.local`:
+
+- **`background.js` (`ProducerBackground`, service worker)** — the authority on
+  blocking decisions and session state. `shouldBlockUrl()` is the single source
+  of truth: it checks permanent rules first (always active), then the active
+  mode's rules when focus is on. It also tracks the session timer, reloads
+  affected tabs when rules change, and discards blocked tabs to save memory.
+- **`content.js` (`ProducerContentScript`)** — injected at `document_start` on
+  every page. It checks the URL, redirects to the block page when blocked, and
+  intercepts clicks, form submits, history navigation, and `window.open` to
+  catch single-page-app navigations.
+- **`blocked.html` + `blocked.js` (`ProducerBlockedPage`)** — the standalone
+  block page. It reads its context from URL parameters and storage, polls to
+  auto-redirect when a rule is removed, and applies your theme and text.
+
+The **popup (`ProducerPopup`)** owns the UI and writes all state through a
+central `saveState()` path, which persists to storage and notifies the
+background worker.
+
+---
+
+## Development workflow
+
+There is no build system. After editing:
+
+- **`popup.js` / `popup.html` / `popup.css`** — take effect the next time you
+  open the popup.
+- **`background.js`** — click **Reload** on the extension card in
+  `chrome://extensions/`.
+- **`content.js`** — reload the affected tabs.
+
+---
 
 ## Troubleshooting
 
-**Extension not working?**
+**Sites aren't being blocked**
 
-- Make sure Developer mode is enabled
-- Check that all files are in the correct folder
-- Reload the extension after making changes
+- Make sure a mode is **active** and focus is **on** (Start Producing).
+- Confirm the rule is in the active mode and the value is correct.
+- Refresh the page after adding a rule.
 
-**Sites not being blocked?**
+**Can't reach a site you need**
 
-- Ensure focus mode is activated (green indicator)
-- Check that your block rules are correctly formatted
-- Try refreshing the page after adding rules
+- Add an **Allow Specific URL** or **Allow Parameter** exception, or turn focus
+  off temporarily.
+- Check for a conflicting **permanent** rule (it blocks even with focus off).
 
-**Can't access needed sites?**
+**A change didn't apply**
 
-- Use **Allow Specific URL** or **Allow Parameter** rules to whitelist important pages
-- Turn off focus mode temporarily if needed
-- Check your rules for conflicts
+- Reload the extension from `chrome://extensions/` after editing
+  `background.js`, and reload open tabs for `content.js` changes.
 
-## Contributing
-
-This extension is designed to be simple and effective. Feel free to modify the code to suit your specific needs!
+---
 
 ## License
 

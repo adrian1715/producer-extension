@@ -8,6 +8,12 @@ feature-complete and ready to publish for public feedback, with a short list of
 items to address first. This report covers that assessment and the fixes applied
 in the same session.
 
+## Commits
+
+- `9ad7c4d` — final review and fixes before v2 release (version sync, block-page
+  XSS fix, import validation, permission trim, privacy policy, console cleanup)
+- `2c2f163` — updating readme accordingly before v2 release
+
 ## Review outcome
 
 Static review of all runtime contexts (`background.js`, `content.js`,
@@ -23,13 +29,13 @@ fixes below.
 
 ## Changes
 
-### Synced the displayed version number
+### Synced the displayed version number (`9ad7c4d`)
 
 The About panel showed `1.0.0` while the manifest declared `2.0.0`. The About
 panel now reads `2.0.0` to match the published version, removing a discrepancy
 visible to users and store reviewers.
 
-### Removed an HTML-injection sink in the rules preview
+### Removed an HTML-injection sink in the rules preview (`9ad7c4d`)
 
 `renderRulesPreview()` was the only renderer that interpolated a rule value
 directly into `innerHTML`; every other list builds DOM nodes with `textContent`.
@@ -39,7 +45,7 @@ The preview now builds its nodes with `createElement` + `textContent`, so rule
 values can never be interpreted as HTML. This protects existing data
 retroactively, not just newly added rules.
 
-### Hardened rule import validation
+### Hardened rule import validation (`9ad7c4d`)
 
 Import previously accepted any line content with no validation, which allowed
 malformed rules and was the delivery vector for the issue above. Import now:
@@ -50,7 +56,7 @@ malformed rules and was the delivery vector for the issue above. Import now:
 - refuses to overwrite a mode's existing rules when a file contains nothing
   importable, and reports how many lines were skipped
 
-### Trimmed permissions and added a privacy policy
+### Trimmed permissions and added a privacy policy (`9ad7c4d`)
 
 - Removed the redundant `activeTab` permission (subsumed by the `<all_urls>`
   host permission plus `tabs`), slightly reducing the install warning.
@@ -60,7 +66,7 @@ malformed rules and was the delivery vector for the issue above. Import now:
   data). It is ready to host and link from the Web Store dashboard, and includes
   per-permission justifications.
 
-### Removed debug console logging
+### Removed debug console logging (`9ad7c4d`)
 
 - `content.js`: removed all 8 `[Producer]` debug logs. These ran at
   `document_start` on every page and printed stored settings and every message
@@ -70,6 +76,19 @@ malformed rules and was the delivery vector for the issue above. Import now:
   browser-closure deactivation) and the two one-time migration logs in
   `popup.js`, since these aid diagnosis and never run on user pages. All
   `console.error` handlers were left intact.
+
+### Rewrote the README for the current feature set (`2c2f163`)
+
+The README still described an early build — it referenced a `rules.json` file
+and a `declarativeNetRequest` permission that this version no longer uses, listed
+outdated permissions, and documented none of the features added since. It was
+rewritten end to end to match the shipping app: modes, focus sessions, permanent
+rules, the block-all wildcard, the block page and its action buttons,
+personalization, per-mode features (Grayscale), import/export with the real line
+format and validation behavior, stats, privacy, the corrected file structure and
+permissions, the three-context architecture, and the no-build dev workflow. UI
+terminology was aligned with what users actually see (tabs Home / Modes / Stats /
+Personalize / Account, the "Start Producing" button, and the rule-type labels).
 
 ---
 
