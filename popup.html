@@ -140,7 +140,7 @@
                 <span id="currentSessionName" style="font-weight: 600"
                   >None</span
                 >
-                <span style="opacity: 0.7"> • Rules: </span>
+                <span style="opacity: 0.7"> • Mode: </span>
                 <span id="currentSessionRules" style="font-weight: 600"
                   >None</span
                 >
@@ -893,6 +893,21 @@ This site is blocked during your focus session</textarea
         <i class="bi bi-person-circle"></i>
         <span>Account</span>
       </button>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="confirm-modal-overlay">
+      <div class="confirm-modal">
+        <div class="confirm-modal-icon">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+        <div class="confirm-modal-title" id="confirmModalTitle"></div>
+        <div class="confirm-modal-message" id="confirmModalMessage"></div>
+        <div class="confirm-modal-actions">
+          <button class="confirm-modal-cancel" id="confirmModalCancel">Cancel</button>
+          <button class="confirm-modal-confirm" id="confirmModalConfirm">Delete</button>
+        </div>
+      </div>
     </div>
 
     <script src="popup.js"></script>

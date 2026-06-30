@@ -90,10 +90,21 @@ permissions, the three-context architecture, and the no-build dev workflow. UI
 terminology was aligned with what users actually see (tabs Home / Modes / Stats /
 Personalize / Account, the "Start Producing" button, and the rule-type labels).
 
+### Custom confirm modal replaces browser dialogs
+
+All destructive actions that previously used the native `confirm()` dialog now open a custom in-popup modal. Affected actions: Delete Mode, Delete Session, Clear All Rules (Mode Settings and All Rules page), Clear All Modes, Clear All Sessions, Clear Session Stats.
+
+The modal is a blurred overlay with a centered card containing a warning icon, a title, a plain-language description, and two buttons — Cancel and a red confirm button with action-specific labels ("Delete", "Clear All", "Clear Stats"). It inherits the active theme's `--dropdown-bg` variable for visual consistency and enters with a short scale animation. Clicking the overlay dismisses it like Cancel.
+
+### Renamed "Rules" to "Mode" in the session info summary
+
+The current session summary on the Stats tab showed `Session • Rules • Blocks`, but the "Rules" field actually displays the name of the active mode, not a rule count or list. The label was renamed to "Mode" to match what it shows.
+
 ---
 
 ## Technical Notes
 
+- `_showConfirmModal({ title, message, confirmText, onConfirm })` helper manages the modal — uses `.onclick` assignment to avoid listener accumulation across multiple opens; the `deleteSession` callback is `async` to preserve its internal `await` calls. Modal markup in `popup.html`, styles in `popup.css`.
 - All four JS files pass `node --check` after the changes.
 - The import validation was verified against a mixed input set: valid rules
   import correctly, and every malicious/invalid line (HTML in a URL, `<script>`

@@ -1012,7 +1012,7 @@ class ProducerPopup {
     const ruleSet = this.customModes.find(
       (rs) => rs.id === currentSession.ruleSetId,
     );
-    const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
+    const ruleSetName = ruleSet ? ruleSet.name : "No Mode";
     detailsElement.textContent = this.formatSessionDetailsText(
       ruleSetName,
       currentSession.blocksCount || 0,
@@ -1088,7 +1088,7 @@ class ProducerPopup {
         const ruleSet = this.customModes.find(
           (rs) => rs.id === currentSession.ruleSetId,
         );
-        let rulesName = ruleSet ? ruleSet.name : "None";
+        let rulesName = ruleSet ? ruleSet.name : "No Mode";
         const blocksCount = String(currentSession.blocksCount || 0);
 
         // Static text: "Session: " (9) + " • Rules: " (10) + " • Blocks: " (11) = 30 chars
@@ -2312,7 +2312,7 @@ class ProducerPopup {
   formatSessionDetailsText(ruleSetName, blocksCount, totalTime) {
     const hours = Math.floor(totalTime / 3600);
     const minutes = Math.floor((totalTime % 3600) / 60);
-    const shortRuleSetName = this.truncateText(ruleSetName || "No Rules", 18);
+    const shortRuleSetName = this.truncateText(ruleSetName || "No Mode", 18);
     const detailsText = `${shortRuleSetName} \u2022 ${blocksCount} block${
       blocksCount !== 1 ? "s" : ""
     } \u2022 ${hours}h${minutes}m`;
@@ -2536,20 +2536,28 @@ class ProducerPopup {
       return;
     }
 
-    ruleSet.rules = [];
+    const rulesLabel = `${ruleSet.rules.length} rule${ruleSet.rules.length !== 1 ? "s" : ""}`;
+    this._showConfirmModal({
+      title: "Clear All Rules",
+      message: `All ${rulesLabel} in this mode will be permanently deleted. This cannot be undone.`,
+      confirmText: "Clear All",
+      onConfirm: () => {
+        ruleSet.rules = [];
 
-    // Only save state if not creating (temp changes don't get saved until confirmation)
-    if (!this.isCreatingNewRuleSet) {
-      this.saveState();
-    }
-    this.updateUI();
+        // Only save state if not creating (temp changes don't get saved until confirmation)
+        if (!this.isCreatingNewRuleSet) {
+          this.saveState();
+        }
+        this.updateUI();
 
-    // If All Rules view is visible, re-render it
-    if (this.allRulesView && this.allRulesView.style.display !== "none") {
-      this.renderAllRulesList();
-    }
+        // If All Rules view is visible, re-render it
+        if (this.allRulesView && this.allRulesView.style.display !== "none") {
+          this.renderAllRulesList();
+        }
 
-    this.showNotification("All rules cleared");
+        this.showNotification("All rules cleared");
+      },
+    });
   }
 
   async clearInfo(sessionId) {
@@ -2573,45 +2581,47 @@ class ProducerPopup {
       return;
     }
 
-    const confirmClear = confirm(
-      `Clear stats for "${session.name}"?\n\nThis will reset the time and blocks count to zero.`,
-    );
-    if (!confirmClear) return;
+    this._showConfirmModal({
+      title: "Clear Session Stats",
+      message: `Reset all time and block count for "${session.name}" to zero? This cannot be undone.`,
+      confirmText: "Clear Stats",
+      onConfirm: () => {
+        // Clear the session's stats
+        session.focusedTime = 0;
+        session.breakTime = 0;
+        session.blocksCount = 0;
 
-    // Clear the session's stats
-    session.focusedTime = 0;
-    session.breakTime = 0;
-    session.blocksCount = 0;
+        // If this is the currently active session, also clear the UI state
+        if (this.currentSessionId === sessionId) {
+          this.sessionTime = 0;
+          this.sessionBlocks = 0;
 
-    // If this is the currently active session, also clear the UI state
-    if (this.currentSessionId === sessionId) {
-      this.sessionTime = 0;
-      this.sessionBlocks = 0;
+          // Reset tracking times in the session
+          if (this.isActive) {
+            session.sessionFocusStartTime = Date.now();
+            session.sessionPauseStartTime = null;
+          } else {
+            session.sessionPauseStartTime = Date.now();
+            session.sessionFocusStartTime = null;
+          }
 
-      // Reset tracking times in the session
-      if (this.isActive) {
-        session.sessionFocusStartTime = Date.now();
-        session.sessionPauseStartTime = null;
-      } else {
-        session.sessionPauseStartTime = Date.now();
-        session.sessionFocusStartTime = null;
-      }
+          // Tell background script to clear focused time and reset session blocks
+          chrome.runtime.sendMessage({
+            action: "setFocusedTime",
+            focusedTime: 0,
+          });
 
-      // Tell background script to clear focused time and reset session blocks
-      chrome.runtime.sendMessage({
-        action: "setFocusedTime",
-        focusedTime: 0,
-      });
+          // Also send message to reset session blocks in background
+          chrome.runtime.sendMessage({
+            action: "resetSessionBlocks",
+          });
+        }
 
-      // Also send message to reset session blocks in background
-      chrome.runtime.sendMessage({
-        action: "resetSessionBlocks",
-      });
-    }
-
-    this.saveState("clearInfo");
-    this.updateUI();
-    this.showNotification("Session stats cleared");
+        this.saveState("clearInfo");
+        this.updateUI();
+        this.showNotification("Session stats cleared");
+      },
+    });
   }
 
   // Helper methods
@@ -2811,20 +2821,19 @@ class ProducerPopup {
     const ruleSet = this.customModes.find((rs) => rs.id === id);
     if (!ruleSet) return;
 
-    const confirmDelete = confirm(
-      `Delete mode "${ruleSet.name}"?\n\nThis will permanently delete ${ruleSet.rules.length} rules.`,
-    );
-    if (!confirmDelete) return;
-
-    // If deleting the active mode, clear active selection
-    if (this.activeRuleSetId === id) {
-      this.activeRuleSetId = null;
-    }
-
-    this.customModes = this.customModes.filter((rs) => rs.id !== id);
-    this.saveState();
-    this.updateUI();
-    this.showNotification("Mode deleted");
+    const rulesLabel = `${ruleSet.rules.length} rule${ruleSet.rules.length !== 1 ? "s" : ""}`;
+    this._showConfirmModal({
+      title: "Delete Mode",
+      message: `"${ruleSet.name}" and its ${rulesLabel} will be permanently deleted.`,
+      confirmText: "Delete",
+      onConfirm: () => {
+        if (this.activeRuleSetId === id) this.activeRuleSetId = null;
+        this.customModes = this.customModes.filter((rs) => rs.id !== id);
+        this.saveState();
+        this.updateUI();
+        this.showNotification("Mode deleted");
+      },
+    });
   }
 
   duplicateRuleSet(id) {
@@ -3460,21 +3469,20 @@ class ProducerPopup {
       return;
     }
 
-    const confirmClear = confirm(
-      `Clear all ${ruleSet.rules.length} rule${
-        ruleSet.rules.length !== 1 ? "s" : ""
-      } from this mode?\n\nThis cannot be undone.`,
-    );
-    if (!confirmClear) return;
-
-    ruleSet.rules = [];
-    this.saveState();
-    this.renderRulesList();
-    this.renderRulesPreview();
-    this.showNotification("All rules cleared");
-
-    // Broadcast rules update to background
-    chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
+    const rulesLabel = `${ruleSet.rules.length} rule${ruleSet.rules.length !== 1 ? "s" : ""}`;
+    this._showConfirmModal({
+      title: "Clear All Rules",
+      message: `Remove all ${rulesLabel} from this mode? This cannot be undone.`,
+      confirmText: "Clear All",
+      onConfirm: () => {
+        ruleSet.rules = [];
+        this.saveState();
+        this.renderRulesList();
+        this.renderRulesPreview();
+        this.showNotification("All rules cleared");
+        chrome.runtime.sendMessage({ action: "reloadAffectedTabs" });
+      },
+    });
   }
 
   _showDropdown(triggerBtn, dropdown) {
@@ -3509,6 +3517,29 @@ class ProducerPopup {
       dropdown.style.top = "auto";
       dropdown.style.bottom = window.innerHeight - btnRect.top + 2 + "px";
     }
+  }
+
+  _showConfirmModal({ title, message, confirmText = "Confirm", onConfirm }) {
+    const modal = document.getElementById("confirmModal");
+    document.getElementById("confirmModalTitle").textContent = title;
+    document.getElementById("confirmModalMessage").textContent = message;
+    const confirmBtn = document.getElementById("confirmModalConfirm");
+    const cancelBtn = document.getElementById("confirmModalCancel");
+    confirmBtn.textContent = confirmText;
+
+    const close = () => {
+      modal.style.display = "none";
+    };
+    confirmBtn.onclick = () => {
+      close();
+      onConfirm();
+    };
+    cancelBtn.onclick = close;
+    modal.onclick = (e) => {
+      if (e.target === modal) close();
+    };
+
+    modal.style.display = "flex";
   }
 
   renderRuleSetsList() {
@@ -3896,7 +3927,7 @@ class ProducerPopup {
       const ruleSet = this.customModes.find(
         (rs) => rs.id === session.ruleSetId,
       );
-      const ruleSetName = ruleSet ? ruleSet.name : "No Rules";
+      const ruleSetName = ruleSet ? ruleSet.name : "No Mode";
 
       // Calculate total time (focused + break)
       let totalTime = (session.focusedTime || 0) + (session.breakTime || 0);
@@ -4053,22 +4084,22 @@ class ProducerPopup {
       return;
     }
 
-    const confirmClear = confirm(
-      "Clear all sessions?\n\nThis will permanently delete all sessions and their data. This cannot be undone.",
-    );
-    if (!confirmClear) return;
-
-    // Stop session stats tracking
-    this.stopSessionStatsTracking();
-
-    this.sessions = [];
-    this.currentSessionId = null;
-    this.sessionBlocks = 0;
-    this.sessionTime = 0;
-
-    this.saveState();
-    this.updateUI();
-    this.showNotification("All sessions cleared");
+    this._showConfirmModal({
+      title: "Clear All Sessions",
+      message:
+        "All sessions and their data will be permanently deleted. This cannot be undone.",
+      confirmText: "Clear All",
+      onConfirm: () => {
+        this.stopSessionStatsTracking();
+        this.sessions = [];
+        this.currentSessionId = null;
+        this.sessionBlocks = 0;
+        this.sessionTime = 0;
+        this.saveState();
+        this.updateUI();
+        this.showNotification("All sessions cleared");
+      },
+    });
   }
 
   clearAllRuleSets() {
@@ -4077,18 +4108,19 @@ class ProducerPopup {
       return;
     }
 
-    const confirmClear = confirm(
-      `Clear all custom modes?\n\nThis will permanently delete all ${
-        this.customModes.length
-      } mode${this.customModes.length !== 1 ? "s" : ""}. This cannot be undone.`,
-    );
-    if (!confirmClear) return;
-
-    this.customModes = [];
-    this.activeRuleSetId = null;
-    this.saveState();
-    this.updateUI();
-    this.showNotification("All modes cleared");
+    const modesLabel = `${this.customModes.length} mode${this.customModes.length !== 1 ? "s" : ""}`;
+    this._showConfirmModal({
+      title: "Clear All Modes",
+      message: `All ${modesLabel} will be permanently deleted. This cannot be undone.`,
+      confirmText: "Clear All",
+      onConfirm: () => {
+        this.customModes = [];
+        this.activeRuleSetId = null;
+        this.saveState();
+        this.updateUI();
+        this.showNotification("All modes cleared");
+      },
+    });
   }
 
   // Personalization methods
@@ -4945,41 +4977,29 @@ class ProducerPopup {
     if (!session) return;
 
     const totalTime = (session.focusedTime || 0) + (session.breakTime || 0);
-    const confirmDelete = confirm(
-      `Delete session "${
-        session.name
-      }"?\n\nThis will permanently delete all session data including ${Math.floor(
-        totalTime / 3600,
-      )}h ${Math.floor((totalTime % 3600) / 60)}m of total time and ${
-        session.blocksCount || 0
-      } blocks.`,
-    );
-    if (!confirmDelete) return;
-
-    // If deleting the current session, clear it
-    if (this.currentSessionId === sessionId) {
-      // Turn off focus mode if active
-      if (this.isActive) await this.toggleProducing();
-
-      // Commit any accumulated break or focus time
-      this.commitCurrentSessionTime();
-
-      // Stop session stats tracking
-      this.stopSessionStatsTracking();
-
-      this.currentSessionId = null;
-      this.sessionBlocks = 0;
-      this.sessionTime = 0;
-
-      // Ensure focus mode is off and stopped
-      this.isActive = false;
-      this.stopTimerUpdates();
-    }
-
-    this.sessions = this.sessions.filter((s) => s.id !== sessionId);
-    await this.saveState();
-    this.updateUI();
-    this.showNotification("Session deleted");
+    const timeLabel = `${Math.floor(totalTime / 3600)}h ${Math.floor((totalTime % 3600) / 60)}m`;
+    const blocksLabel = `${session.blocksCount || 0} block${(session.blocksCount || 0) !== 1 ? "s" : ""}`;
+    this._showConfirmModal({
+      title: "Delete Session",
+      message: `"${session.name}" will be permanently deleted, including ${timeLabel} of focus time and ${blocksLabel}.`,
+      confirmText: "Delete",
+      onConfirm: async () => {
+        if (this.currentSessionId === sessionId) {
+          if (this.isActive) await this.toggleProducing();
+          this.commitCurrentSessionTime();
+          this.stopSessionStatsTracking();
+          this.currentSessionId = null;
+          this.sessionBlocks = 0;
+          this.sessionTime = 0;
+          this.isActive = false;
+          this.stopTimerUpdates();
+        }
+        this.sessions = this.sessions.filter((s) => s.id !== sessionId);
+        await this.saveState();
+        this.updateUI();
+        this.showNotification("Session deleted");
+      },
+    });
   }
 
   editSessionRuleSet(sessionId) {
@@ -4990,18 +5010,16 @@ class ProducerPopup {
     const currentRuleSet = this.customModes.find(
       (rs) => rs.id === session.ruleSetId,
     );
-    const currentRuleSetName = currentRuleSet
-      ? currentRuleSet.name
-      : "No Rules";
+    const currentRuleSetName = currentRuleSet ? currentRuleSet.name : "No Mode";
 
-    // Cycle through modes: No Rules -> Mode 1 -> Mode 2 -> ... -> No Rules
+    // Cycle through modes: No Mode -> Mode 1 -> Mode 2 -> ... -> No Mode
     const currentIndex = currentRuleSet
       ? this.customModes.findIndex((rs) => rs.id === session.ruleSetId)
       : -1;
     const nextIndex = (currentIndex + 1) % (this.customModes.length + 1);
 
     if (nextIndex === this.customModes.length) {
-      // Set to "No Rules"
+      // Set to "No Mode"
       session.ruleSetId = null;
     } else {
       // Set to next mode
@@ -5016,7 +5034,7 @@ class ProducerPopup {
     const newRuleSet = this.customModes.find(
       (rs) => rs.id === session.ruleSetId,
     );
-    const newRuleSetName = newRuleSet ? newRuleSet.name : "No Rules";
+    const newRuleSetName = newRuleSet ? newRuleSet.name : "No Mode";
 
     this.saveState();
     this.updateUI();

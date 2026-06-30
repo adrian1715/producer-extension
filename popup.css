@@ -1341,3 +1341,89 @@ body.theme-teal {
   background: rgba(52, 152, 219, 0.3);
   border-color: rgba(52, 152, 219, 0.5);
 }
+
+/* Confirm Modal */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.confirm-modal {
+  background: var(--dropdown-bg, rgba(20, 20, 50, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 24px 20px 20px;
+  width: 248px;
+  text-align: center;
+  animation: modalPop 0.18s ease;
+}
+
+@keyframes modalPop {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+.confirm-modal-icon {
+  font-size: 30px;
+  color: rgba(231, 76, 60, 0.9);
+  margin-bottom: 10px;
+}
+
+.confirm-modal-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 8px;
+}
+
+.confirm-modal-message {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.55;
+  margin-bottom: 20px;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirm-modal-cancel {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.confirm-modal-cancel:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.confirm-modal-confirm {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(231, 76, 60, 0.8);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.confirm-modal-confirm:hover {
+  background: rgba(231, 76, 60, 1);
+}
