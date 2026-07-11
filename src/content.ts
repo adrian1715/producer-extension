@@ -1,21 +1,22 @@
 class ProducerContentScript {
+  lastUrl: string = window.location.href;
+  isBlocked = false;
+  checkTimeout: ReturnType<typeof setTimeout> | null = null;
+  pollInterval: ReturnType<typeof setInterval> | null = null;
+  observer: MutationObserver | null = null;
+  blockPageSetupTimeout: ReturnType<typeof setTimeout> | null = null;
+  blockStatsInterval: ReturnType<typeof setInterval> | null = null;
+  blockVisibilityHandler: (() => void) | null = null;
+  blockPageTheme = "blue"; // Default theme
+  blockPageTitle = "Stay Focused";
+  blockPageMessage = "This site is blocked during your focus session";
+  blockPageShowQuotes = true;
+  blockPageBackgroundImage = "";
+  blockPagePrimaryColor = "#667eea";
+  blockPageAccentColor = "#2ecc71";
+  blockPageShowActionButtons = true;
+
   constructor() {
-    this.lastUrl = window.location.href;
-    this.isBlocked = false;
-    this.checkTimeout = null;
-    this.pollInterval = null;
-    this.observer = null;
-    this.blockPageSetupTimeout = null;
-    this.blockStatsInterval = null;
-    this.blockVisibilityHandler = null;
-    this.blockPageTheme = "blue"; // Default theme
-    this.blockPageTitle = "Stay Focused";
-    this.blockPageMessage = "This site is blocked during your focus session";
-    this.blockPageShowQuotes = true;
-    this.blockPageBackgroundImage = "";
-    this.blockPagePrimaryColor = "#667eea";
-    this.blockPageAccentColor = "#2ecc71";
-    this.blockPageShowActionButtons = true;
     this.init();
     this.interceptNavigationAttempts();
     this.observeUrlChanges();
@@ -124,7 +125,7 @@ class ProducerContentScript {
     });
   }
 
-  toggleGrayscaleFilter(enabled) {
+  toggleGrayscaleFilter(enabled: boolean) {
     // Check if we're on a blocked page - don't apply grayscale to block pages
     if (document.getElementById("producer-block-overlay")) {
       return;
@@ -177,7 +178,7 @@ class ProducerContentScript {
     await this.checkAndBlock(window.location.href);
   }
 
-  async checkAndBlock(url) {
+  async checkAndBlock(url: string) {
     // Skip if already blocked or same URL
     if (
       this.isBlocked ||
@@ -207,7 +208,7 @@ class ProducerContentScript {
   }
 
   // Debounced URL check to prevent race conditions
-  debouncedCheck(url) {
+  debouncedCheck(url: string) {
     if (this.checkTimeout) {
       clearTimeout(this.checkTimeout);
     }
@@ -225,14 +226,20 @@ class ProducerContentScript {
     // Intercept all clicks on links
     document.addEventListener(
       "click",
-      async (e) => {
+      async (e: MouseEvent) => {
+        const eventTarget = e.target;
         const target =
-          e.target instanceof Element ? e.target : e.target.parentElement;
+          eventTarget instanceof Element
+            ? eventTarget
+            : eventTarget instanceof Node
+              ? eventTarget.parentElement
+              : null;
         if (!target) return;
         const link = target.closest("a[href]");
         if (link) {
           const href = link.getAttribute("href");
-          let targetUrl;
+          if (!href) return;
+          let targetUrl: string;
 
           // Handle different types of links
           if (href.startsWith("http")) {
@@ -279,9 +286,9 @@ class ProducerContentScript {
     // Intercept form submissions
     document.addEventListener(
       "submit",
-      async (e) => {
-        const form = e.target;
-        if (form.action) {
+      async (e: SubmitEvent) => {
+        const form = e.target as HTMLFormElement | null;
+        if (form && form.action) {
           try {
             const response = await chrome.runtime.sendMessage({
               action: "checkBlock",
@@ -309,31 +316,41 @@ class ProducerContentScript {
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
 
-    history.pushState = function (state, title, url) {
+    history.pushState = function (
+      this: History,
+      state: any,
+      title: string,
+      url?: string | URL | null,
+    ) {
       try {
         if (url) {
           const fullUrl = new URL(url, window.location.href).href;
           // Use debounced check to prevent race conditions
           setTimeout(() => self.debouncedCheck(fullUrl), 0);
         }
-        originalPushState.apply(this, arguments);
+        originalPushState.apply(this, arguments as any);
         window.dispatchEvent(new Event("producer-urlchange"));
       } catch (err) {
         // Fallback to original behavior if our override fails
-        originalPushState.apply(this, arguments);
+        originalPushState.apply(this, arguments as any);
       }
     };
 
-    history.replaceState = function (state, title, url) {
+    history.replaceState = function (
+      this: History,
+      state: any,
+      title: string,
+      url?: string | URL | null,
+    ) {
       try {
         if (url) {
           const fullUrl = new URL(url, window.location.href).href;
           setTimeout(() => self.debouncedCheck(fullUrl), 0);
         }
-        originalReplaceState.apply(this, arguments);
+        originalReplaceState.apply(this, arguments as any);
         window.dispatchEvent(new Event("producer-urlchange"));
       } catch (err) {
-        originalReplaceState.apply(this, arguments);
+        originalReplaceState.apply(this, arguments as any);
       }
     };
 
@@ -348,7 +365,11 @@ class ProducerContentScript {
 
     // Override window.open (this one works reliably)
     const originalOpen = window.open;
-    window.open = async function (url, ...args) {
+    window.open = async function (
+      this: Window,
+      url?: string | URL,
+      ...args: any[]
+    ) {
       if (url) {
         try {
           const fullUrl = new URL(url, window.location.href).href;
@@ -369,8 +390,8 @@ class ProducerContentScript {
           // Allow if check fails
         }
       }
-      return originalOpen.apply(this, arguments);
-    };
+      return originalOpen.apply(this, arguments as any);
+    } as unknown as typeof window.open;
 
     // skipped location.assign and location.replace overrides entirely
   }
@@ -395,7 +416,7 @@ class ProducerContentScript {
     }
   }
 
-  async blockPage(blockedUrl = null) {
+  async blockPage(blockedUrl: string | null = null) {
     this.isBlocked = true;
 
     // Use provided URL or fall back to current location
@@ -403,8 +424,10 @@ class ProducerContentScript {
 
     // Report the block to background script and get block number + redirect URL.
     let blockNumber = 1;
-    let blockedPageUrl = null;
-    const navigationEntry = performance.getEntriesByType("navigation")[0];
+    let blockedPageUrl: string | null = null;
+    const navigationEntry = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
     const isReload =
       navigationEntry && navigationEntry.type
         ? navigationEntry.type === "reload"

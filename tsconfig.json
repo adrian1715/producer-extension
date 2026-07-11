@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "module": "ES2015",
+    "moduleDetection": "auto",
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "useUnknownInCatchVariables": false,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "types": ["chrome"],
+    "newLine": "lf"
+  },
+  "include": ["src"]
+}

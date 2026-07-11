@@ -1,4 +1,21 @@
+interface BlockPageThemeStyle {
+  background: string;
+  containerBg: string;
+  borderColor: string;
+  textColor: string;
+  accentColor: string;
+}
+
 class ProducerBlockedPage {
+  blockedUrl: string;
+  blockNumber: number;
+  originalFavIcon: string;
+  isPermanent: boolean;
+  statsInterval: ReturnType<typeof setInterval> | null = null;
+  unblockCheckInterval: ReturnType<typeof setInterval> | null = null;
+  lastKnownBlockState = true;
+  themeStyles: Record<string, BlockPageThemeStyle>;
+
   constructor() {
     const params = new URLSearchParams(window.location.search);
     this.blockedUrl = params.get("blockedUrl") || "";
@@ -8,9 +25,6 @@ class ProducerBlockedPage {
       : 1;
     this.originalFavIcon = params.get("originalFavIcon") || "";
     this.isPermanent = params.get("isPermanent") === "1";
-    this.statsInterval = null;
-    this.unblockCheckInterval = null;
-    this.lastKnownBlockState = true;
 
     this.themeStyles = {
       blackwhite: {
@@ -58,7 +72,7 @@ class ProducerBlockedPage {
     };
   }
 
-  truncateUrl(url) {
+  truncateUrl(url: string) {
     const maxUrlLength = 100;
     if (!url || url.length <= maxUrlLength) return url;
     const keepLength = Math.floor((maxUrlLength - 3) / 2);
@@ -69,7 +83,7 @@ class ProducerBlockedPage {
     );
   }
 
-  formatTime(seconds) {
+  formatTime(seconds: number) {
     if (!seconds || seconds < 0) return "0m";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -80,11 +94,11 @@ class ProducerBlockedPage {
     return `${secs}s`;
   }
 
-  sanitizeHexColor(color, fallback) {
-    return /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : fallback;
+  sanitizeHexColor(color: string | undefined, fallback: string): string {
+    return color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback;
   }
 
-  hexToRgba(hex, alpha) {
+  hexToRgba(hex: string, alpha: number) {
     const safeHex = this.sanitizeHexColor(hex, "#667eea").replace("#", "");
     const int = parseInt(safeHex, 16);
     const r = (int >> 16) & 255;
@@ -93,7 +107,11 @@ class ProducerBlockedPage {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  buildBackground(themeBackground, primaryColor, imageUrl) {
+  buildBackground(
+    themeBackground: string,
+    primaryColor: string,
+    imageUrl: string,
+  ) {
     const overlay = `linear-gradient(140deg, ${this.hexToRgba(primaryColor, 0.5)}, rgba(15, 23, 42, 0.74))`;
     if (!imageUrl) {
       return `${overlay}, ${themeBackground}`;
@@ -133,7 +151,7 @@ class ProducerBlockedPage {
       : "auto";
     document.body.style.backgroundPosition = "center";
 
-    const container = document.querySelector(".block-container");
+    const container = document.querySelector<HTMLElement>(".block-container");
     if (container) {
       container.style.background = this.hexToRgba(primaryColor, 0.2);
       container.style.border = `1px solid ${this.hexToRgba(accentColor, 0.4)}`;
@@ -150,13 +168,13 @@ class ProducerBlockedPage {
     const blockedUrlEl = document.getElementById("blockedUrl");
     const timeEl = document.getElementById("sessionTime");
     const quoteEl = document.getElementById("motivationalQuote");
-    const statsEl = document.querySelector(".stats");
-    const iconEl = document.querySelector(".icon");
+    const statsEl = document.querySelector<HTMLElement>(".stats");
+    const iconEl = document.querySelector<HTMLElement>(".icon");
     const closeBtn = document.getElementById("close-btn");
     const allowOnceBtn = document.getElementById("allow-once-btn");
     const addExceptionBtn = document.getElementById("add-exception-btn");
     const undoPermanentRuleBtn = document.getElementById("undo-permanent-rule-btn");
-    const warningButtons = document.querySelectorAll(".btn-warning");
+    const warningButtons = document.querySelectorAll<HTMLElement>(".btn-warning");
     const utilityActions = allowOnceBtn?.parentElement || null;
     const showActionButtons =
       data.blockPageShowActionButtons !== undefined
@@ -253,7 +271,7 @@ class ProducerBlockedPage {
     }
   }
 
-  isUsableOriginalFavicon(faviconHref) {
+  isUsableOriginalFavicon(faviconHref: string) {
     if (!faviconHref) return false;
     try {
       const parsed = new URL(faviconHref);
@@ -265,7 +283,7 @@ class ProducerBlockedPage {
   }
 
   applyFaviconLinks(
-    faviconHref,
+    faviconHref: string,
     fallbackFaviconHref = "",
     replaceExisting = false,
   ) {
@@ -371,7 +389,7 @@ class ProducerBlockedPage {
     const addExceptionBtn = document.getElementById("add-exception-btn");
     const undoPermanentRuleBtn = document.getElementById("undo-permanent-rule-btn");
     const blockNumberEl = document.getElementById("blockNumber");
-    const statsEl = document.querySelector(".stats");
+    const statsEl = document.querySelector<HTMLElement>(".stats");
     if (addExceptionBtn) addExceptionBtn.style.display = show;
     if (undoPermanentRuleBtn) undoPermanentRuleBtn.style.display = hide;
     if (blockNumberEl) blockNumberEl.style.display = show;

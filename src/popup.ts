@@ -1,228 +1,337 @@
+interface BlockPageSettings {
+  title: string;
+  message: string;
+  showQuotes: boolean;
+  backgroundImage: string;
+  backgroundImageName: string;
+  primaryColor: string;
+  accentColor: string;
+  showActionButtons: boolean;
+}
+
+/** Dropdown element with a back-reference to the button that opened it. */
+type ItemDropdown = HTMLDivElement & { _trigger?: HTMLElement };
+
 class ProducerPopup {
+  isActive = false;
+  customModes: Mode[] = []; // Array of modes (previously customRules)
+  activeRuleSetId: string | null = null; // ID of currently active mode
+  currentEditingRuleSetId: string | null = null; // ID of mode being edited
+  isCreatingNewRuleSet = false; // Flag to track if we're creating a new mode
+  tempRuleSet: Mode | null = null; // Temporary mode for unsaved changes
+
+  // New session management structure
+  sessions: Session[] = []; // Array of all sessions (both active and paused)
+  currentSessionId: string | null = null; // ID of currently selected session
+
+  // Legacy fields for backward compatibility
+  sessionHistory: unknown[] = []; // Array of completed sessions (deprecated)
+  sessionBlocks = 0;
+  sessionTime = 0; // in seconds
+  focusedTime = 0; // in seconds
+  timerInterval: ReturnType<typeof setInterval> | null = null;
+  lastTimerUpdate = 0; // Track when we last received a timer update
+
+  // Session time tracking for stats display
+  sessionStatsInterval: ReturnType<typeof setInterval> | null = null; // Timer for updating session stats display
+  sessionCommitInterval: ReturnType<typeof setInterval> | null = null; // Timer for periodic commits
+  sessionFocusStartTime: number | null = null; // When focus mode started for current session segment
+  sessionPauseStartTime: number | null = null; // When session was paused (focus mode stopped)
+  sessionStartTime: number | null = null; // Timer anchor while focus mode is active
+  isLoaded = false;
+  loadStatePromise: Promise<void> | null = null;
+  personalizationAutoSaveTimeout: ReturnType<typeof setTimeout> | undefined;
+
+  // Personalization state (populated by loadState before first use)
+  currentTheme!: string;
+  currentBlockPageTitle!: string;
+  currentBlockPageMessage!: string;
+  currentBlockPageShowQuotes!: boolean;
+  currentBlockPageBackgroundImage!: string;
+  currentBlockPageBackgroundImageName!: string;
+  currentBlockPagePrimaryColor!: string;
+  currentBlockPageAccentColor!: string;
+  currentBlockPageUseThemeColors!: boolean;
+  currentBlockPageShowActionButtons!: boolean;
+
+  // UI elements (assigned in initializeElements)
+  statusIndicator!: HTMLElement;
+  statusIcon!: HTMLElement;
+  toggleBtn!: HTMLButtonElement;
+  urlInput!: HTMLInputElement;
+  ruleType!: HTMLSelectElement;
+  addRuleBtn!: HTMLButtonElement;
+  rulesList!: HTMLElement;
+  ruleCount!: HTMLElement;
+  blockedCount!: HTMLElement;
+  totalBlockedCountEl!: HTMLElement;
+  totalFocusedTimeEl!: HTMLElement;
+  sessionBlocksEl!: HTMLElement;
+  sessionStatusText!: HTMLElement;
+  sessionTimerEl!: HTMLElement;
+  focusedTimeEl!: HTMLElement;
+  breakTimeEl!: HTMLElement;
+  exportRulesBtn!: HTMLElement;
+  importRulesBtn!: HTMLElement;
+  importFileInput!: HTMLInputElement;
+  clearRulesBtn!: HTMLElement;
+  rulesSectionTitle!: HTMLElement;
+  urlInputContainer!: HTMLElement;
+  paramKeyInput!: HTMLInputElement;
+  paramValueInput!: HTMLInputElement;
+  paramInputsContainer!: HTMLElement;
+  addParamRuleBtn!: HTMLButtonElement;
+  createRuleSetBtn!: HTMLElement;
+  ruleSetsList!: HTMLElement;
+  rulesMainView!: HTMLElement;
+  rulesEditView!: HTMLElement;
+  allRulesView!: HTMLElement;
+  allRulesViewScrollContainer!: HTMLElement;
+  allRulesList!: HTMLElement;
+  backFromAllRulesBtn!: HTMLElement;
+  addRuleAllViewBtn!: HTMLElement;
+  importRulesAllViewBtn!: HTMLElement;
+  exportRulesAllViewBtn!: HTMLElement;
+  clearRulesAllViewBtn!: HTMLElement;
+  backToRuleSetListBtn!: HTMLElement;
+  backToRuleSetListBtn2!: HTMLElement;
+  ruleSetNameInput!: HTMLInputElement;
+  ruleSetNameSection!: HTMLElement;
+  saveRuleSetBtn!: HTMLElement;
+  cancelRuleSetBtn!: HTMLElement;
+  ruleSetActionButtons!: HTMLElement;
+  ruleSetEditTitle!: HTMLElement;
+  clearAllRuleSetsBtn!: HTMLElement;
+  modeGrayscaleToggle!: HTMLInputElement;
+  modeSettingsSection!: HTMLElement;
+  configureModeSettingsBtn!: HTMLElement;
+  modeSettingsView!: HTMLElement;
+  backFromModeSettingsBtn!: HTMLElement;
+  modeGrayscaleToggleView!: HTMLInputElement;
+  rulesPreview!: HTMLElement;
+  rulesPreviewCount!: HTMLElement;
+  rulesPreviewSection!: HTMLElement;
+  sessionsList!: HTMLElement;
+  clearSessionsBtn!: HTMLElement;
+  statsMainView!: HTMLElement;
+  sessionHistoryView!: HTMLElement;
+  viewSessionHistoryBtn!: HTMLElement;
+  backToStatsBtn!: HTMLElement;
+  statsTabTotalSessions!: HTMLElement;
+  statsTabAvgSession!: HTMLElement;
+  currentSessionName!: HTMLElement;
+  currentSessionStats!: HTMLElement;
+  noSessionMessage!: HTMLElement;
+  deactivateSessionBtn!: HTMLElement;
+  createNewSessionBtn!: HTMLElement;
+  currentSessionInfo!: HTMLElement;
+  currentSessionRules!: HTMLElement;
+  currentSessionBlocksCount!: HTMLElement;
+  currentSessionFocusTime!: HTMLElement;
+  currentSessionBreakTime!: HTMLElement;
+  currentSessionTotalTime!: HTMLElement;
+  tabBtns!: NodeListOf<HTMLElement>;
+  tabContents!: NodeListOf<HTMLElement>;
+  contentArea!: HTMLElement;
+  themeOptions!: NodeListOf<HTMLElement>;
+  blockPageTitle!: HTMLInputElement;
+  blockPageMessage!: HTMLInputElement;
+  blockPageShowQuotes!: HTMLInputElement;
+  blockPageImage!: HTMLInputElement;
+  useBackgroundImageUrlBtn!: HTMLElement;
+  importBackgroundImageBtn!: HTMLElement;
+  removeBackgroundImageBtn!: HTMLElement;
+  blockPageImageUrlRow!: HTMLElement;
+  confirmBackgroundImageUrlBtn!: HTMLElement;
+  blockPageImageFileInput!: HTMLInputElement;
+  blockPageImageStatus!: HTMLElement;
+  blockPagePrimaryColor!: HTMLInputElement;
+  blockPagePrimaryColorDisplay!: HTMLElement;
+  blockPagePrimaryColorText!: HTMLInputElement;
+  blockPageAccentColor!: HTMLInputElement;
+  blockPageAccentColorDisplay!: HTMLElement;
+  blockPageAccentColorText!: HTMLInputElement;
+  blockPageShowActionButtons!: HTMLInputElement;
+  previewTitle!: HTMLElement;
+  previewMessage!: HTMLElement;
+  previewQuote!: HTMLElement;
+  previewUtilityActions!: HTMLElement;
+  blockPagePreview!: HTMLElement;
+  blockPagePreviewCard!: HTMLElement;
+  previewAccentBtn!: HTMLElement;
+  blockPageImageInputMode: "hidden" | "url" = "hidden";
+  savePersonalizationBtn!: HTMLElement;
+  resetPersonalizationBtn!: HTMLElement;
+  grayscaleToggle!: HTMLInputElement;
+  openBlockPageSettingsBtn!: HTMLElement;
+  backToThemeBtn!: HTMLElement;
+  themeMainView!: HTMLElement;
+  blockPageSettingsView!: HTMLElement;
+
   constructor() {
-    this.isActive = false;
-    this.customModes = []; // Array of modes (previously customRules)
-    this.activeRuleSetId = null; // ID of currently active mode
-    this.currentEditingRuleSetId = null; // ID of mode being edited
-    this.isCreatingNewRuleSet = false; // Flag to track if we're creating a new mode
-    this.tempRuleSet = null; // Temporary mode for unsaved changes
-
-    // New session management structure
-    this.sessions = []; // Array of all sessions (both active and paused)
-    this.currentSessionId = null; // ID of currently selected session
-
-    // Legacy fields for backward compatibility
-    this.sessionHistory = []; // Array of completed sessions (deprecated)
-    this.sessionBlocks = 0;
-    this.sessionTime = 0; // in seconds
-    this.focusedTime = 0; // in seconds
-    this.timerInterval = null;
-    this.lastTimerUpdate = 0; // Track when we last received a timer update
-
-    // Session time tracking for stats display
-    this.sessionStatsInterval = null; // Timer for updating session stats display
-    this.sessionCommitInterval = null; // Timer for periodic commits
-    this.sessionFocusStartTime = null; // When focus mode started for current session segment
-    this.sessionPauseStartTime = null; // When session was paused (focus mode stopped)
-    this.isLoaded = false;
-    this.loadStatePromise = null;
-
     this.initializeElements();
     this.bindEvents();
     this.loadStatePromise = this.loadState();
   }
 
+  /**
+   * Typed getElementById helper. The popup markup is bundled with the
+   * extension, so elements referenced here are expected to exist; optional
+   * elements are still truthiness-guarded at their usage sites.
+   */
+  private $<T extends HTMLElement = HTMLElement>(id: string): T {
+    return document.getElementById(id) as T;
+  }
+
   initializeElements() {
-    this.statusIndicator = document.getElementById("statusIndicator");
-    this.statusIcon = document.getElementById("statusIcon");
-    this.toggleBtn = document.getElementById("toggleBtn");
-    this.urlInput = document.getElementById("urlInput");
-    this.ruleType = document.getElementById("ruleType");
-    this.addRuleBtn = document.getElementById("addRule");
-    this.rulesList = document.getElementById("rulesList");
-    this.ruleCount = document.getElementById("ruleCount");
-    this.blockedCount = document.getElementById("blockedCount");
-    this.totalBlockedCountEl = document.getElementById("totalBlockedCount");
-    this.totalFocusedTimeEl = document.getElementById("totalFocusedTime");
-    this.sessionBlocksEl = document.getElementById("sessionBlocks");
-    this.sessionStatusText = document.getElementById("sessionStatusText");
-    this.sessionTimerEl = document.getElementById("sessionTimer");
-    this.focusedTimeEl = document.getElementById("focusedTime");
-    this.breakTimeEl = document.getElementById("breakTime");
-    this.exportRulesBtn = document.getElementById("exportRulesBtn");
-    this.importRulesBtn = document.getElementById("importRulesBtn");
-    this.importFileInput = document.getElementById("importFileInput");
-    this.clearRulesBtn = document.getElementById("clearRulesBtn");
-    this.rulesSectionTitle = document.getElementById("rulesSectionTitle");
-    this.urlInputContainer = document.getElementById("urlInputContainer");
-    this.paramKeyInput = document.getElementById("paramKeyInput");
-    this.paramValueInput = document.getElementById("paramValueInput");
-    this.paramInputsContainer = document.getElementById("paramInputsContainer");
-    this.addParamRuleBtn = document.getElementById("addParamRule");
+    this.statusIndicator = this.$("statusIndicator");
+    this.statusIcon = this.$("statusIcon");
+    this.toggleBtn = this.$<HTMLButtonElement>("toggleBtn");
+    this.urlInput = this.$<HTMLInputElement>("urlInput");
+    this.ruleType = this.$<HTMLSelectElement>("ruleType");
+    this.addRuleBtn = this.$<HTMLButtonElement>("addRule");
+    this.rulesList = this.$("rulesList");
+    this.ruleCount = this.$("ruleCount");
+    this.blockedCount = this.$("blockedCount");
+    this.totalBlockedCountEl = this.$("totalBlockedCount");
+    this.totalFocusedTimeEl = this.$("totalFocusedTime");
+    this.sessionBlocksEl = this.$("sessionBlocks");
+    this.sessionStatusText = this.$("sessionStatusText");
+    this.sessionTimerEl = this.$("sessionTimer");
+    this.focusedTimeEl = this.$("focusedTime");
+    this.breakTimeEl = this.$("breakTime");
+    this.exportRulesBtn = this.$("exportRulesBtn");
+    this.importRulesBtn = this.$("importRulesBtn");
+    this.importFileInput = this.$<HTMLInputElement>("importFileInput");
+    this.clearRulesBtn = this.$("clearRulesBtn");
+    this.rulesSectionTitle = this.$("rulesSectionTitle");
+    this.urlInputContainer = this.$("urlInputContainer");
+    this.paramKeyInput = this.$<HTMLInputElement>("paramKeyInput");
+    this.paramValueInput = this.$<HTMLInputElement>("paramValueInput");
+    this.paramInputsContainer = this.$("paramInputsContainer");
+    this.addParamRuleBtn = this.$<HTMLButtonElement>("addParamRule");
 
     // Custom rule sets elements
-    this.createRuleSetBtn = document.getElementById("createRuleSetBtn");
-    this.ruleSetsList = document.getElementById("ruleSetsList");
-    this.rulesMainView = document.getElementById("rules-main-view");
-    this.rulesEditView = document.getElementById("rules-edit-view");
-    this.allRulesView = document.getElementById("all-rules-view");
-    this.allRulesViewScrollContainer = document.getElementById(
-      "allRulesViewScrollContainer",
-    );
-    this.allRulesList = document.getElementById("allRulesList");
-    this.backFromAllRulesBtn = document.getElementById("backFromAllRulesBtn");
-    this.addRuleAllViewBtn = document.getElementById("addRuleAllViewBtn");
-    this.importRulesAllViewBtn = document.getElementById(
-      "importRulesAllViewBtn",
-    );
-    this.exportRulesAllViewBtn = document.getElementById(
-      "exportRulesAllViewBtn",
-    );
-    this.clearRulesAllViewBtn = document.getElementById("clearRulesAllViewBtn");
-    this.backToRuleSetListBtn = document.getElementById("backToRuleSetListBtn");
-    this.backToRuleSetListBtn2 = document.getElementById(
-      "backToRuleSetListBtn2",
-    );
-    this.ruleSetNameInput = document.getElementById("ruleSetNameInput");
-    this.ruleSetNameSection = document.getElementById("ruleSetNameSection");
-    this.saveRuleSetBtn = document.getElementById("saveRuleSetBtn");
-    this.cancelRuleSetBtn = document.getElementById("cancelRuleSetBtn");
-    this.ruleSetActionButtons = document.getElementById("ruleSetActionButtons");
-    this.ruleSetEditTitle = document.getElementById("ruleSetEditTitle");
-    this.clearAllRuleSetsBtn = document.getElementById("clearAllRuleSetsBtn");
+    this.createRuleSetBtn = this.$("createRuleSetBtn");
+    this.ruleSetsList = this.$("ruleSetsList");
+    this.rulesMainView = this.$("rules-main-view");
+    this.rulesEditView = this.$("rules-edit-view");
+    this.allRulesView = this.$("all-rules-view");
+    this.allRulesViewScrollContainer = this.$("allRulesViewScrollContainer");
+    this.allRulesList = this.$("allRulesList");
+    this.backFromAllRulesBtn = this.$("backFromAllRulesBtn");
+    this.addRuleAllViewBtn = this.$("addRuleAllViewBtn");
+    this.importRulesAllViewBtn = this.$("importRulesAllViewBtn");
+    this.exportRulesAllViewBtn = this.$("exportRulesAllViewBtn");
+    this.clearRulesAllViewBtn = this.$("clearRulesAllViewBtn");
+    this.backToRuleSetListBtn = this.$("backToRuleSetListBtn");
+    this.backToRuleSetListBtn2 = this.$("backToRuleSetListBtn2");
+    this.ruleSetNameInput = this.$<HTMLInputElement>("ruleSetNameInput");
+    this.ruleSetNameSection = this.$("ruleSetNameSection");
+    this.saveRuleSetBtn = this.$("saveRuleSetBtn");
+    this.cancelRuleSetBtn = this.$("cancelRuleSetBtn");
+    this.ruleSetActionButtons = this.$("ruleSetActionButtons");
+    this.ruleSetEditTitle = this.$("ruleSetEditTitle");
+    this.clearAllRuleSetsBtn = this.$("clearAllRuleSetsBtn");
 
     // Mode settings elements
-    this.modeGrayscaleToggle = document.getElementById("modeGrayscaleToggle");
-    this.modeSettingsSection = document.getElementById("modeSettingsSection");
-    this.configureModeSettingsBtn = document.getElementById(
-      "configureModeSettingsBtn",
-    );
+    this.modeGrayscaleToggle = this.$<HTMLInputElement>("modeGrayscaleToggle");
+    this.modeSettingsSection = this.$("modeSettingsSection");
+    this.configureModeSettingsBtn = this.$("configureModeSettingsBtn");
 
     // Mode features view elements
-    this.modeSettingsView = document.getElementById("mode-settings-view");
-    this.backFromModeSettingsBtn = document.getElementById(
-      "backFromModeSettingsBtn",
-    );
-    this.modeGrayscaleToggleView = document.getElementById(
+    this.modeSettingsView = this.$("mode-settings-view");
+    this.backFromModeSettingsBtn = this.$("backFromModeSettingsBtn");
+    this.modeGrayscaleToggleView = this.$<HTMLInputElement>(
       "modeGrayscaleToggleView",
     );
 
     // Rules preview and management elements
-    this.rulesPreview = document.getElementById("rulesPreview");
-    this.rulesPreviewCount = document.getElementById("rulesPreviewCount");
-    this.rulesPreviewSection = document.getElementById("rulesPreviewSection");
+    this.rulesPreview = this.$("rulesPreview");
+    this.rulesPreviewCount = this.$("rulesPreviewCount");
+    this.rulesPreviewSection = this.$("rulesPreviewSection");
 
     // Sessions elements
-    this.sessionsList = document.getElementById("sessionsList");
-    this.clearSessionsBtn = document.getElementById("clearSessionsBtn");
+    this.sessionsList = this.$("sessionsList");
+    this.clearSessionsBtn = this.$("clearSessionsBtn");
 
     // Stats tab navigation elements
-    this.statsMainView = document.getElementById("stats-main-view");
-    this.sessionHistoryView = document.getElementById("session-history-view");
-    this.viewSessionHistoryBtn = document.getElementById(
-      "viewSessionHistoryBtn",
-    );
-    this.backToStatsBtn = document.getElementById("backToStatsBtn");
-    this.statsTabTotalSessions = document.getElementById(
-      "statsTabTotalSessions",
-    );
-    this.statsTabAvgSession = document.getElementById("statsTabAvgSession");
+    this.statsMainView = this.$("stats-main-view");
+    this.sessionHistoryView = this.$("session-history-view");
+    this.viewSessionHistoryBtn = this.$("viewSessionHistoryBtn");
+    this.backToStatsBtn = this.$("backToStatsBtn");
+    this.statsTabTotalSessions = this.$("statsTabTotalSessions");
+    this.statsTabAvgSession = this.$("statsTabAvgSession");
 
     // Current session stats elements
-    this.currentSessionName = document.getElementById("currentSessionName");
-    this.currentSessionStats = document.getElementById("currentSessionStats");
-    this.noSessionMessage = document.getElementById("noSessionMessage");
-    this.deactivateSessionBtn = document.getElementById("deactivateSessionBtn");
-    this.createNewSessionBtn = document.getElementById("createNewSessionBtn");
-    this.currentSessionInfo = document.getElementById("currentSessionInfo");
-    this.currentSessionRules = document.getElementById("currentSessionRules");
-    this.currentSessionBlocksCount = document.getElementById(
-      "currentSessionBlocksCount",
-    );
-    this.currentSessionFocusTime = document.getElementById(
-      "currentSessionFocusTime",
-    );
-    this.currentSessionBreakTime = document.getElementById(
-      "currentSessionBreakTime",
-    );
-    this.currentSessionTotalTime = document.getElementById(
-      "currentSessionTotalTime",
-    );
+    this.currentSessionName = this.$("currentSessionName");
+    this.currentSessionStats = this.$("currentSessionStats");
+    this.noSessionMessage = this.$("noSessionMessage");
+    this.deactivateSessionBtn = this.$("deactivateSessionBtn");
+    this.createNewSessionBtn = this.$("createNewSessionBtn");
+    this.currentSessionInfo = this.$("currentSessionInfo");
+    this.currentSessionRules = this.$("currentSessionRules");
+    this.currentSessionBlocksCount = this.$("currentSessionBlocksCount");
+    this.currentSessionFocusTime = this.$("currentSessionFocusTime");
+    this.currentSessionBreakTime = this.$("currentSessionBreakTime");
+    this.currentSessionTotalTime = this.$("currentSessionTotalTime");
 
     // Tab elements
-    this.tabBtns = document.querySelectorAll(".tab-btn");
-    this.tabContents = document.querySelectorAll(".tab-content");
-    this.contentArea = document.querySelector(".content-area");
+    this.tabBtns = document.querySelectorAll<HTMLElement>(".tab-btn");
+    this.tabContents = document.querySelectorAll<HTMLElement>(".tab-content");
+    this.contentArea = document.querySelector<HTMLElement>(
+      ".content-area",
+    ) as HTMLElement;
 
     // Personalization elements
-    this.themeOptions = document.querySelectorAll(".theme-option");
-    this.blockPageTitle = document.getElementById("blockPageTitle");
-    this.blockPageMessage = document.getElementById("blockPageMessage");
-    this.blockPageShowQuotes = document.getElementById("blockPageShowQuotes");
-    this.blockPageImage = document.getElementById("blockPageImage");
-    this.useBackgroundImageUrlBtn = document.getElementById(
-      "useBackgroundImageUrlBtn",
-    );
-    this.importBackgroundImageBtn = document.getElementById(
-      "importBackgroundImageBtn",
-    );
-    this.removeBackgroundImageBtn = document.getElementById(
-      "removeBackgroundImageBtn",
-    );
-    this.blockPageImageUrlRow = document.getElementById("blockPageImageUrlRow");
-    this.confirmBackgroundImageUrlBtn = document.getElementById(
-      "confirmBackgroundImageUrlBtn",
-    );
-    this.blockPageImageFileInput = document.getElementById(
+    this.themeOptions = document.querySelectorAll<HTMLElement>(".theme-option");
+    this.blockPageTitle = this.$<HTMLInputElement>("blockPageTitle");
+    this.blockPageMessage = this.$<HTMLInputElement>("blockPageMessage");
+    this.blockPageShowQuotes = this.$<HTMLInputElement>("blockPageShowQuotes");
+    this.blockPageImage = this.$<HTMLInputElement>("blockPageImage");
+    this.useBackgroundImageUrlBtn = this.$("useBackgroundImageUrlBtn");
+    this.importBackgroundImageBtn = this.$("importBackgroundImageBtn");
+    this.removeBackgroundImageBtn = this.$("removeBackgroundImageBtn");
+    this.blockPageImageUrlRow = this.$("blockPageImageUrlRow");
+    this.confirmBackgroundImageUrlBtn = this.$("confirmBackgroundImageUrlBtn");
+    this.blockPageImageFileInput = this.$<HTMLInputElement>(
       "blockPageImageFileInput",
     );
-    this.blockPageImageStatus = document.getElementById("blockPageImageStatus");
-    this.blockPagePrimaryColor = document.getElementById(
+    this.blockPageImageStatus = this.$("blockPageImageStatus");
+    this.blockPagePrimaryColor = this.$<HTMLInputElement>(
       "blockPagePrimaryColor",
     );
-    this.blockPagePrimaryColorDisplay = document.getElementById(
-      "blockPagePrimaryColorDisplay",
-    );
-    this.blockPagePrimaryColorText = document.getElementById(
+    this.blockPagePrimaryColorDisplay = this.$("blockPagePrimaryColorDisplay");
+    this.blockPagePrimaryColorText = this.$<HTMLInputElement>(
       "blockPagePrimaryColorText",
     );
-    this.blockPageAccentColor = document.getElementById("blockPageAccentColor");
-    this.blockPageAccentColorDisplay = document.getElementById(
-      "blockPageAccentColorDisplay",
+    this.blockPageAccentColor = this.$<HTMLInputElement>(
+      "blockPageAccentColor",
     );
-    this.blockPageAccentColorText = document.getElementById(
+    this.blockPageAccentColorDisplay = this.$("blockPageAccentColorDisplay");
+    this.blockPageAccentColorText = this.$<HTMLInputElement>(
       "blockPageAccentColorText",
     );
-    this.blockPageShowActionButtons = document.getElementById(
+    this.blockPageShowActionButtons = this.$<HTMLInputElement>(
       "blockPageShowActionButtons",
     );
-    this.previewTitle = document.getElementById("previewTitle");
-    this.previewMessage = document.getElementById("previewMessage");
-    this.previewQuote = document.getElementById("previewQuote");
-    this.previewUtilityActions = document.getElementById(
-      "previewUtilityActions",
-    );
-    this.blockPagePreview = document.getElementById("blockPagePreview");
-    this.blockPagePreviewCard = document.getElementById("blockPagePreviewCard");
-    this.previewAccentBtn = document.getElementById("previewAccentBtn");
+    this.previewTitle = this.$("previewTitle");
+    this.previewMessage = this.$("previewMessage");
+    this.previewQuote = this.$("previewQuote");
+    this.previewUtilityActions = this.$("previewUtilityActions");
+    this.blockPagePreview = this.$("blockPagePreview");
+    this.blockPagePreviewCard = this.$("blockPagePreviewCard");
+    this.previewAccentBtn = this.$("previewAccentBtn");
     this.blockPageImageInputMode = "hidden";
-    this.savePersonalizationBtn = document.getElementById(
-      "savePersonalizationBtn",
-    );
-    this.resetPersonalizationBtn = document.getElementById(
-      "resetPersonalizationBtn",
-    );
-    this.grayscaleToggle = document.getElementById("grayscaleToggle");
+    this.savePersonalizationBtn = this.$("savePersonalizationBtn");
+    this.resetPersonalizationBtn = this.$("resetPersonalizationBtn");
+    this.grayscaleToggle = this.$<HTMLInputElement>("grayscaleToggle");
 
     // Navigation elements for block page settings
-    this.openBlockPageSettingsBtn = document.getElementById(
-      "openBlockPageSettingsBtn",
-    );
-    this.backToThemeBtn = document.getElementById("backToThemeBtn");
-    this.themeMainView = document.getElementById("theme-main-view");
-    this.blockPageSettingsView = document.getElementById(
-      "block-page-settings-view",
-    );
+    this.openBlockPageSettingsBtn = this.$("openBlockPageSettingsBtn");
+    this.backToThemeBtn = this.$("backToThemeBtn");
+    this.themeMainView = this.$("theme-main-view");
+    this.blockPageSettingsView = this.$("block-page-settings-view");
   }
 
   bindEvents() {
@@ -241,9 +350,10 @@ class ProducerPopup {
     }
     if (this.importFileInput) {
       this.importFileInput.addEventListener("change", (e) => {
-        const file = e.target.files[0];
+        const input = e.target as HTMLInputElement;
+        const file = input.files && input.files[0];
         if (file) this.importRules(file);
-        e.target.value = ""; // Reset file input
+        input.value = ""; // Reset file input
       });
     }
     if (this.exportRulesBtn) {
@@ -282,7 +392,7 @@ class ProducerPopup {
     // Personalization events
     this.themeOptions.forEach((option) => {
       option.addEventListener("click", () => {
-        this.selectTheme(option.getAttribute("data-theme"));
+        this.selectTheme(option.getAttribute("data-theme")!);
       });
     });
 
@@ -541,16 +651,17 @@ class ProducerPopup {
 
     // Close any open item dropdown when clicking outside the trigger or dropdown
     document.addEventListener("click", (e) => {
+      const target = e.target instanceof Element ? e.target : null;
       if (
-        !e.target.closest(".item-menu-wrap") &&
-        !e.target.closest(".item-dropdown")
+        !target?.closest(".item-menu-wrap") &&
+        !target?.closest(".item-dropdown")
       ) {
         document.querySelectorAll(".item-dropdown").forEach((d) => d.remove());
       }
     });
   }
 
-  switchTab(tabName) {
+  switchTab(tabName: string | null) {
     // If switching away from rules tab and there are unsaved changes, discard them
     if (tabName !== "rules" && this.isCreatingNewRuleSet) {
       this.cancelRuleSetCreation();
@@ -585,7 +696,7 @@ class ProducerPopup {
     this.resetScrollPosition(activeContent);
   }
 
-  resetScrollPosition(activeContainer = null) {
+  resetScrollPosition(activeContainer: HTMLElement | null = null) {
     if (this.contentArea) {
       this.contentArea.scrollTop = 0;
     }
@@ -654,7 +765,7 @@ class ProducerPopup {
         data.customRules &&
         data.customRules.length > 0
       ) {
-        this.customModes = data.customRules.map((ruleSet) => ({
+        this.customModes = (data.customRules as Mode[]).map((ruleSet) => ({
           ...ruleSet,
           settings: {
             grayscaleEnabled: data.grayscaleEnabled || false,
@@ -1180,7 +1291,7 @@ class ProducerPopup {
       const totalSessionTime = totalFocusedTime + totalBreakTime;
 
       // Format time helper
-      const formatTime = (seconds) => {
+      const formatTime = (seconds: number) => {
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         return `${hours.toString().padStart(2, "0")}h${minutes
@@ -1255,18 +1366,19 @@ class ProducerPopup {
     }
   }
 
-  async saveState(action, oldData) {
+  async saveState(action?: string, oldData?: Record<string, any>) {
     try {
       // Commit accumulated time before saving
       this.commitCurrentSessionTime();
 
-      const before =
+      const before: Record<string, any> =
         oldData ||
         (await chrome.storage.local.get([
           "customModes",
           "activeRuleSetId",
           "isActive",
-        ]));
+        ])) ||
+        {};
 
       // Update current session data if a session is selected
       if (this.currentSessionId) {
@@ -1582,12 +1694,12 @@ class ProducerPopup {
     this.statusIcon.textContent = this.isActive ? "⏸️" : "🎯";
 
     // Update stats in home tab
-    this.blockedCount.textContent = this.sessionBlocks || 0;
+    this.blockedCount.textContent = String(this.sessionBlocks || 0);
     // Note: focusedTimeEl is updated in updateCurrentSessionStats() for real-time updates
 
     // Update stats tab session blocks element
     if (this.sessionBlocksEl) {
-      this.sessionBlocksEl.textContent = this.sessionBlocks || 0;
+      this.sessionBlocksEl.textContent = String(this.sessionBlocks || 0);
     }
 
     // Update current session's blocksCount from sessionBlocks (source of truth)
@@ -1602,7 +1714,9 @@ class ProducerPopup {
 
     // Update Current Session section blocks count
     if (this.currentSessionBlocksCount) {
-      this.currentSessionBlocksCount.textContent = this.sessionBlocks || 0;
+      this.currentSessionBlocksCount.textContent = String(
+        this.sessionBlocks || 0,
+      );
     }
 
     // Update stats in stats tab - Total Blocks across all sessions
@@ -1611,7 +1725,7 @@ class ProducerPopup {
         (sum, s) => sum + (s.blocksCount || 0),
         0,
       );
-      this.totalBlockedCountEl.textContent = totalBlocks;
+      this.totalBlockedCountEl.textContent = String(totalBlocks);
     }
     // Note: totalFocusedTimeEl (Avg Focus Time) is updated in updateAverageFocusedTime()
 
@@ -1784,20 +1898,22 @@ class ProducerPopup {
       }
     }
 
-    // Add rule
-    const rule = {
-      id: Date.now(),
-      type: type,
-      created: new Date().toISOString(),
-    };
-
-    // Set URL or parameters based on rule type
-    if (type === "allowParam") {
-      rule.paramKey = paramKey;
-      rule.paramValue = paramValue;
-    } else {
-      rule.url = cleanUrl;
-    }
+    // Add rule — set URL or parameters based on rule type
+    const rule: Rule =
+      type === "allowParam"
+        ? {
+            id: Date.now(),
+            type: "allowParam",
+            created: new Date().toISOString(),
+            paramKey,
+            paramValue,
+          }
+        : {
+            id: Date.now(),
+            type: type as UrlRule["type"],
+            created: new Date().toISOString(),
+            url: cleanUrl,
+          };
 
     ruleSet.rules.push(rule);
     this.urlInput.value = "";
@@ -1811,7 +1927,7 @@ class ProducerPopup {
     this.showNotification("Rule added successfully!");
   }
 
-  removeRule(ruleId) {
+  removeRule(ruleId: number | undefined) {
     if (!this.currentEditingRuleSetId) return;
 
     // Find the rule set (from temp if creating, otherwise from custom modes)
@@ -1837,11 +1953,11 @@ class ProducerPopup {
     this.showNotification("Rule removed");
   }
 
-  editRuleUrlInline(rule, urlElement) {
+  editRuleUrlInline(rule: UrlRule, urlElement: HTMLElement) {
     if (!this.currentEditingRuleSetId) return;
 
     // Don't allow editing allowParam rules (they have paramKey/paramValue)
-    if (rule.type === "allowParam") {
+    if ((rule.type as string) === "allowParam") {
       this.showNotification(
         "Parameter rules cannot be edited. Please delete and re-add.",
         "error",
@@ -1894,7 +2010,7 @@ class ProducerPopup {
         if (ruleSet) {
           // Find and update the rule
           const ruleToEdit = ruleSet.rules.find((r) => r.id === rule.id);
-          if (ruleToEdit) {
+          if (ruleToEdit && ruleToEdit.type !== "allowParam") {
             ruleToEdit.url = cleanedUrl;
             rule.url = cleanedUrl; // Update the rule reference too
 
@@ -1932,12 +2048,12 @@ class ProducerPopup {
     });
 
     urlElement.style.display = "none";
-    urlElement.parentNode.insertBefore(input, urlElement);
+    urlElement.parentNode!.insertBefore(input, urlElement);
     input.focus();
     input.select();
   }
 
-  editParamRuleInline(rule, urlElement) {
+  editParamRuleInline(rule: ParamRule, urlElement: HTMLElement) {
     if (!this.currentEditingRuleSetId) return;
 
     // Create container for both inputs
@@ -2016,7 +2132,7 @@ class ProducerPopup {
         if (ruleSet) {
           // Find and update the rule
           const ruleToEdit = ruleSet.rules.find((r) => r.id === rule.id);
-          if (ruleToEdit) {
+          if (ruleToEdit && ruleToEdit.type === "allowParam") {
             ruleToEdit.paramKey = newKey;
             ruleToEdit.paramValue = newValue;
             rule.paramKey = newKey; // Update the rule reference too
@@ -2049,7 +2165,7 @@ class ProducerPopup {
     };
 
     // Add event listeners to both inputs
-    const handleKeydown = (e) => {
+    const handleKeydown = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         saveEdit();
       } else if (e.key === "Escape") {
@@ -2101,7 +2217,7 @@ class ProducerPopup {
     container.appendChild(valueInput);
 
     urlElement.style.display = "none";
-    urlElement.parentNode.insertBefore(container, urlElement);
+    urlElement.parentNode!.insertBefore(container, urlElement);
     keyInput.focus();
     keyInput.select();
   }
@@ -2140,7 +2256,7 @@ class ProducerPopup {
 
     // Update rule count
     if (this.ruleCount) {
-      this.ruleCount.textContent = ruleSet.rules.length;
+      this.ruleCount.textContent = String(ruleSet.rules.length);
     }
 
     // Update export/clear/import button visibility
@@ -2248,7 +2364,7 @@ class ProducerPopup {
     this.renderRulesPreview();
   }
 
-  cleanUrl(url) {
+  cleanUrl(url: string): string {
     // Remove protocol if present, remove www prefix, and remove trailing slash
     return url
       .replace(/^https?:\/\//, "")
@@ -2256,7 +2372,7 @@ class ProducerPopup {
       .replace(/\/+$/, "");
   }
 
-  isValidUrl(url) {
+  isValidUrl(url: string): boolean {
     // Allow wildcard "*" to block all websites
     if (url === "*") return true;
 
@@ -2280,20 +2396,20 @@ class ProducerPopup {
     return urlPattern.test(url);
   }
 
-  formatUrl(url) {
+  formatUrl(url: string): string {
     // Show descriptive text for wildcard rule
     if (url === "*") return "* (All Websites)";
 
     return url.length > 35 ? url.substring(0, 35) + "..." : url;
   }
 
-  formatRuleType(rule) {
+  formatRuleType(rule: Rule): string {
     // Show special indicator for wildcard block-all rule (both domain and url types)
     if (rule.url === "*" && (rule.type === "domain" || rule.type === "url")) {
       return "🌐 Block All Websites";
     }
 
-    const typeMap = {
+    const typeMap: Record<string, string> = {
       domain: "🚫 Block Domain",
       url: "🎯 Block URL",
       allow: "✅ Allow URL",
@@ -2302,14 +2418,18 @@ class ProducerPopup {
     return typeMap[rule.type] || rule.type;
   }
 
-  truncateText(text, maxLength) {
+  truncateText(text: string, maxLength: number): string {
     if (!text || text.length <= maxLength) {
       return text;
     }
     return text.substring(0, maxLength) + "...";
   }
 
-  formatSessionDetailsText(ruleSetName, blocksCount, totalTime) {
+  formatSessionDetailsText(
+    ruleSetName: string,
+    blocksCount: number,
+    totalTime: number,
+  ) {
     const hours = Math.floor(totalTime / 3600);
     const minutes = Math.floor((totalTime % 3600) / 60);
     const shortRuleSetName = this.truncateText(ruleSetName || "No Mode", 18);
@@ -2320,7 +2440,7 @@ class ProducerPopup {
     return this.truncateText(detailsText, 48);
   }
 
-  showNotification(message, type = "success") {
+  showNotification(message: string, type: "success" | "error" = "success") {
     const existingNotification = document.querySelector(".notification");
     if (existingNotification)
       document.querySelectorAll(".notification").forEach((n) => n.remove());
@@ -2349,7 +2469,7 @@ class ProducerPopup {
     }, 3000);
   }
 
-  async importRules(file) {
+  async importRules(file: File) {
     if (!this.currentEditingRuleSetId) {
       this.showNotification("No mode selected", "error");
       return;
@@ -2362,7 +2482,7 @@ class ProducerPopup {
 
       // Parse rules from file
       const validTypes = ["domain", "url", "allow", "allowParam"];
-      const importedRules = [];
+      const importedRules: Rule[] = [];
       let skippedCount = 0;
       for (const line of lines) {
         const trimmed = line.trim();
@@ -2379,11 +2499,8 @@ class ProducerPopup {
           continue;
         }
 
-        const baseRule = {
-          id: Math.floor(Date.now() * Math.random()),
-          created: new Date().toISOString(),
-          type,
-        };
+        const id = Math.floor(Date.now() * Math.random());
+        const created = new Date().toISOString();
 
         // Properly split query parameter rules
         if (type === "allowParam") {
@@ -2400,8 +2517,13 @@ class ProducerPopup {
             skippedCount++;
             continue;
           }
-          baseRule.paramKey = paramKey;
-          baseRule.paramValue = paramValueTrimmed;
+          importedRules.push({
+            id,
+            created,
+            type: "allowParam",
+            paramKey,
+            paramValue: paramValueTrimmed,
+          });
         } else {
           const cleanedUrl = this.cleanUrl(value);
           // Validate against the same rules the manual Add flow enforces.
@@ -2409,10 +2531,13 @@ class ProducerPopup {
             skippedCount++;
             continue;
           }
-          baseRule.url = cleanedUrl;
+          importedRules.push({
+            id,
+            created,
+            type: type as UrlRule["type"],
+            url: cleanedUrl,
+          });
         }
-
-        importedRules.push(baseRule);
       }
 
       // Find the rule set and update its rules (from temp if creating)
@@ -2489,9 +2614,10 @@ class ProducerPopup {
       return;
     }
 
-    const lines = ruleSet.rules.map(
-      (rule) =>
-        `${rule.type} ${rule.url || rule.paramKey + "=" + rule.paramValue}`,
+    const lines = ruleSet.rules.map((rule) =>
+      rule.type === "allowParam"
+        ? `${rule.type} ${rule.paramKey}=${rule.paramValue}`
+        : `${rule.type} ${rule.url}`,
     );
 
     const fileContent =
@@ -2560,7 +2686,7 @@ class ProducerPopup {
     });
   }
 
-  async clearInfo(sessionId) {
+  async clearInfo(sessionId: string) {
     if (!sessionId) {
       this.showNotification("No session specified", "error");
       return;
@@ -2625,7 +2751,7 @@ class ProducerPopup {
   }
 
   // Helper methods
-  getActiveRules() {
+  getActiveRules(): Rule[] {
     if (!this.activeRuleSetId) return [];
     const ruleSet = this.customModes.find(
       (rs) => rs.id === this.activeRuleSetId,
@@ -2633,14 +2759,17 @@ class ProducerPopup {
     return ruleSet ? ruleSet.rules : [];
   }
 
-  getRulesFromData(customModes, activeRuleSetId) {
+  getRulesFromData(
+    customModes: Mode[] | undefined,
+    activeRuleSetId: string | null | undefined,
+  ): Rule[] {
     if (!activeRuleSetId || !customModes) return [];
     const ruleSet = customModes.find((rs) => rs.id === activeRuleSetId);
     return ruleSet ? ruleSet.rules : [];
   }
 
-  getAllPermanentRules() {
-    const permanentRules = [];
+  getAllPermanentRules(): Rule[] {
+    const permanentRules: Rule[] = [];
     this.customModes.forEach((mode) => {
       mode.rules.forEach((rule) => {
         if (rule.permanent && (rule.type === "domain" || rule.type === "url")) {
@@ -2651,7 +2780,10 @@ class ProducerPopup {
     return permanentRules;
   }
 
-  toggleRulePermanent(ruleId, ruleSetId) {
+  toggleRulePermanent(
+    ruleId: number | undefined,
+    ruleSetId: string | null,
+  ) {
     const ruleSet = this.customModes.find((rs) => rs.id === ruleSetId);
     if (!ruleSet) return;
     const rule = ruleSet.rules.find((r) => r.id === ruleId);
@@ -2817,7 +2949,7 @@ class ProducerPopup {
     this.showRulesMainView();
   }
 
-  deleteRuleSet(id) {
+  deleteRuleSet(id: string) {
     const ruleSet = this.customModes.find((rs) => rs.id === id);
     if (!ruleSet) return;
 
@@ -2836,7 +2968,7 @@ class ProducerPopup {
     });
   }
 
-  duplicateRuleSet(id) {
+  duplicateRuleSet(id: string) {
     const ruleSet = this.customModes.find((rs) => rs.id === id);
     if (!ruleSet) return;
 
@@ -2859,7 +2991,7 @@ class ProducerPopup {
     this.showNotification(`"${clone.name}" duplicated and activated`);
   }
 
-  editRuleSet(id) {
+  editRuleSet(id: string) {
     this.currentEditingRuleSetId = id;
     this.showRulesEditView();
 
@@ -2890,7 +3022,7 @@ class ProducerPopup {
     this.showNotification("Name saved!");
   }
 
-  activateRuleSet(ruleSetId) {
+  activateRuleSet(ruleSetId: string) {
     if (!ruleSetId) return;
 
     const ruleSet = this.customModes.find((rs) => rs.id === ruleSetId);
@@ -3080,7 +3212,7 @@ class ProducerPopup {
         item.className = "rule-item";
         if (rule.permanent) item.classList.add("rule-permanent");
         item.draggable = true;
-        item.dataset.index = index;
+        item.dataset.index = String(index);
 
         const dragHandle = document.createElement("span");
         dragHandle.className = "drag-handle";
@@ -3163,8 +3295,8 @@ class ProducerPopup {
 
         // Drag-and-drop
         item.addEventListener("dragstart", (e) => {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", index);
+          e.dataTransfer!.effectAllowed = "move";
+          e.dataTransfer!.setData("text/plain", String(index));
           setTimeout(() => item.classList.add("is-dragging"), 0);
         });
         item.addEventListener("dragend", () => {
@@ -3175,20 +3307,20 @@ class ProducerPopup {
         });
         item.addEventListener("dragover", (e) => {
           e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
+          e.dataTransfer!.dropEffect = "move";
           this.allRulesList
             .querySelectorAll(".drag-over")
             .forEach((el) => el.classList.remove("drag-over"));
           item.classList.add("drag-over");
         });
         item.addEventListener("dragleave", (e) => {
-          if (!item.contains(e.relatedTarget))
+          if (!item.contains(e.relatedTarget as Node | null))
             item.classList.remove("drag-over");
         });
         item.addEventListener("drop", (e) => {
           e.preventDefault();
           item.classList.remove("drag-over");
-          const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+          const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
           const toIndex = index;
           if (fromIndex === toIndex) return;
           const moved = ruleSet.rules.splice(fromIndex, 1)[0];
@@ -3410,7 +3542,7 @@ class ProducerPopup {
       return;
     }
 
-    this.rulesPreviewCount.textContent = ruleSet.rules.length;
+    this.rulesPreviewCount.textContent = String(ruleSet.rules.length);
 
     // Show only the last added rule
     const lastRule = ruleSet.rules[ruleSet.rules.length - 1];
@@ -3485,7 +3617,7 @@ class ProducerPopup {
     });
   }
 
-  _showDropdown(triggerBtn, dropdown) {
+  _showDropdown(triggerBtn: HTMLElement, dropdown: HTMLElement) {
     document.querySelectorAll(".item-dropdown").forEach((d) => d.remove());
 
     // Append off-screen first so offsetHeight is measurable
@@ -3519,12 +3651,22 @@ class ProducerPopup {
     }
   }
 
-  _showConfirmModal({ title, message, confirmText = "Confirm", onConfirm }) {
-    const modal = document.getElementById("confirmModal");
-    document.getElementById("confirmModalTitle").textContent = title;
-    document.getElementById("confirmModalMessage").textContent = message;
-    const confirmBtn = document.getElementById("confirmModalConfirm");
-    const cancelBtn = document.getElementById("confirmModalCancel");
+  _showConfirmModal({
+    title,
+    message,
+    confirmText = "Confirm",
+    onConfirm,
+  }: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    onConfirm: () => void;
+  }) {
+    const modal = this.$("confirmModal");
+    this.$("confirmModalTitle").textContent = title;
+    this.$("confirmModalMessage").textContent = message;
+    const confirmBtn = this.$("confirmModalConfirm");
+    const cancelBtn = this.$("confirmModalCancel");
     confirmBtn.textContent = confirmText;
 
     const close = () => {
@@ -3568,7 +3710,7 @@ class ProducerPopup {
       const item = document.createElement("div");
       item.className = "rule-set-item";
       item.draggable = true;
-      item.dataset.index = index;
+      item.dataset.index = String(index);
 
       // Check if this rule set is active
       const isActive = this.activeRuleSetId === ruleSet.id;
@@ -3642,7 +3784,7 @@ class ProducerPopup {
         });
 
         name.style.display = "none";
-        name.parentNode.insertBefore(input, name);
+        name.parentNode!.insertBefore(input, name);
         input.focus();
         input.select();
       });
@@ -3704,13 +3846,13 @@ class ProducerPopup {
       menuBtn.title = "More options";
       menuBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const existing = document.querySelector(".item-dropdown");
+        const existing = document.querySelector<ItemDropdown>(".item-dropdown");
         if (existing && existing._trigger === menuBtn) {
           existing.remove();
           return;
         }
 
-        const dropdown = document.createElement("div");
+        const dropdown = document.createElement("div") as ItemDropdown;
         dropdown.className = "item-dropdown";
         dropdown._trigger = menuBtn;
 
@@ -3739,8 +3881,8 @@ class ProducerPopup {
 
       // Drag-and-drop events
       item.addEventListener("dragstart", (e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", index);
+        e.dataTransfer!.effectAllowed = "move";
+        e.dataTransfer!.setData("text/plain", String(index));
         setTimeout(() => item.classList.add("is-dragging"), 0);
       });
       item.addEventListener("dragend", () => {
@@ -3751,19 +3893,19 @@ class ProducerPopup {
       });
       item.addEventListener("dragover", (e) => {
         e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
+        e.dataTransfer!.dropEffect = "move";
         this.ruleSetsList
           .querySelectorAll(".drag-over")
           .forEach((el) => el.classList.remove("drag-over"));
         item.classList.add("drag-over");
       });
       item.addEventListener("dragleave", (e) => {
-        if (!item.contains(e.relatedTarget)) item.classList.remove("drag-over");
+        if (!item.contains(e.relatedTarget as Node | null)) item.classList.remove("drag-over");
       });
       item.addEventListener("drop", (e) => {
         e.preventDefault();
         item.classList.remove("drag-over");
-        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+        const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
         const toIndex = index;
         if (fromIndex === toIndex) return;
         const moved = this.customModes.splice(fromIndex, 1)[0];
@@ -3791,7 +3933,7 @@ class ProducerPopup {
     // Update statistics in main stats view
     const totalSessions = this.sessions.length;
     if (this.statsTabTotalSessions) {
-      this.statsTabTotalSessions.textContent = totalSessions;
+      this.statsTabTotalSessions.textContent = String(totalSessions);
     }
 
     if (totalSessions > 0) {
@@ -3841,7 +3983,7 @@ class ProducerPopup {
       item.style.textAlign = "left";
       item.style.gap = "4px";
       item.draggable = true;
-      item.dataset.index = index;
+      item.dataset.index = String(index);
 
       // Highlight if this is the current active session
       const isActive = session.id === this.currentSessionId;
@@ -3916,7 +4058,7 @@ class ProducerPopup {
         });
 
         name.style.display = "none";
-        name.parentNode.insertBefore(input, name);
+        name.parentNode!.insertBefore(input, name);
         input.focus();
         input.select();
       });
@@ -4000,13 +4142,13 @@ class ProducerPopup {
 
       menuBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const existing = document.querySelector(".item-dropdown");
+        const existing = document.querySelector<ItemDropdown>(".item-dropdown");
         if (existing && existing._trigger === menuBtn) {
           existing.remove();
           return;
         }
 
-        const dropdown = document.createElement("div");
+        const dropdown = document.createElement("div") as ItemDropdown;
         dropdown.className = "item-dropdown";
         dropdown._trigger = menuBtn;
 
@@ -4037,8 +4179,8 @@ class ProducerPopup {
 
       // Drag-and-drop events
       item.addEventListener("dragstart", (e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", index);
+        e.dataTransfer!.effectAllowed = "move";
+        e.dataTransfer!.setData("text/plain", String(index));
         setTimeout(() => item.classList.add("is-dragging"), 0);
       });
       item.addEventListener("dragend", () => {
@@ -4049,19 +4191,19 @@ class ProducerPopup {
       });
       item.addEventListener("dragover", (e) => {
         e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
+        e.dataTransfer!.dropEffect = "move";
         this.sessionsList
           .querySelectorAll(".drag-over")
           .forEach((el) => el.classList.remove("drag-over"));
         item.classList.add("drag-over");
       });
       item.addEventListener("dragleave", (e) => {
-        if (!item.contains(e.relatedTarget)) item.classList.remove("drag-over");
+        if (!item.contains(e.relatedTarget as Node | null)) item.classList.remove("drag-over");
       });
       item.addEventListener("drop", (e) => {
         e.preventDefault();
         item.classList.remove("drag-over");
-        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+        const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
         const toIndex = index;
         if (fromIndex === toIndex) return;
         const moved = this.sessions.splice(fromIndex, 1)[0];
@@ -4124,8 +4266,11 @@ class ProducerPopup {
   }
 
   // Personalization methods
-  getThemeBlockPageDefaults(theme = this.currentTheme || "blue") {
-    const themeDefaults = {
+  getThemeBlockPageDefaults(theme: string = this.currentTheme || "blue") {
+    const themeDefaults: Record<
+      string,
+      { primaryColor: string; accentColor: string }
+    > = {
       blackwhite: { primaryColor: "#1a1a1a", accentColor: "#ffffff" },
       blue: { primaryColor: "#667eea", accentColor: "#2ecc71" },
       red: { primaryColor: "#e74c3c", accentColor: "#2ecc71" },
@@ -4137,7 +4282,7 @@ class ProducerPopup {
     return themeDefaults[theme] || themeDefaults.blue;
   }
 
-  getDefaultBlockPageSettings() {
+  getDefaultBlockPageSettings(): BlockPageSettings {
     const themeDefaults = this.getThemeBlockPageDefaults();
     return {
       title: "Stay Focused",
@@ -4151,14 +4296,17 @@ class ProducerPopup {
     };
   }
 
-  syncColorInput(textInput, colorInput) {
+  syncColorInput(
+    textInput: HTMLInputElement | null,
+    colorInput: HTMLInputElement | null,
+  ) {
     const value = (textInput?.value || "").trim();
     if (/^#[0-9a-fA-F]{6}$/.test(value) && colorInput) {
       colorInput.value = value;
     }
   }
 
-  showColorCodeInput(type) {
+  showColorCodeInput(type: "primary" | "accent") {
     const isPrimary = type === "primary";
     const input = isPrimary
       ? this.blockPagePrimaryColorText
@@ -4175,13 +4323,17 @@ class ProducerPopup {
     input.select();
   }
 
-  hideColorCodeInput(input, display) {
+  hideColorCodeInput(input: HTMLInputElement, display: HTMLElement) {
     if (!input || !display) return;
     input.style.display = "none";
     display.style.display = "block";
   }
 
-  commitColorCodeInput(input, colorInput, display) {
+  commitColorCodeInput(
+    input: HTMLInputElement,
+    colorInput: HTMLInputElement,
+    display: HTMLElement,
+  ) {
     if (!input || !colorInput || !display) return;
 
     const typedValue = input.value.trim();
@@ -4203,7 +4355,11 @@ class ProducerPopup {
     }
   }
 
-  bindColorCodeInput(input, colorInput, display) {
+  bindColorCodeInput(
+    input: HTMLInputElement,
+    colorInput: HTMLInputElement,
+    display: HTMLElement,
+  ) {
     if (!input || !colorInput || !display) return;
 
     input.addEventListener("input", () => {
@@ -4226,18 +4382,18 @@ class ProducerPopup {
     });
   }
 
-  sanitizeHexColor(color, fallback) {
-    return /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : fallback;
+  sanitizeHexColor(color: string | undefined, fallback: string): string {
+    return color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback;
   }
 
-  setBackgroundImageStatus(message) {
+  setBackgroundImageStatus(message: string) {
     if (this.blockPageImageStatus) {
       this.blockPageImageStatus.textContent = message;
       this.blockPageImageStatus.title = message;
     }
   }
 
-  estimateImageStorageBytes(imageDataUrl, imageName) {
+  estimateImageStorageBytes(imageDataUrl: string, imageName: string) {
     const payload = JSON.stringify({
       blockPageBackgroundImage: imageDataUrl || "",
       blockPageBackgroundImageName: imageName || "",
@@ -4245,7 +4401,7 @@ class ProducerPopup {
     return new TextEncoder().encode(payload).length;
   }
 
-  setBackgroundImageInputVisibility(show) {
+  setBackgroundImageInputVisibility(show: boolean) {
     this.blockPageImageInputMode = show ? "url" : "hidden";
     if (this.blockPageImageUrlRow) {
       this.blockPageImageUrlRow.style.display = show ? "flex" : "none";
@@ -4260,7 +4416,7 @@ class ProducerPopup {
     this.setBackgroundImageInputVisibility(shouldShow);
   }
 
-  getBackgroundImageLabel(imageValue, imageName = "") {
+  getBackgroundImageLabel(imageValue: string, imageName = "") {
     if (!imageValue) {
       return "No background image applied.";
     }
@@ -4332,8 +4488,9 @@ class ProducerPopup {
     this.updatePreview();
   }
 
-  async importBackgroundImageFile(event) {
-    const file = event?.target?.files?.[0];
+  async importBackgroundImageFile(event: Event) {
+    const fileInput = event?.target as HTMLInputElement | null;
+    const file = fileInput?.files?.[0];
     if (!file) return;
 
     const maxImportBytes = 2 * 1024 * 1024;
@@ -4349,12 +4506,14 @@ class ProducerPopup {
     }
 
     try {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
+      const dataUrl = await new Promise<string | ArrayBuffer | null>(
+        (resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        },
+      );
 
       if (typeof dataUrl === "string" && this.blockPageImage) {
         const quotaBytes =
@@ -4397,7 +4556,7 @@ class ProducerPopup {
     }
   }
 
-  getBlockPageSettingsFromInputs() {
+  getBlockPageSettingsFromInputs(): BlockPageSettings {
     const defaults = this.getDefaultBlockPageSettings();
     return {
       title: this.blockPageTitle?.value?.trim() || defaults.title,
@@ -4418,7 +4577,7 @@ class ProducerPopup {
     };
   }
 
-  getPersonalizationPayload(overrides = {}) {
+  getPersonalizationPayload(overrides: Record<string, unknown> = {}) {
     return {
       theme: this.currentTheme,
       blockPageTitle: this.currentBlockPageTitle,
@@ -4434,7 +4593,7 @@ class ProducerPopup {
     };
   }
 
-  async selectTheme(theme) {
+  async selectTheme(theme: string) {
     if (this.currentTheme === theme) {
       return;
     }
@@ -4460,7 +4619,7 @@ class ProducerPopup {
 
     // Auto-save theme to storage
     try {
-      const themePayload = { theme };
+      const themePayload: Record<string, unknown> = { theme };
       if (this.currentBlockPageUseThemeColors !== false) {
         themePayload.blockPagePrimaryColor = this.currentBlockPagePrimaryColor;
         themePayload.blockPageAccentColor = this.currentBlockPageAccentColor;
@@ -4485,7 +4644,7 @@ class ProducerPopup {
     }
   }
 
-  applyTheme(theme) {
+  applyTheme(theme: string) {
     // Remove all theme classes
     document.body.className = document.body.className
       .split(" ")
@@ -4560,7 +4719,7 @@ class ProducerPopup {
     });
   }
 
-  getPreviewBackground(primaryColor, imageUrl) {
+  getPreviewBackground(primaryColor: string, imageUrl: string) {
     const fallback = `linear-gradient(135deg, ${primaryColor} 0%, #764ba2 100%)`;
     if (!imageUrl) return fallback;
     return `linear-gradient(140deg, rgba(10, 15, 31, 0.4), rgba(10, 15, 31, 0.6)), url("${imageUrl}"), ${fallback}`;
@@ -4711,7 +4870,7 @@ class ProducerPopup {
     this.showNotification("Block page settings reset");
   }
 
-  async broadcastGrayscaleState(enabled = null) {
+  async broadcastGrayscaleState(enabled: boolean | null = null) {
     // Get active mode for determining grayscale state and logging
     const activeMode = this.customModes.find(
       (mode) => mode.id === this.activeRuleSetId,
@@ -4811,7 +4970,7 @@ class ProducerPopup {
   }
 
   // Session management methods
-  async activateSession(sessionId) {
+  async activateSession(sessionId: string) {
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
@@ -4930,7 +5089,7 @@ class ProducerPopup {
     this.showNotification(`Session "${session.name}" resumed!`);
   }
 
-  async deactivateSession(sessionId) {
+  async deactivateSession(sessionId: string) {
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
@@ -4972,7 +5131,7 @@ class ProducerPopup {
     }
   }
 
-  async deleteSession(sessionId) {
+  async deleteSession(sessionId: string) {
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
@@ -5002,7 +5161,7 @@ class ProducerPopup {
     });
   }
 
-  editSessionRuleSet(sessionId) {
+  editSessionRuleSet(sessionId: string) {
     const session = this.sessions.find((s) => s.id === sessionId);
     if (!session) return;
 
@@ -5053,12 +5212,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Update home tab blocks count
     if (popup.blockedCount) {
-      popup.blockedCount.textContent = popup.sessionBlocks;
+      popup.blockedCount.textContent = String(popup.sessionBlocks);
     }
 
     // Update stats tab session blocks element
     if (popup.sessionBlocksEl) {
-      popup.sessionBlocksEl.textContent = popup.sessionBlocks;
+      popup.sessionBlocksEl.textContent = String(popup.sessionBlocks);
     }
 
     // Update current session's blocks count if there's an active session
@@ -5072,7 +5231,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // Update Current Session section blocks count
         if (popup.currentSessionBlocksCount) {
-          popup.currentSessionBlocksCount.textContent = popup.sessionBlocks;
+          popup.currentSessionBlocksCount.textContent = String(
+            popup.sessionBlocks,
+          );
         }
 
         // Update session history item for this session
@@ -5109,12 +5270,12 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
     // Update home tab blocked count
     if (popup.blockedCount) {
-      popup.blockedCount.textContent = popup.sessionBlocks;
+      popup.blockedCount.textContent = String(popup.sessionBlocks);
     }
 
     // Update stats tab session blocks element
     if (popup.sessionBlocksEl) {
-      popup.sessionBlocksEl.textContent = popup.sessionBlocks;
+      popup.sessionBlocksEl.textContent = String(popup.sessionBlocks);
     }
 
     // Update current session object & UI if active
@@ -5127,7 +5288,9 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
         // Update Current Session section blocks count
         if (popup.currentSessionBlocksCount) {
-          popup.currentSessionBlocksCount.textContent = popup.sessionBlocks;
+          popup.currentSessionBlocksCount.textContent = String(
+            popup.sessionBlocks,
+          );
         }
 
         // Update session history item for this session

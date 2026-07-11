@@ -1,18 +1,30 @@
 class ProducerBackground {
+  rules: Rule[] = [];
+  permanentRules: Rule[] = []; // Always-blocked rules, independent of focus mode
+  isActive = false;
+  sessionBlocks = 0;
+  sessionStartTime: number | null = null;
+  focusedTime = 0; // persisted cumulative total
+  focusedTimeBase = 0; // snapshot of cumulative total at session start
+  timerInterval: ReturnType<typeof setInterval> | null = null;
+  heartbeatInterval: ReturnType<typeof setInterval> | null = null; // Heartbeat for detecting browser closure
+  temporaryAllowedUrls = new Set<string>(); // For Allow Once button - temporary bypass
+  pendingDiscardTimeouts = new Map<number, ReturnType<typeof setTimeout>>(); // Debounce discard attempts per tab
+  blockedPageUrlPrefix: string;
+  listenersSetup = false;
+
+  // Personalization cache (set via updatePersonalization message)
+  currentTheme?: string;
+  blockPageTitle?: string;
+  blockPageMessage?: string;
+  blockPageShowQuotes?: boolean;
+  blockPageBackgroundImage?: string;
+  blockPagePrimaryColor?: string;
+  blockPageAccentColor?: string;
+  blockPageShowActionButtons?: boolean;
+
   constructor() {
-    this.rules = [];
-    this.permanentRules = []; // Always-blocked rules, independent of focus mode
-    this.isActive = false;
-    this.sessionBlocks = 0;
-    this.sessionStartTime = null;
-    this.focusedTime = 0; // persisted cumulative total
-    this.focusedTimeBase = 0; // snapshot of cumulative total at session start
-    this.timerInterval = null;
-    this.heartbeatInterval = null; // Heartbeat for detecting browser closure
-    this.temporaryAllowedUrls = new Set(); // For Allow Once button - temporary bypass
-    this.pendingDiscardTimeouts = new Map(); // Debounce discard attempts per tab
     this.blockedPageUrlPrefix = chrome.runtime.getURL("blocked.html");
-    this.listenersSetup = false;
 
     this.init();
   }
@@ -67,7 +79,7 @@ class ProducerBackground {
       const activeRuleSetId = data.activeRuleSetId;
       if (!activeRuleSetId) return;
 
-      const ruleSets = data.customModes || data.customRules || [];
+      const ruleSets: Mode[] = data.customModes || data.customRules || [];
       const activeRuleSet = ruleSets.find((rs) => rs.id === activeRuleSetId);
       if (activeRuleSet && Array.isArray(activeRuleSet.rules)) {
         this.rules = activeRuleSet.rules;
@@ -97,12 +109,12 @@ class ProducerBackground {
 
       // Load rules from active rule set if using new structure
       if (data.customModes && data.activeRuleSetId) {
-        const activeRuleSet = data.customModes.find(
+        const activeRuleSet = (data.customModes as Mode[]).find(
           (rs) => rs.id === data.activeRuleSetId,
         );
         this.rules = activeRuleSet ? activeRuleSet.rules : [];
       } else if (data.customRules && data.activeRuleSetId) {
-        const activeRuleSet = data.customRules.find(
+        const activeRuleSet = (data.customRules as Mode[]).find(
           (rs) => rs.id === data.activeRuleSetId,
         );
         this.rules = activeRuleSet ? activeRuleSet.rules : [];
@@ -177,8 +189,8 @@ class ProducerBackground {
           permanentRulesAfter,
         } = message;
         const isDeactivatingFocusMode = isActiveBefore && !isActiveAfter;
-        const permBefore = permanentRulesBefore !== undefined ? permanentRulesBefore : this.permanentRules;
-        const permAfter = permanentRulesAfter !== undefined ? permanentRulesAfter : this.permanentRules;
+        const permBefore: Rule[] = permanentRulesBefore !== undefined ? permanentRulesBefore : this.permanentRules;
+        const permAfter: Rule[] = permanentRulesAfter !== undefined ? permanentRulesAfter : this.permanentRules;
 
         // Sync in-memory permanent rules before tabs are reloaded so that
         // content.js checkBlock calls after navigation see the updated state.
@@ -291,8 +303,10 @@ class ProducerBackground {
 
     chrome.tabs.onActivated.addListener((activeInfo) => {
       // The tab that just lost focus is a good discard candidate.
-      if (activeInfo.previousTabId) {
-        this.scheduleDiscardBlockedTab(activeInfo.previousTabId, "tabBlurred");
+      const previousTabId = (activeInfo as { previousTabId?: number })
+        .previousTabId;
+      if (previousTabId) {
+        this.scheduleDiscardBlockedTab(previousTabId, "tabBlurred");
       }
     });
 
@@ -301,7 +315,7 @@ class ProducerBackground {
     });
   }
 
-  clearPendingDiscardTimeout(tabId) {
+  clearPendingDiscardTimeout(tabId: number) {
     const timeoutId = this.pendingDiscardTimeouts.get(tabId);
     if (timeoutId) {
       clearTimeout(timeoutId);
@@ -314,7 +328,7 @@ class ProducerBackground {
     this.pendingDiscardTimeouts.clear();
   }
 
-  shouldSkipDiscard(tab) {
+  shouldSkipDiscard(tab: chrome.tabs.Tab | undefined) {
     if (!tab || !tab.id || !tab.url) return true;
     const isProducerBlockedPage = this.isProducerBlockedPageUrl(tab.url);
 
@@ -340,7 +354,7 @@ class ProducerBackground {
     return false;
   }
 
-  isProducerBlockedPageUrl(url) {
+  isProducerBlockedPageUrl(url: string | null | undefined) {
     return !!(
       url &&
       this.blockedPageUrlPrefix &&
@@ -348,8 +362,9 @@ class ProducerBackground {
     );
   }
 
-  getBlockedPageOriginalUrl(blockedPageUrl) {
-    if (!this.isProducerBlockedPageUrl(blockedPageUrl)) return null;
+  getBlockedPageOriginalUrl(blockedPageUrl: string | null | undefined): string | null {
+    if (!blockedPageUrl || !this.isProducerBlockedPageUrl(blockedPageUrl))
+      return null;
     try {
       const parsed = new URL(blockedPageUrl);
       return parsed.searchParams.get("blockedUrl");
@@ -358,7 +373,7 @@ class ProducerBackground {
     }
   }
 
-  scheduleDiscardBlockedTab(tabId, reason = "unknown") {
+  scheduleDiscardBlockedTab(tabId: number, reason = "unknown") {
     this.clearPendingDiscardTimeout(tabId);
 
     const timeoutId = setTimeout(async () => {
@@ -452,7 +467,7 @@ class ProducerBackground {
             "sessions",
             "currentSessionId",
           ]);
-          const liveSessions = liveData.sessions || [];
+          const liveSessions: Session[] = liveData.sessions || [];
           const liveCurrentSession = liveData.currentSessionId
             ? liveSessions.find((s) => s.id === liveData.currentSessionId)
             : null;
@@ -544,7 +559,7 @@ class ProducerBackground {
           "sessions",
           "currentSessionId",
         ]);
-        const liveSessions = liveData.sessions || [];
+        const liveSessions: Session[] = liveData.sessions || [];
         const liveCurrentSession = liveData.currentSessionId
           ? liveSessions.find((s) => s.id === liveData.currentSessionId)
           : null;
@@ -608,15 +623,19 @@ class ProducerBackground {
     }
   }
 
-  async handleMessage(message, sender, sendResponse) {
+  async handleMessage(
+    message: RuntimeMessage,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: (response?: any) => void,
+  ) {
     switch (message.action) {
       case "ping":
         sendResponse({ ok: true });
         break;
 
       case "updateRules":
-        this.rules = message.rules;
-        this.isActive = message.isActive;
+        this.rules = message.rules || [];
+        this.isActive = !!message.isActive;
         break;
 
       case "updatePersonalization":
@@ -689,7 +708,7 @@ class ProducerBackground {
           "sessions",
         ]);
         if (data.currentSessionId && data.sessions) {
-          const currentSession = data.sessions.find(
+          const currentSession = (data.sessions as Session[]).find(
             (s) => s.id === data.currentSessionId,
           );
           if (currentSession) {
@@ -766,7 +785,7 @@ class ProducerBackground {
 
       case "checkBlock": {
         // Check if URL is temporarily allowed (Allow Once)
-        if (this.temporaryAllowedUrls.has(message.url)) {
+        if (message.url && this.temporaryAllowedUrls.has(message.url)) {
           this.temporaryAllowedUrls.delete(message.url);
           sendResponse({ shouldBlock: false, isPermanent: false });
           break;
@@ -872,7 +891,7 @@ class ProducerBackground {
             "customModes",
             "activeRuleSetId",
           ]);
-          const customModes = data.customModes || [];
+          const customModes: Mode[] = data.customModes || [];
           const activeRuleSetId = data.activeRuleSetId;
 
           if (!activeRuleSetId) {
@@ -928,8 +947,8 @@ class ProducerBackground {
         }
         try {
           const data = await chrome.storage.local.get(["permanentRules", "customModes"]);
-          const permanentRules = data.permanentRules || [];
-          const customModes = data.customModes || [];
+          const permanentRules: Rule[] = data.permanentRules || [];
+          const customModes: Mode[] = data.customModes || [];
           const cleanUrl = this.cleanUrl(message.url);
 
           const newPermanentRules = permanentRules.filter(
@@ -1051,7 +1070,7 @@ class ProducerBackground {
     return Math.floor((Date.now() - this.sessionStartTime) / 1000);
   }
 
-  shouldBlockUrl(url) {
+  shouldBlockUrl(url: string | null | undefined): boolean {
     if (!url) return false;
 
     const cleanUrl = this.cleanUrl(url);
@@ -1091,7 +1110,7 @@ class ProducerBackground {
     // If URL would be blocked, check for allowParam exceptions
     if (wouldBeBlocked) {
       const allowParamRules = this.rules.filter(
-        (rule) => rule.type === "allowParam",
+        (rule): rule is ParamRule => rule.type === "allowParam",
       );
       for (const rule of allowParamRules) {
         if (this.matchesParamRule(url, rule)) {
@@ -1105,7 +1124,12 @@ class ProducerBackground {
   }
 
   // To check if the URL should be refreshed or not
-  shouldBlockUrlWith(rules, isActive, url, permanentRules = this.permanentRules) {
+  shouldBlockUrlWith(
+    rules: Rule[],
+    isActive: boolean,
+    url: string,
+    permanentRules: Rule[] = this.permanentRules,
+  ) {
     const oldRules = this.rules;
     const oldIsActive = this.isActive;
     const oldPermanentRules = this.permanentRules;
@@ -1121,7 +1145,7 @@ class ProducerBackground {
     return result;
   }
 
-  matchesRule(url, rule) {
+  matchesRule(url: string, rule: Rule): boolean {
     const normalizedRuleUrl = this.normalizeRuleUrl(rule.url, rule.type);
     const normalizedCheckUrl = this.cleanUrl(url);
     const ruleUrl = normalizedRuleUrl.toLowerCase();
@@ -1183,7 +1207,7 @@ class ProducerBackground {
     }
   }
 
-  matchesParamRule(url, rule) {
+  matchesParamRule(url: string, rule: ParamRule): boolean {
     try {
       const urlObj = new URL(url);
       const paramValue = urlObj.searchParams.get(rule.paramKey);
@@ -1206,7 +1230,7 @@ class ProducerBackground {
     }
   }
 
-  cleanUrl(url) {
+  cleanUrl(url: string | null | undefined): string {
     if (!url) return "";
 
     const raw = String(url).trim();
@@ -1256,7 +1280,7 @@ class ProducerBackground {
     }
   }
 
-  normalizeRuleUrl(url, ruleType) {
+  normalizeRuleUrl(url: string | undefined, ruleType?: string): string {
     if (!url) return "";
 
     const raw = String(url).trim();
@@ -1300,7 +1324,7 @@ class ProducerBackground {
     return "Stay positive and keep pushing forward!";
   }
 
-  notifyPopup(action, data) {
+  notifyPopup(action: string, data: Record<string, unknown>) {
     // Try to send message to popup if it's open
     chrome.runtime.sendMessage({ action, ...data }).catch(() => {
       // Popup is closed, ignore error

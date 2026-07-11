@@ -37,12 +37,16 @@ sites blocked **permanently**, and customize the block page to your taste.
 
 ## Installation
 
-Producer has no build step — it loads directly as an unpacked extension.
+Producer is written in TypeScript and compiled to plain JavaScript in `dist/`,
+which is committed to the repo — so it loads directly as an unpacked extension
+with no install step.
 
 1. Open `chrome://extensions/`.
 2. Enable **Developer mode** (toggle in the top right).
 3. Click **Load unpacked** and select the repository root folder.
 4. The Producer icon appears in your toolbar — click it to open the popup.
+
+To modify the source, see [Development workflow](#development-workflow).
 
 ---
 
@@ -200,11 +204,16 @@ producer-extension/
 ├── manifest.json     # Extension configuration (Manifest V3)
 ├── popup.html        # Popup UI markup
 ├── popup.css         # Popup styles
-├── popup.js          # Popup logic and all user-initiated state changes
-├── background.js     # Service worker — blocking decisions & session/timer state
-├── content.js        # Content script — enforces blocking on every page
 ├── blocked.html      # Standalone block page
-├── blocked.js        # Block page logic
+├── src/              # TypeScript sources
+│   ├── popup.ts      # Popup logic and all user-initiated state changes
+│   ├── background.ts # Service worker — blocking decisions & session/timer state
+│   ├── content.ts    # Content script — enforces blocking on every page
+│   ├── blocked.ts    # Block page logic
+│   └── types.d.ts    # Shared data-model types (Rule, Mode, Session, messages)
+├── dist/             # Compiled JavaScript (what the manifest loads)
+├── tsconfig.json     # TypeScript compiler configuration
+├── package.json      # Dev dependencies and build scripts
 ├── icon.png          # Extension/toolbar icon
 ├── producer-logo.png # Logo used in the popup
 ├── PRIVACY.md        # Privacy policy
@@ -227,16 +236,16 @@ producer-extension/
 Three runtime contexts communicate only via Chrome runtime messages and
 `chrome.storage.local`:
 
-- **`background.js` (`ProducerBackground`, service worker)** — the authority on
+- **`background.ts` (`ProducerBackground`, service worker)** — the authority on
   blocking decisions and session state. `shouldBlockUrl()` is the single source
   of truth: it checks permanent rules first (always active), then the active
   mode's rules when focus is on. It also tracks the session timer, reloads
   affected tabs when rules change, and discards blocked tabs to save memory.
-- **`content.js` (`ProducerContentScript`)** — injected at `document_start` on
+- **`content.ts` (`ProducerContentScript`)** — injected at `document_start` on
   every page. It checks the URL, redirects to the block page when blocked, and
   intercepts clicks, form submits, history navigation, and `window.open` to
   catch single-page-app navigations.
-- **`blocked.html` + `blocked.js` (`ProducerBlockedPage`)** — the standalone
+- **`blocked.html` + `blocked.ts` (`ProducerBlockedPage`)** — the standalone
   block page. It reads its context from URL parameters and storage, polls to
   auto-redirect when a rule is removed, and applies your theme and text.
 
@@ -248,13 +257,22 @@ background worker.
 
 ## Development workflow
 
-There is no build system. After editing:
+The source lives in `src/` as TypeScript and compiles to `dist/`, which is what
+the extension actually runs.
 
-- **`popup.js` / `popup.html` / `popup.css`** — take effect the next time you
-  open the popup.
-- **`background.js`** — click **Reload** on the extension card in
+```bash
+npm install     # once, to get the TypeScript compiler
+npm run build   # compile src/ -> dist/
+npm run watch   # recompile automatically on save
+```
+
+After a rebuild:
+
+- **`src/popup.ts` / `popup.html` / `popup.css`** — take effect the next time
+  you open the popup.
+- **`src/background.ts`** — click **Reload** on the extension card in
   `chrome://extensions/`.
-- **`content.js`** — reload the affected tabs.
+- **`src/content.ts`** — reload the affected tabs.
 
 ---
 
@@ -274,8 +292,9 @@ There is no build system. After editing:
 
 **A change didn't apply**
 
-- Reload the extension from `chrome://extensions/` after editing
-  `background.js`, and reload open tabs for `content.js` changes.
+- Run `npm run build` (or keep `npm run watch` running) so `dist/` is up to
+  date, then reload the extension from `chrome://extensions/` after editing
+  `src/background.ts`, and reload open tabs for `src/content.ts` changes.
 
 ---
 
