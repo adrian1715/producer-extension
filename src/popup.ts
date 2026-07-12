@@ -3302,31 +3302,10 @@ class ProducerPopup {
         item.addEventListener("dragend", () => {
           item.classList.remove("is-dragging");
           this.allRulesList
-            .querySelectorAll(".drag-over")
-            .forEach((el) => el.classList.remove("drag-over"));
-        });
-        item.addEventListener("dragover", (e) => {
-          e.preventDefault();
-          e.dataTransfer!.dropEffect = "move";
-          this.allRulesList
-            .querySelectorAll(".drag-over")
-            .forEach((el) => el.classList.remove("drag-over"));
-          item.classList.add("drag-over");
-        });
-        item.addEventListener("dragleave", (e) => {
-          if (!item.contains(e.relatedTarget as Node | null))
-            item.classList.remove("drag-over");
-        });
-        item.addEventListener("drop", (e) => {
-          e.preventDefault();
-          item.classList.remove("drag-over");
-          const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
-          const toIndex = index;
-          if (fromIndex === toIndex) return;
-          const moved = ruleSet.rules.splice(fromIndex, 1)[0];
-          ruleSet.rules.splice(toIndex, 0, moved);
-          this.saveState();
-          this.renderAllRulesList();
+            .querySelectorAll(".drag-over, .drag-over-top, .drag-over-bottom")
+            .forEach((el) =>
+              el.classList.remove("drag-over", "drag-over-top", "drag-over-bottom"),
+            );
         });
 
         item.appendChild(dragHandle);
@@ -3334,6 +3313,13 @@ class ProducerPopup {
         item.appendChild(actionsWrap);
         this.allRulesList.appendChild(item);
       });
+
+    this._attachListReorderDrop(this.allRulesList, ".rule-item", (fromIndex, toIndex) => {
+      const moved = ruleSet.rules.splice(fromIndex, 1)[0];
+      ruleSet.rules.splice(toIndex, 0, moved);
+      this.saveState();
+      this.renderAllRulesList();
+    });
   }
 
   showRulesEditView() {
@@ -3651,6 +3637,75 @@ class ProducerPopup {
     }
   }
 
+  // Drives drag-and-drop reordering for a whole list from a single set of
+  // handlers on the list container (not each item), so hovering the gap
+  // between two items is a valid drop target too — that space belongs to the
+  // container, not to any item element, so per-item handlers alone can't see
+  // it and the browser shows a "not-allowed" cursor there otherwise.
+  // Also paints a top/bottom line on whichever item the pointer is closest
+  // to, showing exactly which side of it the dragged item will land on.
+  _attachListReorderDrop(
+    container: HTMLElement,
+    itemSelector: string,
+    onDrop: (fromIndex: number, toIndex: number) => void,
+  ) {
+    const indicatorClasses = ["drag-over", "drag-over-top", "drag-over-bottom"];
+    const clearIndicators = () => {
+      container
+        .querySelectorAll(indicatorClasses.map((c) => `.${c}`).join(","))
+        .forEach((el) => el.classList.remove(...indicatorClasses));
+    };
+
+    // Some lists (e.g. All Rules) render newest-first, so a later DOM
+    // position can mean a *lower* array index. Walk DOM order to find where
+    // the pointer falls, but derive the "past the last item" case from
+    // whichever direction this particular list's indices actually run.
+    const findDropTarget = (
+      clientY: number,
+    ): { index: number; element: HTMLElement | null; before: boolean } => {
+      const itemEls = Array.from(
+        container.querySelectorAll<HTMLElement>(itemSelector),
+      );
+      if (itemEls.length === 0) return { index: 0, element: null, before: true };
+      for (const el of itemEls) {
+        const rect = el.getBoundingClientRect();
+        if (clientY < rect.top + rect.height / 2) {
+          return { index: parseInt(el.dataset.index!, 10), element: el, before: true };
+        }
+      }
+      const lastEl = itemEls[itemEls.length - 1];
+      const first = parseInt(itemEls[0].dataset.index!, 10);
+      const last = parseInt(lastEl.dataset.index!, 10);
+      const index = last >= first ? last + 1 : last;
+      return { index, element: lastEl, before: false };
+    };
+
+    container.ondragenter = (e) => {
+      e.preventDefault();
+    };
+    container.ondragover = (e) => {
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = "move";
+      const target = findDropTarget(e.clientY);
+      clearIndicators();
+      target.element?.classList.add(
+        "drag-over",
+        target.before ? "drag-over-top" : "drag-over-bottom",
+      );
+    };
+    container.ondragleave = (e) => {
+      if (!container.contains(e.relatedTarget as Node | null)) clearIndicators();
+    };
+    container.ondrop = (e) => {
+      e.preventDefault();
+      clearIndicators();
+      const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
+      const toIndex = findDropTarget(e.clientY).index;
+      if (Number.isNaN(fromIndex) || fromIndex === toIndex) return;
+      onDrop(fromIndex, toIndex);
+    };
+  }
+
   _showConfirmModal({
     title,
     message,
@@ -3742,6 +3797,10 @@ class ProducerPopup {
         input.style.border = "1px solid #ccc";
         input.style.borderRadius = "4px";
 
+        // Disable dragging on the item while its input is focused, so
+        // selecting text with the mouse doesn't get hijacked as a drag.
+        item.draggable = false;
+
         const saveEdit = () => {
           const newName = input.value.trim();
           if (!newName) {
@@ -3766,12 +3825,14 @@ class ProducerPopup {
           name.textContent = this.truncateText(ruleSet.name, 30);
           name.style.display = "";
           input.remove();
+          item.draggable = true;
         };
 
         const cancelEdit = () => {
           name.textContent = this.truncateText(ruleSet.name, 30);
           name.style.display = "";
           input.remove();
+          item.draggable = true;
         };
 
         input.addEventListener("blur", saveEdit);
@@ -3888,30 +3949,10 @@ class ProducerPopup {
       item.addEventListener("dragend", () => {
         item.classList.remove("is-dragging");
         this.ruleSetsList
-          .querySelectorAll(".drag-over")
-          .forEach((el) => el.classList.remove("drag-over"));
-      });
-      item.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        e.dataTransfer!.dropEffect = "move";
-        this.ruleSetsList
-          .querySelectorAll(".drag-over")
-          .forEach((el) => el.classList.remove("drag-over"));
-        item.classList.add("drag-over");
-      });
-      item.addEventListener("dragleave", (e) => {
-        if (!item.contains(e.relatedTarget as Node | null)) item.classList.remove("drag-over");
-      });
-      item.addEventListener("drop", (e) => {
-        e.preventDefault();
-        item.classList.remove("drag-over");
-        const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
-        const toIndex = index;
-        if (fromIndex === toIndex) return;
-        const moved = this.customModes.splice(fromIndex, 1)[0];
-        this.customModes.splice(toIndex, 0, moved);
-        this.saveState();
-        this.renderRuleSetsList();
+          .querySelectorAll(".drag-over, .drag-over-top, .drag-over-bottom")
+          .forEach((el) =>
+            el.classList.remove("drag-over", "drag-over-top", "drag-over-bottom"),
+          );
       });
 
       item.appendChild(dragHandle);
@@ -3919,6 +3960,14 @@ class ProducerPopup {
       item.appendChild(actionsWrap);
       this.ruleSetsList.appendChild(item);
     });
+
+    this._attachListReorderDrop(this.ruleSetsList, ".rule-set-item", (fromIndex, toIndex) => {
+      const moved = this.customModes.splice(fromIndex, 1)[0];
+      this.customModes.splice(toIndex, 0, moved);
+      this.saveState();
+      this.renderRuleSetsList();
+    });
+
     this.ruleSetsList.scrollTop = scrollTop;
   }
 
@@ -4016,6 +4065,10 @@ class ProducerPopup {
         input.style.border = "1px solid #ccc";
         input.style.borderRadius = "4px";
 
+        // Disable dragging on the item while its input is focused, so
+        // selecting text with the mouse doesn't get hijacked as a drag.
+        item.draggable = false;
+
         const saveEdit = () => {
           const newName = input.value.trim();
           if (!newName) {
@@ -4040,12 +4093,14 @@ class ProducerPopup {
           name.textContent = this.truncateText(session.name, 40);
           name.style.display = "";
           input.remove();
+          item.draggable = true;
         };
 
         const cancelEdit = () => {
           name.textContent = this.truncateText(session.name, 40);
           name.style.display = "";
           input.remove();
+          item.draggable = true;
         };
 
         input.addEventListener("blur", saveEdit);
@@ -4186,30 +4241,10 @@ class ProducerPopup {
       item.addEventListener("dragend", () => {
         item.classList.remove("is-dragging");
         this.sessionsList
-          .querySelectorAll(".drag-over")
-          .forEach((el) => el.classList.remove("drag-over"));
-      });
-      item.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        e.dataTransfer!.dropEffect = "move";
-        this.sessionsList
-          .querySelectorAll(".drag-over")
-          .forEach((el) => el.classList.remove("drag-over"));
-        item.classList.add("drag-over");
-      });
-      item.addEventListener("dragleave", (e) => {
-        if (!item.contains(e.relatedTarget as Node | null)) item.classList.remove("drag-over");
-      });
-      item.addEventListener("drop", (e) => {
-        e.preventDefault();
-        item.classList.remove("drag-over");
-        const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
-        const toIndex = index;
-        if (fromIndex === toIndex) return;
-        const moved = this.sessions.splice(fromIndex, 1)[0];
-        this.sessions.splice(toIndex, 0, moved);
-        this.saveState();
-        this.renderSessionHistory();
+          .querySelectorAll(".drag-over, .drag-over-top, .drag-over-bottom")
+          .forEach((el) =>
+            el.classList.remove("drag-over", "drag-over-top", "drag-over-bottom"),
+          );
       });
 
       item.appendChild(dragHandle);
@@ -4217,6 +4252,14 @@ class ProducerPopup {
       item.appendChild(actionsWrap);
       this.sessionsList.appendChild(item);
     });
+
+    this._attachListReorderDrop(this.sessionsList, ".session-item", (fromIndex, toIndex) => {
+      const moved = this.sessions.splice(fromIndex, 1)[0];
+      this.sessions.splice(toIndex, 0, moved);
+      this.saveState();
+      this.renderSessionHistory();
+    });
+
     if (scrollContainer) scrollContainer.scrollTop = scrollTop;
   }
 
