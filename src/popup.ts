@@ -3305,8 +3305,13 @@ class ProducerPopup {
             .querySelectorAll(".drag-over")
             .forEach((el) => el.classList.remove("drag-over"));
         });
+        item.addEventListener("dragenter", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
         item.addEventListener("dragover", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           e.dataTransfer!.dropEffect = "move";
           this.allRulesList
             .querySelectorAll(".drag-over")
@@ -3319,6 +3324,7 @@ class ProducerPopup {
         });
         item.addEventListener("drop", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           item.classList.remove("drag-over");
           const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
           const toIndex = index;
@@ -3334,6 +3340,13 @@ class ProducerPopup {
         item.appendChild(actionsWrap);
         this.allRulesList.appendChild(item);
       });
+
+    this._attachListReorderDrop(this.allRulesList, ".rule-item", (fromIndex, toIndex) => {
+      const moved = ruleSet.rules.splice(fromIndex, 1)[0];
+      ruleSet.rules.splice(toIndex, 0, moved);
+      this.saveState();
+      this.renderAllRulesList();
+    });
   }
 
   showRulesEditView() {
@@ -3651,6 +3664,70 @@ class ProducerPopup {
     }
   }
 
+  // Lets a dragged item be dropped in the gap between two items, not just
+  // directly on top of one. Attached to the list container itself (not each
+  // item) so the browser doesn't show a "not-allowed" cursor over the margins
+  // between items, where no item element exists to catch the drag events.
+  // Item-level dragover/drop handlers stopPropagation() so this only runs for
+  // drops that land in those gaps.
+  _attachListReorderDrop(
+    container: HTMLElement,
+    itemSelector: string,
+    onDrop: (fromIndex: number, toIndex: number) => void,
+  ) {
+    // Some lists (e.g. All Rules) render newest-first, so a later DOM
+    // position can mean a *lower* array index. Walk DOM order to find where
+    // the pointer falls, but derive the "past the last item" case from
+    // whichever direction this particular list's indices actually run.
+    const findDropIndex = (clientY: number): number => {
+      const itemEls = Array.from(
+        container.querySelectorAll<HTMLElement>(itemSelector),
+      );
+      if (itemEls.length === 0) return 0;
+      for (const el of itemEls) {
+        const rect = el.getBoundingClientRect();
+        if (clientY < rect.top + rect.height / 2) {
+          return parseInt(el.dataset.index!, 10);
+        }
+      }
+      const first = parseInt(itemEls[0].dataset.index!, 10);
+      const last = parseInt(itemEls[itemEls.length - 1].dataset.index!, 10);
+      return last >= first ? last + 1 : last;
+    };
+
+    container.ondragenter = (e) => {
+      e.preventDefault();
+    };
+    container.ondragover = (e) => {
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = "move";
+      const toIndex = findDropIndex(e.clientY);
+      container.querySelectorAll<HTMLElement>(itemSelector).forEach((el) => {
+        el.classList.toggle(
+          "drag-over",
+          parseInt(el.dataset.index!, 10) === toIndex,
+        );
+      });
+    };
+    container.ondragleave = (e) => {
+      if (!container.contains(e.relatedTarget as Node | null)) {
+        container
+          .querySelectorAll(".drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+      }
+    };
+    container.ondrop = (e) => {
+      e.preventDefault();
+      container
+        .querySelectorAll(".drag-over")
+        .forEach((el) => el.classList.remove("drag-over"));
+      const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
+      const toIndex = findDropIndex(e.clientY);
+      if (Number.isNaN(fromIndex) || fromIndex === toIndex) return;
+      onDrop(fromIndex, toIndex);
+    };
+  }
+
   _showConfirmModal({
     title,
     message,
@@ -3742,6 +3819,10 @@ class ProducerPopup {
         input.style.border = "1px solid #ccc";
         input.style.borderRadius = "4px";
 
+        // Disable dragging on the item while its input is focused, so
+        // selecting text with the mouse doesn't get hijacked as a drag.
+        item.draggable = false;
+
         const saveEdit = () => {
           const newName = input.value.trim();
           if (!newName) {
@@ -3766,12 +3847,14 @@ class ProducerPopup {
           name.textContent = this.truncateText(ruleSet.name, 30);
           name.style.display = "";
           input.remove();
+          item.draggable = true;
         };
 
         const cancelEdit = () => {
           name.textContent = this.truncateText(ruleSet.name, 30);
           name.style.display = "";
           input.remove();
+          item.draggable = true;
         };
 
         input.addEventListener("blur", saveEdit);
@@ -3891,8 +3974,13 @@ class ProducerPopup {
           .querySelectorAll(".drag-over")
           .forEach((el) => el.classList.remove("drag-over"));
       });
+      item.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
       item.addEventListener("dragover", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         e.dataTransfer!.dropEffect = "move";
         this.ruleSetsList
           .querySelectorAll(".drag-over")
@@ -3904,6 +3992,7 @@ class ProducerPopup {
       });
       item.addEventListener("drop", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         item.classList.remove("drag-over");
         const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
         const toIndex = index;
@@ -3919,6 +4008,14 @@ class ProducerPopup {
       item.appendChild(actionsWrap);
       this.ruleSetsList.appendChild(item);
     });
+
+    this._attachListReorderDrop(this.ruleSetsList, ".rule-set-item", (fromIndex, toIndex) => {
+      const moved = this.customModes.splice(fromIndex, 1)[0];
+      this.customModes.splice(toIndex, 0, moved);
+      this.saveState();
+      this.renderRuleSetsList();
+    });
+
     this.ruleSetsList.scrollTop = scrollTop;
   }
 
@@ -4016,6 +4113,10 @@ class ProducerPopup {
         input.style.border = "1px solid #ccc";
         input.style.borderRadius = "4px";
 
+        // Disable dragging on the item while its input is focused, so
+        // selecting text with the mouse doesn't get hijacked as a drag.
+        item.draggable = false;
+
         const saveEdit = () => {
           const newName = input.value.trim();
           if (!newName) {
@@ -4040,12 +4141,14 @@ class ProducerPopup {
           name.textContent = this.truncateText(session.name, 40);
           name.style.display = "";
           input.remove();
+          item.draggable = true;
         };
 
         const cancelEdit = () => {
           name.textContent = this.truncateText(session.name, 40);
           name.style.display = "";
           input.remove();
+          item.draggable = true;
         };
 
         input.addEventListener("blur", saveEdit);
@@ -4189,8 +4292,13 @@ class ProducerPopup {
           .querySelectorAll(".drag-over")
           .forEach((el) => el.classList.remove("drag-over"));
       });
+      item.addEventListener("dragenter", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
       item.addEventListener("dragover", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         e.dataTransfer!.dropEffect = "move";
         this.sessionsList
           .querySelectorAll(".drag-over")
@@ -4202,6 +4310,7 @@ class ProducerPopup {
       });
       item.addEventListener("drop", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         item.classList.remove("drag-over");
         const fromIndex = parseInt(e.dataTransfer!.getData("text/plain"), 10);
         const toIndex = index;
@@ -4217,6 +4326,14 @@ class ProducerPopup {
       item.appendChild(actionsWrap);
       this.sessionsList.appendChild(item);
     });
+
+    this._attachListReorderDrop(this.sessionsList, ".session-item", (fromIndex, toIndex) => {
+      const moved = this.sessions.splice(fromIndex, 1)[0];
+      this.sessions.splice(toIndex, 0, moved);
+      this.saveState();
+      this.renderSessionHistory();
+    });
+
     if (scrollContainer) scrollContainer.scrollTop = scrollTop;
   }
 
