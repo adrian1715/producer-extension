@@ -160,12 +160,12 @@ class ProducerContentScript {
     async init() {
         await this.checkAndBlock(window.location.href);
     }
-    async checkAndBlock(url) {
+    async checkAndBlock(url, attempt = 0) {
         // Skip if already blocked or same URL
         if (this.isBlocked ||
             (url === this.lastUrl &&
                 document.getElementById("producer-block-overlay"))) {
-            return;
+            return false;
         }
         this.lastUrl = url;
         try {
@@ -173,6 +173,22 @@ class ProducerContentScript {
                 action: "checkBlock",
                 url: url,
             });
+            // The tab may have already moved on to a different URL while we were
+            // waiting on the background response. Many sites (YouTube included)
+            // briefly rewrite the address bar via the History API to an internal
+            // "redirect"/tracking URL when a link is clicked, then immediately
+            // replace it again with the real destination — without ever loading a
+            // new page. If we acted on the stale URL here, an already-allowed page
+            // could get blocked over a URL the tab never actually settled on.
+            // Re-check wherever the tab actually is now instead of trusting `url`.
+            const currentUrl = window.location.href;
+            if (currentUrl !== url) {
+                // Bound the re-check chain in case a page keeps rewriting its URL;
+                // whatever it settles on will still get checked on the next event.
+                if (attempt >= 5)
+                    return false;
+                return this.checkAndBlock(currentUrl, attempt + 1);
+            }
             if (response && response.shouldBlock) {
                 this.blockPage();
                 return true;
@@ -184,13 +200,16 @@ class ProducerContentScript {
             return false;
         }
     }
-    // Debounced URL check to prevent race conditions
-    debouncedCheck(url) {
+    // Debounced URL check to prevent race conditions. Always reads the URL at
+    // fire time (not when scheduled) so a burst of rapid URL changes — like a
+    // History-API redirect bouncing through an intermediate URL — resolves to
+    // wherever the tab actually settles, not a stale intermediate value.
+    debouncedCheck() {
         if (this.checkTimeout) {
             clearTimeout(this.checkTimeout);
         }
         this.checkTimeout = setTimeout(() => {
-            this.checkAndBlock(url);
+            this.checkAndBlock(window.location.href);
         }, 100); // 100ms debounce
     }
     // Intercept all navigation attempts before they happen
@@ -233,6 +252,16 @@ class ProducerContentScript {
                         return; // Invalid URL, let it proceed
                     }
                 }
+                // Links opened in a new tab/window (target="_blank" or a
+                // ctrl/cmd/shift-click) must never affect the current page — only
+                // the new tab's own navigation should be checked and blocked.
+                // Otherwise a blocked link on an allowed page (e.g. a redirect
+                // link under a domain that's blocked at the root) would replace
+                // the current, already-allowed page with the blocked page.
+                const opensInNewTab = link.getAttribute("target") === "_blank" ||
+                    e.ctrlKey ||
+                    e.metaKey ||
+                    e.shiftKey;
                 // Check if target URL should be blocked
                 try {
                     const response = await chrome.runtime.sendMessage({
@@ -243,8 +272,17 @@ class ProducerContentScript {
                         e.preventDefault();
                         e.stopPropagation();
                         e.stopImmediatePropagation();
-                        // Show block page immediately with correct URL (this will report the block)
-                        self.blockPage(targetUrl);
+                        if (opensInNewTab) {
+                            // Just stop the new tab from opening; leave the current
+                            // page alone, but still count it as a block.
+                            chrome.runtime
+                                .sendMessage({ action: "reportBlock", url: targetUrl })
+                                .catch(() => { });
+                        }
+                        else {
+                            // Show block page immediately with correct URL (this will report the block)
+                            self.blockPage(targetUrl);
+                        }
                         return false;
                     }
                 }
@@ -280,12 +318,10 @@ class ProducerContentScript {
         const originalReplaceState = history.replaceState;
         history.pushState = function (state, title, url) {
             try {
-                if (url) {
-                    const fullUrl = new URL(url, window.location.href).href;
-                    // Use debounced check to prevent race conditions
-                    setTimeout(() => self.debouncedCheck(fullUrl), 0);
-                }
                 originalPushState.apply(this, arguments);
+                // Dispatched after apply() so the debounced check (which reads
+                // window.location.href when it fires) sees the URL that's actually
+                // live, not a value computed ahead of the real navigation.
                 window.dispatchEvent(new Event("producer-urlchange"));
             }
             catch (err) {
@@ -295,10 +331,6 @@ class ProducerContentScript {
         };
         history.replaceState = function (state, title, url) {
             try {
-                if (url) {
-                    const fullUrl = new URL(url, window.location.href).href;
-                    setTimeout(() => self.debouncedCheck(fullUrl), 0);
-                }
                 originalReplaceState.apply(this, arguments);
                 window.dispatchEvent(new Event("producer-urlchange"));
             }
@@ -410,20 +442,20 @@ class ProducerContentScript {
     observeUrlChanges() {
         // Listen for popstate, hashchange, and custom urlchange events
         window.addEventListener("popstate", () => {
-            this.debouncedCheck(window.location.href);
+            this.debouncedCheck();
         });
         window.addEventListener("hashchange", () => {
-            this.debouncedCheck(window.location.href);
+            this.debouncedCheck();
         });
         window.addEventListener("producer-urlchange", () => {
-            this.debouncedCheck(window.location.href);
+            this.debouncedCheck();
         });
         // More efficient MutationObserver - only observe significant changes
         const startObserver = () => {
             if (document.body) {
                 this.observer = new MutationObserver((mutations) => {
                     if (window.location.href !== this.lastUrl) {
-                        this.debouncedCheck(window.location.href);
+                        this.debouncedCheck();
                     }
                 });
                 this.observer.observe(document.body, {
@@ -439,7 +471,7 @@ class ProducerContentScript {
         // Less aggressive polling - 2 seconds instead of 500ms
         this.pollInterval = setInterval(() => {
             if (window.location.href !== this.lastUrl && !this.isBlocked) {
-                this.debouncedCheck(window.location.href);
+                this.debouncedCheck();
             }
         }, 2000);
     }
