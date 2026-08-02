@@ -4,6 +4,11 @@
 
 Fixed scroll position inheritance across all tab switches and subpage navigations so every view is entered from the top, providing consistent and predictable page entry throughout the popup.
 
+## Commits
+
+- `f0beb1b` — block page settings page rework + moving popup styles to a
+  separate css file
+
 ---
 
 ## Changes

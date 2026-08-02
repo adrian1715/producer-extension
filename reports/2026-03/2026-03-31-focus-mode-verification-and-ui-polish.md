@@ -4,6 +4,10 @@
 
 Verified that the intermittent first-activation bug is resolved by the February fixes, and applied spacing and truncation improvements to the Modes and Session History lists.
 
+## Commits
+
+- `d460de3` — quick UI updates
+
 ---
 
 ## Changes

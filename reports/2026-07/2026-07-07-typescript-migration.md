@@ -12,7 +12,7 @@ and a build step, without introducing a bundler or module system.
 
 ## Commits
 
-- Changes are in the working tree, pending commit at the time of writing.
+- `18dc5ad` — migrating from javascript to typescript
 
 ---
 
@@ -83,25 +83,17 @@ extension for background changes / reopen the popup / reload affected tabs).
 
 ## Technical Notes
 
-- The conversion started from 1,833 compiler errors on the renamed files and
-  ended at zero under `strict: true` (including `strictNullChecks`);
-  `useUnknownInCatchVariables` is relaxed to keep the existing `error.message`
-  handlers unchanged.
-- Behavior-preserving type fixes rather than logic changes throughout, e.g.:
-  rule objects are now constructed per-branch to satisfy the `Rule` union
-  (`addRule`, `importRules`), the export line formatter narrows on `rule.type`
-  instead of `||`-chaining possibly-undefined fields, inline rule editing
-  narrows the found rule before assigning URL vs param fields, and
-  `checkBlock` guards `message.url` before consulting the allow-once set.
-- DOM/API points that needed explicit typing: the `history.pushState`/
-  `replaceState` and `window.open` overrides in the content script, drag-and-
-  drop `DataTransfer` access in the three sortable lists, the dropdown's
-  `_trigger` back-reference (typed as `ItemDropdown`), `FileReader` results,
-  and `PerformanceNavigationTiming` for reload detection.
-- Compilation targets ES2021 with no bundler, so class fields compile back
-  into constructor assignments and the emitted `dist/` files read almost
-  line-for-line like the previous sources. All four outputs pass
-  `node --check`, and the manifest was validated after the path changes.
-- Verified by rebuilding and reloading the unpacked extension: `dist/` is the
-  only code the browser executes; editing `src/` without rebuilding has no
-  effect, which is why `npm run watch` is the recommended dev loop.
+- `src/types.d.ts` — new ambient `Rule` (discriminated union of `UrlRule` and
+  `ParamRule`), `Mode`, `Session`, and `RuntimeMessage`/
+  `PersonalizationFields` types shared by all four scripts
+- `src/background.ts`, `src/content.ts`, `src/popup.ts`, `src/blocked.ts` —
+  converted in place from the deleted root-level `.js` files; rule
+  construction narrowed per `Rule` branch (`addRule`, `importRules`),
+  `checkBlock` guards `message.url`, and the `history.pushState`/
+  `replaceState`/`window.open` overrides and drag-and-drop `DataTransfer`
+  access are explicitly typed
+- `package.json` / `tsconfig.json` — `typescript` and `@types/chrome`
+  devDependencies, `npm run build`/`watch` scripts, `strict: true` compiling
+  `src/` to `dist/`
+- `manifest.json` / `popup.html` / `blocked.html` — script references
+  updated to `dist/*.js`

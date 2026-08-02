@@ -12,7 +12,7 @@ in the same session.
 
 - `9ad7c4d` — final review and fixes before v2 release (version sync, block-page
   XSS fix, import validation, permission trim, privacy policy, console cleanup)
-- `2c2f163` — updating readme accordingly before v2 release
+- `d0d6e54` — updating readme accordingly before v2 release
 
 ## Review outcome
 
@@ -77,7 +77,7 @@ malformed rules and was the delivery vector for the issue above. Import now:
   `popup.js`, since these aid diagnosis and never run on user pages. All
   `console.error` handlers were left intact.
 
-### Rewrote the README for the current feature set (`2c2f163`)
+### Rewrote the README for the current feature set (`d0d6e54`)
 
 The README still described an early build — it referenced a `rules.json` file
 and a `declarativeNetRequest` permission that this version no longer uses, listed

@@ -4,6 +4,11 @@
 
 Several targeted refinements to the rule lists and session history: newest-first rule ordering, a fix for the select-button hover state, unified button spacing in the modes list, a more visible delete button, a dedicated inline Resume/End button for sessions, and longer session name truncation.
 
+## Commits
+
+- `595e196` — lists interface update: replacing list buttons with see more
+  dropdown & adding drag and drop button
+
 ---
 
 ## Changes

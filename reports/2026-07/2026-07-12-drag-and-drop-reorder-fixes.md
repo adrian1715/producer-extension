@@ -10,7 +10,7 @@ directly in `src/popup.ts` and compiled through to `dist/popup.js`.
 
 ## Commits
 
-- Changes are in the working tree, pending commit at the time of writing.
+- `e27f950` — drag and drop feature quick fix
 
 ---
 
@@ -38,3 +38,8 @@ The Modes list and Session History list highlighted the item under the dragged i
 - Per-item `dragover`/`dragleave`/`drop` listeners were removed entirely once the container handled every case; only `dragstart` (to seed the drag data) and `dragend` (cleanup) remain per item, since drag events bubble from item to container the same as any other DOM event.
 - New CSS: `.drag-over-top`/`.drag-over-bottom` use an inset `box-shadow` rather than a border, so the indicator line doesn't shift item height or fight the existing dashed `.drag-over` outline. `.rule-item` was added to all three drag-feedback selectors, which is what actually enabled highlighting on the All Rules page — the JS was already toggling the classes there, but no CSS rule matched that class.
 - Verified with `npm run build` (strict-mode `tsc`, zero errors) after each change, and confirmed the compiled output in `dist/popup.js` contains the new handlers.
+- `src/popup.ts` — `_attachListReorderDrop(container, itemSelector, onDrop)`
+  attaches `dragover`/`dragenter`/`dragleave`/`drop` on the list container
+  itself, computing the drop index from cursor position instead of the
+  hovered item; per-item handlers call `stopPropagation()` to avoid
+  double-handling; accounts for the All Rules list rendering newest-first
