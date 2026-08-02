@@ -1698,6 +1698,149 @@ class ProducerPopup {
         keyInput.focus();
         keyInput.select();
     }
+    editRuleTypeInline(rule, typeElement) {
+        if (!this.currentEditingRuleSetId)
+            return;
+        const ruleOptions = [
+            { value: "domain", label: "Block Domain" },
+            { value: "url", label: "Block URL" },
+            { value: "allow", label: "Allow URL" },
+            { value: "allowParam", label: "Allow Parameter" },
+        ];
+        const select = document.createElement("select");
+        select.style.width = "100%";
+        select.style.fontSize = "10px";
+        select.style.fontWeight = "inherit";
+        select.style.padding = "4px 8px";
+        select.style.background = "rgba(255, 255, 255, 0.1)";
+        select.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+        select.style.borderRadius = "6px";
+        select.style.color = "white";
+        select.style.textTransform = "uppercase";
+        const currentType = rule.type;
+        const currentOption = ruleOptions.find((option) => option.value === currentType);
+        const selectedOption = document.createElement("option");
+        selectedOption.value = currentType;
+        selectedOption.textContent = currentOption
+            ? currentOption.label
+            : this.formatRuleType(rule);
+        selectedOption.disabled = true;
+        selectedOption.hidden = true;
+        selectedOption.selected = true;
+        select.appendChild(selectedOption);
+        ruleOptions
+            .filter((option) => option.value !== currentType)
+            .forEach((option) => {
+            const optionElement = document.createElement("option");
+            optionElement.value = option.value;
+            optionElement.textContent = option.label;
+            select.appendChild(optionElement);
+        });
+        const item = typeElement.closest(".rule-item");
+        if (item)
+            item.draggable = false;
+        const restoreTypeElement = () => {
+            typeElement.textContent = this.formatRuleType(rule);
+            typeElement.style.display = "";
+            if (item)
+                item.draggable = true;
+            select.remove();
+        };
+        const saveEdit = () => {
+            const newType = select.value;
+            if (newType !== rule.type) {
+                let ruleSet;
+                if (this.isCreatingNewRuleSet && this.tempRuleSet) {
+                    ruleSet = this.tempRuleSet;
+                }
+                else {
+                    ruleSet = this.customModes.find((rs) => rs.id === this.currentEditingRuleSetId);
+                }
+                const ruleIndex = ruleSet?.rules.findIndex((r) => r.id === rule.id) ?? -1;
+                if (ruleSet && ruleIndex >= 0) {
+                    const updatedRule = this.convertRuleType(ruleSet.rules[ruleIndex], newType);
+                    const isDuplicate = ruleSet.rules.some((candidate, index) => {
+                        return index !== ruleIndex && this.rulesHaveSameTarget(candidate, updatedRule);
+                    });
+                    if (isDuplicate) {
+                        this.showNotification("Rule already exists", "error");
+                    }
+                    else {
+                        ruleSet.rules[ruleIndex] = updatedRule;
+                        Object.keys(rule).forEach((key) => delete rule[key]);
+                        Object.assign(rule, updatedRule);
+                        if (!this.isCreatingNewRuleSet) {
+                            this.saveState();
+                        }
+                        this.updateUI();
+                        this.renderRulesPreview();
+                        if (this.allRulesView && this.allRulesView.style.display !== "none") {
+                            this.renderAllRulesList();
+                        }
+                        this.showNotification("Rule type updated!");
+                    }
+                }
+            }
+            restoreTypeElement();
+        };
+        select.addEventListener("change", saveEdit);
+        select.addEventListener("blur", restoreTypeElement);
+        select.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                saveEdit();
+            }
+            else if (e.key === "Escape") {
+                restoreTypeElement();
+            }
+        });
+        typeElement.style.display = "none";
+        typeElement.parentNode.insertBefore(select, typeElement);
+        select.focus();
+    }
+    convertRuleType(rule, newType) {
+        const base = {
+            id: rule.id,
+            created: rule.created,
+            permanent: newType === "domain" || newType === "url" ? rule.permanent : undefined,
+        };
+        if (newType === "allowParam") {
+            const fallbackParam = this.getParamPartsFromRule(rule);
+            return {
+                ...base,
+                type: "allowParam",
+                paramKey: fallbackParam.key,
+                paramValue: fallbackParam.value,
+            };
+        }
+        return {
+            ...base,
+            type: newType,
+            url: rule.type === "allowParam" ? this.cleanUrl(rule.paramKey) : rule.url,
+        };
+    }
+    getParamPartsFromRule(rule) {
+        if (rule.type === "allowParam") {
+            return {
+                key: rule.paramKey,
+                value: rule.paramValue || "",
+            };
+        }
+        return {
+            key: this.cleanUrl(rule.url) || "param",
+            value: "",
+        };
+    }
+    rulesHaveSameTarget(first, second) {
+        if (first.type !== second.type)
+            return false;
+        if (first.type === "allowParam" && second.type === "allowParam") {
+            return (first.paramKey === second.paramKey &&
+                (first.paramValue || "") === (second.paramValue || ""));
+        }
+        return (first.type !== "allowParam" &&
+            second.type !== "allowParam" &&
+            first.url === second.url);
+    }
     renderRulesList() {
         this.rulesList.innerHTML = "";
         if (!this.currentEditingRuleSetId) {
@@ -1785,6 +1928,12 @@ class ProducerPopup {
             const type = document.createElement("div");
             type.className = "rule-type";
             type.textContent = this.formatRuleType(rule);
+            type.title = "Double-click to edit rule type";
+            type.style.cursor = "pointer";
+            type.addEventListener("dblclick", (e) => {
+                e.stopPropagation();
+                this.editRuleTypeInline(rule, type);
+            });
             info.appendChild(url);
             info.appendChild(type);
             // Inline action buttons (permanent toggle + delete)
@@ -2586,6 +2735,12 @@ class ProducerPopup {
             const type = document.createElement("div");
             type.className = "rule-type";
             type.textContent = this.formatRuleType(rule);
+            type.title = "Double-click to edit rule type";
+            type.style.cursor = "pointer";
+            type.addEventListener("dblclick", (e) => {
+                e.stopPropagation();
+                this.editRuleTypeInline(rule, type);
+            });
             info.appendChild(url);
             info.appendChild(type);
             // Inline action buttons (permanent toggle + delete)
