@@ -1,8 +1,8 @@
-# Development Report — 2026-08-02 — Rule Type Inline Editing & New-Tab Link Block Fixes
+# Development Report — 2026-08-02 — Rule Type Inline Editing, New-Tab Link Block Fixes & Permanent Rule Recognition
 
 ## Summary
 
-Two separate updates made today:
+Three separate updates made today:
 
 1. Added inline editing for rule types in both rule list views. Users can now
    double-click a rule's type label and switch it between Block Domain, Block
@@ -19,6 +19,11 @@ Two separate updates made today:
      API (e.g. a YouTube-style `youtube.com/redirect?...` tracking URL)
      before settling back on the real, allowed page — and the extension
      acted on that transient URL.
+3. Fixed a bug where adding a rule that was already marked permanent in a
+   different mode didn't get recognized as permanent in the new mode — the
+   block itself still worked (the original mode's permanent rule kept
+   enforcing it), but the new mode's copy showed as a regular, non-permanent
+   rule instead of reflecting its already-permanent status.
 
 ## Commits
 
@@ -119,36 +124,42 @@ URL captured when it was scheduled, for the same reason.
 
 ---
 
+## Permanent Rule Recognition Fix
+
+### Rules now recognize their permanent status across modes
+
+Adding a rule that's identical (same type and URL/domain) to a rule already
+marked permanent in another mode now automatically marks the new one
+permanent too — including the "make permanent" button showing as active.
+Previously, permanent status only synced to rules that already existed at
+the moment the original rule was toggled permanent, so a matching rule added
+to a different mode afterward stayed unmarked even though the same URL was
+already being enforced as a permanent block. The same inheritance now also
+applies when editing an existing rule's URL inline so that it matches an
+already-permanent rule elsewhere.
+
+### Rule comparison consolidated around one helper
+
+The places that compared two rules for equality by manually checking their
+type/URL (or param key/value) fields — the permanent-toggle sync-across-modes
+logic and the allow-parameter duplicate check — now reuse the existing
+`rulesHaveSameTarget()` helper (previously only used by rule-type
+conversion) instead of re-implementing the same comparison inline.
+
+---
+
 ## Technical Notes
 
-### Rule Type Inline Editing
-
-- Added `editRuleTypeInline()` in `src/popup.ts` to render the inline select,
-  disable dragging while editing on the All Rules page, save on change, and
-  restore the display state after save or cancel.
-- Added shared conversion helpers for rule type updates:
-  `convertRuleType()`, `getParamPartsFromRule()`, and
-  `rulesHaveSameTarget()`.
-- Wired the rule type double-click handler into both `renderRulesList()` and
-  `renderAllRulesList()`.
-- Rebuilt `dist/popup.js` with `npm run build`.
-- Verified `npm run build` passes. `git diff --check` only reports the
-  repository's existing CRLF normalization warnings.
-
-### New-Tab Link Block Fixes
-
-- Added an `opensInNewTab` check (`target="_blank"` attribute plus
-  ctrl/meta/shift modifier keys) to the click handler in `src/content.ts`.
-- When a new-tab click resolves to a blocked URL, the extension now sends a
-  `reportBlock` message directly instead of calling `blockPage()`, so the
-  session block counter still increments without navigating the current tab.
-- `checkAndBlock(url, attempt)` in `src/content.ts` now compares
-  `window.location.href` against the URL it just checked after the
-  `checkBlock` response returns, and recurses onto the live URL (max 5
-  attempts) instead of blocking on stale data.
-- `debouncedCheck()` no longer takes a URL parameter — it always reads
-  `window.location.href` when its timer fires; all call sites (`pushState`/
-  `replaceState` overrides, `popstate`, `hashchange`, `producer-urlchange`,
-  the mutation observer, and the polling fallback) updated accordingly.
-- Rebuilt `dist/content.js` with `npm run build`; `npx tsc --noEmit` passes
-  with no new errors.
+- `src/popup.ts` — `editRuleTypeInline()` for the inline rule-type select,
+  wired into both `renderRulesList()` and `renderAllRulesList()`;
+  `convertRuleType()` / `getParamPartsFromRule()` for URL-to-param
+  conversion; `rulesHaveSameTarget()` shared by duplicate detection, the
+  permanent-toggle cross-mode sync, and the new `isRulePermanentElsewhere()`,
+  which makes `addRule()` and `editRuleUrlInline()` inherit an existing
+  permanent flag automatically
+- `src/content.ts` — `opensInNewTab` check before reacting to a blocked
+  link click; new-tab blocks now send `reportBlock` directly instead of
+  calling `blockPage()`; `checkAndBlock()` re-verifies against
+  `window.location.href` after the background responds and retries (max 5)
+  on a live-URL mismatch; `debouncedCheck()` always reads the live URL when
+  its timer fires instead of a URL captured when it was scheduled

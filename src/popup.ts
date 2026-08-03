@@ -1883,11 +1883,15 @@ class ProducerPopup {
       }
     } else {
       // For allowParam rules, check for exact param match
-      const exists = ruleSet.rules.some(
-        (rule) =>
-          rule.type === "allowParam" &&
-          rule.paramKey === paramKey &&
-          rule.paramValue === paramValue,
+      const candidate: Rule = {
+        id: 0,
+        type: "allowParam",
+        created: "",
+        paramKey,
+        paramValue,
+      };
+      const exists = ruleSet.rules.some((rule) =>
+        this.rulesHaveSameTarget(rule, candidate),
       );
 
       if (exists) {
@@ -1914,6 +1918,15 @@ class ProducerPopup {
             created: new Date().toISOString(),
             url: cleanUrl,
           };
+
+    // If an identical rule is already permanent in another mode, this is the
+    // same rule — inherit the permanent flag automatically.
+    if (
+      (type === "domain" || type === "url") &&
+      this.isRulePermanentElsewhere(rule)
+    ) {
+      (rule as UrlRule).permanent = true;
+    }
 
     ruleSet.rules.push(rule);
     this.urlInput.value = "";
@@ -2013,6 +2026,13 @@ class ProducerPopup {
           if (ruleToEdit && ruleToEdit.type !== "allowParam") {
             ruleToEdit.url = cleanedUrl;
             rule.url = cleanedUrl; // Update the rule reference too
+
+            // Inherit the permanent flag if this now matches a rule that's
+            // already permanent in another mode.
+            if (this.isRulePermanentElsewhere(ruleToEdit)) {
+              ruleToEdit.permanent = true;
+              rule.permanent = true;
+            }
 
             // Only save state if not creating (temp changes don't get saved until confirmation)
             if (!this.isCreatingNewRuleSet) {
@@ -2954,6 +2974,17 @@ class ProducerPopup {
     return permanentRules;
   }
 
+  // True if a rule matching `candidate` (per rulesHaveSameTarget) is already
+  // marked permanent in any mode. Used so a rule made permanent in one mode
+  // is recognized as permanent when the same rule is added/edited elsewhere.
+  isRulePermanentElsewhere(candidate: Rule): boolean {
+    return this.customModes.some((mode) =>
+      mode.rules.some(
+        (r) => r.permanent && this.rulesHaveSameTarget(r, candidate),
+      ),
+    );
+  }
+
   toggleRulePermanent(
     ruleId: number | undefined,
     ruleSetId: string | null,
@@ -2967,10 +2998,10 @@ class ProducerPopup {
     const newPermanent = !rule.permanent;
 
     // Apply the same permanent flag to every rule across all modes that
-    // shares the same type and URL (so modes stay in sync)
+    // matches this one (so modes stay in sync)
     this.customModes.forEach((mode) => {
       mode.rules.forEach((r) => {
-        if (r.type === rule.type && r.url === rule.url) {
+        if (this.rulesHaveSameTarget(r, rule)) {
           r.permanent = newPermanent;
         }
       });
