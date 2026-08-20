@@ -33,6 +33,8 @@ type Rule = UrlRule | ParamRule;
 
 interface ModeSettings {
   grayscaleEnabled?: boolean;
+  /** Hides YouTube's recommended/related videos on watch pages. */
+  hideYoutubeRecommendationsEnabled?: boolean;
 }
 
 /** A rule set ("mode") shown in the popup's Rules tab. */
@@ -92,6 +94,9 @@ interface RuntimeMessage extends PersonalizationFields {
   focusedTime?: number;
   isReload?: boolean;
   enabled?: boolean;
+  // applyModeFeatures payload (per-mode features, gated on focus mode)
+  grayscaleEnabled?: boolean;
+  hideYoutubeRecommendationsEnabled?: boolean;
   isPermanent?: boolean;
   count?: number;
   sessionTime?: number;

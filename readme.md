@@ -23,7 +23,8 @@ sites blocked **permanently**, and customize the block page to your taste.
   optional motivational quotes, a background image, and toggleable action
   buttons.
 - **Per-mode features** — optional behaviors such as **Grayscale** (drains
-  color from every page while focus is active).
+  color from every page while focus is active) and **No YouTube Suggestions**
+  (hides the recommended videos around the YouTube player).
 - **On-the-fly updates** — changing rules instantly reloads or redirects only
   the affected tabs; blocked tabs return to their original page the moment a
   rule is removed.
@@ -156,6 +157,10 @@ Open a mode's **Features** page to enable optional behaviors for that mode:
 
 - **Grayscale** — while focus is active and this mode is on, every page is
   rendered in grayscale to reduce its pull.
+- **No YouTube Suggestions** — hides the recommended videos column beside the
+  YouTube player, along with the suggestions overlaid on the player when a
+  video is paused or ends, so only the video you chose stays in view. The
+  playlist queue and live chat are left untouched.
 
 More features are planned.
 

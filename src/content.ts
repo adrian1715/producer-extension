@@ -45,14 +45,17 @@ class ProducerContentScript {
             ? message.blockPageShowActionButtons
             : true;
         sendResponse({ success: true });
-      } else if (message.action === "toggleGrayscale") {
-        this.toggleGrayscaleFilter(message.enabled);
+      } else if (message.action === "applyModeFeatures") {
+        this.toggleGrayscaleFilter(!!message.grayscaleEnabled);
+        this.toggleYoutubeRecommendations(
+          !!message.hideYoutubeRecommendationsEnabled,
+        );
         sendResponse({ success: true });
       }
       return true; // Keep the message channel open for async response
     });
 
-    // Load current theme and grayscale setting from storage on initialization
+    // Load current theme and mode-feature settings from storage on initialization
     chrome.storage.local.get(
       [
         "theme",
@@ -64,6 +67,7 @@ class ProducerContentScript {
         "blockPageAccentColor",
         "blockPageShowActionButtons",
         "grayscaleEnabled",
+        "hideYoutubeRecommendationsEnabled",
         "isActive",
       ],
       (data) => {
@@ -91,38 +95,95 @@ class ProducerContentScript {
         if (data.blockPageShowActionButtons !== undefined) {
           this.blockPageShowActionButtons = data.blockPageShowActionButtons;
         }
-        // Apply grayscale if it's enabled AND focus mode is active
-        if (data.grayscaleEnabled && data.isActive) {
-          this.toggleGrayscaleFilter(true);
+        // Apply mode features only while focus mode is active
+        if (data.isActive) {
+          if (data.grayscaleEnabled) {
+            this.toggleGrayscaleFilter(true);
+          }
+          if (data.hideYoutubeRecommendationsEnabled) {
+            this.toggleYoutubeRecommendations(true);
+          }
         }
       },
     );
 
-    // Listen for storage changes to react to grayscale setting changes
+    // Listen for storage changes to react to mode-feature setting changes
     // This is the PRIMARY method for instant updates across all tabs
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === "local") {
-        // Check if grayscale or isActive changed
+        // Check if any mode feature or isActive changed
         if (
           changes.grayscaleEnabled ||
+          changes.hideYoutubeRecommendationsEnabled ||
           changes.isActive ||
           changes.activeRuleSetId
         ) {
           // Always re-read fresh values from storage when any relevant key changes
-          chrome.storage.local.get(["grayscaleEnabled", "isActive"], (data) => {
-            const shouldEnable = !!(data.grayscaleEnabled && data.isActive);
+          chrome.storage.local.get(
+            [
+              "grayscaleEnabled",
+              "hideYoutubeRecommendationsEnabled",
+              "isActive",
+            ],
+            (data) => {
+              // Force update every feature to the fresh state
+              this.toggleGrayscaleFilter(
+                !!(data.grayscaleEnabled && data.isActive),
+              );
+              this.toggleYoutubeRecommendations(
+                !!(data.hideYoutubeRecommendationsEnabled && data.isActive),
+              );
 
-            // Force update the grayscale filter
-            this.toggleGrayscaleFilter(shouldEnable);
-
-            // Force a reflow to ensure the change is applied immediately
-            if (document.documentElement) {
-              void document.documentElement.offsetHeight;
-            }
-          });
+              // Force a reflow to ensure the change is applied immediately
+              if (document.documentElement) {
+                void document.documentElement.offsetHeight;
+              }
+            },
+          );
         }
       }
     });
+  }
+
+  /**
+   * Injects (or replaces) a <style> tag by id. The content script runs at
+   * document_start, so the document may not have a node to append to yet.
+   */
+  injectStyle(id: string, css: string) {
+    // Remove existing style first to ensure clean state
+    const existing = document.getElementById(id);
+    if (existing) {
+      existing.remove();
+    }
+
+    const apply = () => {
+      if (!document.head && !document.documentElement) {
+        setTimeout(apply, 10);
+        return;
+      }
+
+      const style = document.createElement("style");
+      style.id = id;
+      style.textContent = css;
+
+      // Append to head if available, otherwise to documentElement
+      const target = document.head || document.documentElement;
+      target.appendChild(style);
+
+      // Force reflow to ensure the style is applied
+      if (document.documentElement) {
+        document.documentElement.offsetHeight;
+      }
+    };
+
+    apply();
+  }
+
+  removeStyle(id: string) {
+    const style = document.getElementById(id);
+    if (style) {
+      style.remove();
+    }
   }
 
   toggleGrayscaleFilter(enabled: boolean) {
@@ -132,46 +193,54 @@ class ProducerContentScript {
     }
 
     const styleId = "producer-grayscale-filter";
-    let style = document.getElementById(styleId);
 
     if (enabled) {
-      // Remove existing style first to ensure clean state
-      if (style) {
-        style.remove();
-      }
-
-      // Wait for DOM to be ready
-      const applyFilter = () => {
-        if (!document.head && !document.documentElement) {
-          setTimeout(applyFilter, 10);
-          return;
-        }
-
-        const newStyle = document.createElement("style");
-        newStyle.id = styleId;
-        newStyle.textContent = `
+      this.injectStyle(
+        styleId,
+        `
           html {
             filter: grayscale(100%) !important;
             -webkit-filter: grayscale(100%) !important;
           }
-        `;
-
-        // Append to head if available, otherwise to documentElement
-        const target = document.head || document.documentElement;
-        target.appendChild(newStyle);
-
-        // Force reflow to ensure filter is applied
-        if (document.documentElement) {
-          document.documentElement.offsetHeight;
-        }
-      };
-
-      applyFilter();
+        `,
+      );
     } else {
-      if (style) {
-        style.remove();
-      }
+      this.removeStyle(styleId);
     }
+  }
+
+  isYoutube() {
+    return /(^|\.)youtube\.com$/.test(window.location.hostname);
+  }
+
+  /**
+   * Hides YouTube's algorithmic video suggestions while focus mode is active:
+   * the related-videos column beside the player (and its stacked position on
+   * narrow layouts), plus the suggestions layered over the player itself when
+   * it is paused or a video ends. The playlist queue and live chat, which also
+   * live in the sidebar, are intentionally left alone.
+   */
+  toggleYoutubeRecommendations(enabled: boolean) {
+    const styleId = "producer-hide-youtube-recommendations";
+
+    if (!enabled || !this.isYoutube()) {
+      this.removeStyle(styleId);
+      return;
+    }
+
+    this.injectStyle(
+      styleId,
+      `
+        #related,
+        ytd-watch-next-secondary-results-renderer,
+        .ytp-endscreen-content,
+        .ytp-ce-element,
+        .ytp-pause-overlay,
+        .ytp-suggestion-set {
+          display: none !important;
+        }
+      `,
+    );
   }
 
   async init() {

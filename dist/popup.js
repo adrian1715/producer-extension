@@ -95,6 +95,7 @@ class ProducerPopup {
         this.modeSettingsView = this.$("mode-settings-view");
         this.backFromModeSettingsBtn = this.$("backFromModeSettingsBtn");
         this.modeGrayscaleToggleView = this.$("modeGrayscaleToggleView");
+        this.modeYoutubeRecommendationsToggleView = this.$("modeYoutubeRecommendationsToggleView");
         // Rules preview and management elements
         this.rulesPreview = this.$("rulesPreview");
         this.rulesPreviewCount = this.$("rulesPreviewCount");
@@ -374,6 +375,9 @@ class ProducerPopup {
         if (this.modeGrayscaleToggleView) {
             this.modeGrayscaleToggleView.addEventListener("change", () => this.saveModeSettingsFromView());
         }
+        if (this.modeYoutubeRecommendationsToggleView) {
+            this.modeYoutubeRecommendationsToggleView.addEventListener("change", () => this.saveModeSettingsFromView());
+        }
         // Sessions events
         if (this.clearSessionsBtn) {
             this.clearSessionsBtn.addEventListener("click", () => this.clearSessions());
@@ -605,11 +609,8 @@ class ProducerPopup {
                 await this.ensureBackgroundTimerRunning();
                 this.requestTimerUpdate();
                 this.startTimerUpdates();
-                // Reapply grayscale state if focus mode is active
-                const activeMode = this.customModes.find((mode) => mode.id === this.activeRuleSetId);
-                if (activeMode?.settings?.grayscaleEnabled) {
-                    await this.broadcastGrayscaleState(true);
-                }
+                // Reapply per-mode features if focus mode is active
+                await this.broadcastModeFeatures();
             }
             // Initialize session tracking times if there's a current session
             if (this.currentSessionId) {
@@ -1034,9 +1035,10 @@ class ProducerPopup {
                     s.isActive = false;
                 }
             });
-            // Get the active mode's grayscale setting for content script
+            // Get the active mode's feature settings for content script
             const activeMode = this.customModes.find((mode) => mode.id === this.activeRuleSetId);
             const grayscaleEnabled = activeMode?.settings?.grayscaleEnabled || false;
+            const hideYoutubeRecommendationsEnabled = activeMode?.settings?.hideYoutubeRecommendationsEnabled || false;
             await chrome.storage.local.set({
                 isActive: this.isActive,
                 customModes: this.customModes,
@@ -1047,6 +1049,7 @@ class ProducerPopup {
                 sessionBlocks: this.sessionBlocks,
                 focusedTime: this.focusedTime,
                 grayscaleEnabled: grayscaleEnabled, // Save for content script initialization
+                hideYoutubeRecommendationsEnabled: hideYoutubeRecommendationsEnabled,
                 permanentRules: this.getAllPermanentRules(),
             });
             // Get active rule set's rules
@@ -1230,18 +1233,9 @@ class ProducerPopup {
             // Don't clear currentSessionId - keep the session active for next time
         }
         await this.saveState("toggleProducing");
-        // Apply or remove grayscale filter based on focus mode state
+        // Apply or remove the active mode's features based on focus mode state
         // This happens AFTER saveState so storage is updated first
-        if (this.isActive) {
-            const activeMode = this.customModes.find((mode) => mode.id === this.activeRuleSetId);
-            if (activeMode?.settings?.grayscaleEnabled) {
-                await this.broadcastGrayscaleState(true);
-            }
-        }
-        else {
-            // Remove grayscale filter when focus mode stops
-            await this.broadcastGrayscaleState(false);
-        }
+        await this.broadcastModeFeatures();
         this.updateUI();
         // Show feedback
         this.showNotification(this.isActive ? "Focus activated!" : "Focus deactivated");
@@ -2413,6 +2407,7 @@ class ProducerPopup {
             rules: [],
             settings: {
                 grayscaleEnabled: false,
+                hideYoutubeRecommendationsEnabled: false,
             },
         };
         this.isCreatingNewRuleSet = true;
@@ -2910,6 +2905,10 @@ class ProducerPopup {
                 this.modeGrayscaleToggleView.checked =
                     ruleSet.settings.grayscaleEnabled || false;
             }
+            if (this.modeYoutubeRecommendationsToggleView) {
+                this.modeYoutubeRecommendationsToggleView.checked =
+                    ruleSet.settings.hideYoutubeRecommendationsEnabled || false;
+            }
         }
     }
     async saveModeSettingsFromView() {
@@ -2930,17 +2929,19 @@ class ProducerPopup {
         // Update settings from view UI
         ruleSet.settings.grayscaleEnabled =
             this.modeGrayscaleToggleView?.checked || false;
+        ruleSet.settings.hideYoutubeRecommendationsEnabled =
+            this.modeYoutubeRecommendationsToggleView?.checked || false;
         // Sync to hidden element for backward compatibility
         if (this.modeGrayscaleToggle) {
             this.modeGrayscaleToggle.checked = ruleSet.settings.grayscaleEnabled;
         }
         // Save to storage (with special action to prevent tab reloading)
         this.saveState("modeSettings");
-        // If this is the active mode and focus is active, broadcast the grayscale update immediately
+        // If this is the active mode and focus is active, broadcast the feature update immediately
         if (!this.isCreatingNewRuleSet &&
             this.activeRuleSetId === this.currentEditingRuleSetId &&
             this.isActive) {
-            await this.broadcastGrayscaleState();
+            await this.broadcastModeFeatures();
         }
     }
     loadModeSettings() {
@@ -2954,7 +2955,10 @@ class ProducerPopup {
         }
         if (!ruleSet || !ruleSet.settings) {
             if (ruleSet) {
-                ruleSet.settings = { grayscaleEnabled: false };
+                ruleSet.settings = {
+                    grayscaleEnabled: false,
+                    hideYoutubeRecommendationsEnabled: false,
+                };
             }
         }
         if (ruleSet && ruleSet.settings) {
@@ -2984,11 +2988,11 @@ class ProducerPopup {
             this.modeGrayscaleToggle?.checked || false;
         // Save to storage (with special action to prevent tab reloading)
         this.saveState("modeSettings");
-        // If this is the active mode and focus is active, broadcast the grayscale update immediately
+        // If this is the active mode and focus is active, broadcast the feature update immediately
         if (!this.isCreatingNewRuleSet &&
             this.activeRuleSetId === this.currentEditingRuleSetId &&
             this.isActive) {
-            await this.broadcastGrayscaleState();
+            await this.broadcastModeFeatures();
         }
     }
     renderRulesPreview() {
@@ -4151,24 +4155,24 @@ class ProducerPopup {
         this.loadPersonalizationUI();
         this.showNotification("Block page settings reset");
     }
-    async broadcastGrayscaleState(enabled = null) {
-        // Get active mode for determining grayscale state and logging
+    /**
+     * Pushes the active mode's per-mode features (grayscale, hidden YouTube
+     * recommendations) to every tab. A feature is only on when BOTH focus mode is
+     * active AND the active mode has it enabled.
+     */
+    async broadcastModeFeatures() {
         const activeMode = this.customModes.find((mode) => mode.id === this.activeRuleSetId);
-        // If enabled is not provided, get it from the active mode's settings
-        if (enabled === null) {
-            // Grayscale should only be enabled if BOTH focus mode is active AND the mode has grayscale enabled
-            if (this.isActive) {
-                enabled = activeMode?.settings?.grayscaleEnabled || false;
-            }
-            else {
-                // Focus mode is off, so grayscale should always be off
-                enabled = false;
-            }
-        }
+        const grayscaleEnabled = this.isActive
+            ? activeMode?.settings?.grayscaleEnabled || false
+            : false;
+        const hideYoutubeRecommendationsEnabled = this.isActive
+            ? activeMode?.settings?.hideYoutubeRecommendationsEnabled || false
+            : false;
         // FIRST: Update storage to trigger storage change listeners in ALL tabs
         // This is the PRIMARY method for instant updates
         await chrome.storage.local.set({
-            grayscaleEnabled: enabled,
+            grayscaleEnabled: grayscaleEnabled,
+            hideYoutubeRecommendationsEnabled: hideYoutubeRecommendationsEnabled,
             isActive: this.isActive,
         });
         // SECOND: Send direct messages to all tabs as backup (in case storage listener hasn't fired yet)
@@ -4185,8 +4189,9 @@ class ProducerPopup {
                     for (let attempt = 0; attempt < 2; attempt++) {
                         try {
                             await chrome.tabs.sendMessage(tab.id, {
-                                action: "toggleGrayscale",
-                                enabled: enabled,
+                                action: "applyModeFeatures",
+                                grayscaleEnabled: grayscaleEnabled,
+                                hideYoutubeRecommendationsEnabled: hideYoutubeRecommendationsEnabled,
                             });
                             break; // Success, exit retry loop
                         }
@@ -4203,7 +4208,7 @@ class ProducerPopup {
             await Promise.all(messagePromises);
         }
         catch (error) {
-            console.error("[Producer Popup] Error broadcasting grayscale state:", error);
+            console.error("[Producer Popup] Error broadcasting mode features:", error);
         }
     }
     // Navigation methods for block page settings
@@ -4314,12 +4319,12 @@ class ProducerPopup {
             isActive: this.isActive,
             rules: activeRules,
         });
-        // ALWAYS broadcast grayscale when switching modes, regardless of focus state
-        // This ensures tabs reflect the new mode's grayscale setting immediately
-        // The broadcastGrayscaleState() method will determine the correct state based on this.isActive
-        await this.broadcastGrayscaleState();
+        // ALWAYS broadcast mode features when switching modes, regardless of focus state
+        // This ensures tabs reflect the new mode's feature settings immediately
+        // The broadcastModeFeatures() method will determine the correct state based on this.isActive
+        await this.broadcastModeFeatures();
         // Now reload only the tabs that changed from blocked to unblocked or vice versa
-        // This happens AFTER grayscale update so unaffected tabs don't reload
+        // This happens AFTER the feature update so unaffected tabs don't reload
         if (this.isActive) {
             chrome.runtime.sendMessage({
                 action: "reloadAffectedTabs",
