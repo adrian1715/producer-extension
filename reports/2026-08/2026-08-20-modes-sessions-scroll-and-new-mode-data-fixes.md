@@ -19,7 +19,7 @@ reducing friction when reopening pages inside the popup:
 ## Commits
 
 - `c965314` — adding no youtube suggestions mode feature
-- `ab447e9` — adding small visual fixes to Modes/Sessions pages
+- `9e5ce49` — adding small visual fixes to Modes/Sessions pages
 
 ---
 

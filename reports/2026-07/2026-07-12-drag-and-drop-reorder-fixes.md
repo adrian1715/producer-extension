@@ -10,7 +10,7 @@ directly in `src/popup.ts` and compiled through to `dist/popup.js`.
 
 ## Commits
 
-- `e27f950` — drag and drop feature quick fix
+- `06291b6` — drag and drop feature quick fix
 
 ---
 

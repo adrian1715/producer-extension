@@ -10,9 +10,10 @@ in the same session.
 
 ## Commits
 
-- `9ad7c4d` — final review and fixes before v2 release (version sync, block-page
-  XSS fix, import validation, permission trim, privacy policy, console cleanup)
-- `d0d6e54` — updating readme accordingly before v2 release
+- `9ad7c4d` — final review and fixes before v2 release
+- `d0d6e54` — updating readme accordingly and adding updates report
+  before v2 release
+- `2746bb3` — changing confirmation buttons from javascript prompts to modal
 
 ## Review outcome
 

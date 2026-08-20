@@ -29,6 +29,7 @@ Three separate updates made today:
 
 - `d260a41` — adding rule type update feature
 - `b6942da` — fixing redirect page blocking bug
+- `879c5af` — permanent rule across modes recognition fix
 
 ---
 
