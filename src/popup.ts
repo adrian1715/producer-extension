@@ -687,6 +687,10 @@ class ProducerPopup {
     if (activeBtn) activeBtn.classList.add("active");
     if (activeContent) activeContent.classList.add("active");
 
+    // Reset scroll position first so the tab-specific view methods below
+    // (which may re-align a list to its active item) have the final say.
+    this.resetScrollPosition(activeContent);
+
     // If switching to personalize tab, always show main theme view
     if (tabName === "personalize") {
       this.showThemeMainView();
@@ -701,8 +705,6 @@ class ProducerPopup {
     if (tabName === "stats") {
       this.showStatsMainView();
     }
-
-    this.resetScrollPosition(activeContent);
   }
 
   resetScrollPosition(activeContainer: HTMLElement | null = null) {
@@ -715,6 +717,62 @@ class ProducerPopup {
         el.scrollTop = 0;
       });
     }
+  }
+
+  // Scrolls `scrollContainer` just enough to bring `itemEl` fully into view
+  // at the bottom of the visible area. If the item is already visible
+  // without scrolling (e.g. it's among the first few items), does nothing.
+  scrollActiveItemIntoView(
+    scrollContainer: HTMLElement | null | undefined,
+    itemEl: HTMLElement | null | undefined,
+  ) {
+    if (!scrollContainer || !itemEl) return;
+
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const itemRect = itemEl.getBoundingClientRect();
+    const containerHeight = containerRect.height;
+    const itemBottomOffset =
+      itemRect.bottom - containerRect.top + scrollContainer.scrollTop;
+
+    // Already visible without scrolling - leave it alone.
+    if (itemBottomOffset <= containerHeight) return;
+
+    const maxScrollTop = Math.max(
+      0,
+      scrollContainer.scrollHeight - containerHeight,
+    );
+    scrollContainer.scrollTop = Math.min(
+      itemBottomOffset - containerHeight,
+      maxScrollTop,
+    );
+  }
+
+  // Scrolls the modes list so the active mode is visible (at the bottom of
+  // the list if it wouldn't otherwise show without scrolling).
+  scrollActiveRuleSetIntoView() {
+    if (!this.ruleSetsList || !this.activeRuleSetId) return;
+    const activeIndex = this.customModes.findIndex(
+      (m) => m.id === this.activeRuleSetId,
+    );
+    if (activeIndex < 0) return;
+    const itemEl = this.ruleSetsList.children[activeIndex] as
+      | HTMLElement
+      | undefined;
+    this.scrollActiveItemIntoView(this.ruleSetsList, itemEl);
+  }
+
+  // Scrolls the session history list so the active session is visible (at
+  // the bottom of the list if it wouldn't otherwise show without scrolling).
+  scrollActiveSessionIntoView() {
+    if (!this.sessionsList || !this.currentSessionId) return;
+    const activeIndex = this.sessions.findIndex(
+      (s) => s.id === this.currentSessionId,
+    );
+    if (activeIndex < 0) return;
+    const itemEl = this.sessionsList.children[activeIndex] as
+      | HTMLElement
+      | undefined;
+    this.scrollActiveItemIntoView(this.sessionsList.parentElement, itemEl);
   }
 
   async loadState() {
@@ -3054,6 +3112,9 @@ class ProducerPopup {
   }
 
   startCreatingRuleSet() {
+    // Clear all inputs to ensure a clean starting state for the new mode
+    this.clearAllInputs();
+
     // Create a temporary rule set with default settings
     this.tempRuleSet = {
       id: "temp-" + Date.now(),
@@ -3195,6 +3256,9 @@ class ProducerPopup {
   }
 
   editRuleSet(id: string) {
+    // Clear all inputs to ensure a clean starting state for this edit session
+    this.clearAllInputs();
+
     this.currentEditingRuleSetId = id;
     this.showRulesEditView();
 
@@ -3284,6 +3348,7 @@ class ProducerPopup {
     this.isCreatingNewRuleSet = false;
     this.tempRuleSet = null;
     this.resetScrollPosition(document.getElementById("tab-rules"));
+    this.scrollActiveRuleSetIntoView();
   }
 
   showAllRulesView() {
@@ -3532,9 +3597,12 @@ class ProducerPopup {
   }
 
   showRulesEditView() {
-    // Clear all inputs first to ensure clean state
-    this.clearAllInputs();
-
+    // Note: inputs are NOT cleared here. This view is also reached when
+    // navigating back from sub-views (All Rules, Mode Settings) while
+    // creating/editing a mode, and any unsaved data the user typed there
+    // (name, in-progress rule fields) should be preserved. Callers that are
+    // starting a fresh create/edit session clear inputs themselves before
+    // calling this (see startCreatingRuleSet / editRuleSet).
     if (this.rulesMainView) this.rulesMainView.style.display = "none";
     if (this.rulesEditView) this.rulesEditView.style.display = "block";
     if (this.allRulesView) this.allRulesView.style.display = "none";
@@ -5223,6 +5291,7 @@ class ProducerPopup {
       this.sessionHistoryView.style.display = "block";
     }
     this.resetScrollPosition(document.getElementById("tab-stats"));
+    this.scrollActiveSessionIntoView();
   }
 
   showStatsMainView() {

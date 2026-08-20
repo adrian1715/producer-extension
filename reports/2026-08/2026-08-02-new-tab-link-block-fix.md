@@ -27,8 +27,8 @@ Three separate updates made today:
 
 ## Commits
 
-- `5cd1d3d` — adding rule type update feature
-- `601a6e4` — fixing redirect page blocking bug
+- `d260a41` — adding rule type update feature
+- `b6942da` — fixing redirect page blocking bug
 
 ---
 
