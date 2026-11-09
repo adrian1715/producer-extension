@@ -3,6 +3,7 @@
   "name": "Producer - Focus Extension",
   "version": "2.0.0",
   "description": "Dynamically block distracting websites and URLs to boost your productivity",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArQnJpOwuuwH383k5zkgM5zj3TECkBWy201auZonw8cI3g49gmbV5ehdzuK64QqbAzbzLKzpPFCG5QWwT8UFOos4QuEnO142p05D08SY9liZAznHt1P8+JrvLVru0oCm8I32awMrQaPLY+Y2iQyzp/40Vic60OdR7df35wshTr/h0JtMsydDJW1mi5p9eMJGNYEpQW5i4cEsfgIc0fPIvefsB+fy0/pVk45JnocdjkfLBK7mk2A2DUFmuY3ok4kc0QFWIsGjs/ZKsHFDUjbBbQbSuIS22ZM8Ygy7jy9hS57OHZVhwrT9bb1zxmn9FxFcdC5KOKtSAobEQ1HPoIZRSdQIDAQAB",
   "permissions": ["storage", "tabs"],
   "host_permissions": ["<all_urls>"],
   "background": {

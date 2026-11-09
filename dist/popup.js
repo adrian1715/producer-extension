@@ -4062,8 +4062,8 @@ class ProducerPopup {
             this.blockPageShowActionButtons.checked =
                 this.currentBlockPageShowActionButtons;
         }
-        // Update preview
-        this.updatePreview();
+        // Update preview (no auto-save: the UI is only mirroring saved state)
+        this.updatePreview(false);
         // Set active theme option
         this.themeOptions.forEach((option) => {
             if (option.getAttribute("data-theme") === this.currentTheme) {
@@ -4080,7 +4080,7 @@ class ProducerPopup {
             return fallback;
         return `linear-gradient(140deg, rgba(10, 15, 31, 0.4), rgba(10, 15, 31, 0.6)), url("${imageUrl}"), ${fallback}`;
     }
-    updatePreview() {
+    updatePreview(autoSave = true) {
         const defaults = this.getDefaultBlockPageSettings();
         const settings = this.getBlockPageSettingsFromInputs();
         if (this.previewTitle) {
@@ -4117,7 +4117,7 @@ class ProducerPopup {
             previewSessionTime.style.color = settings.accentColor;
         }
         // If explicit save button was removed, persist personalization automatically.
-        if (!this.savePersonalizationBtn && this.isLoaded) {
+        if (autoSave && !this.savePersonalizationBtn && this.isLoaded) {
             this.schedulePersonalizationAutoSave();
         }
     }
@@ -4202,6 +4202,9 @@ class ProducerPopup {
         this.currentBlockPageUseThemeColors = true;
         this.currentBlockPageShowActionButtons = defaults.showActionButtons;
         this.loadPersonalizationUI();
+        if (!this.savePersonalizationBtn) {
+            void this.savePersonalization(true);
+        }
         this.showNotification("Block page settings reset");
     }
     /**
